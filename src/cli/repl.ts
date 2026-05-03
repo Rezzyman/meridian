@@ -18,7 +18,7 @@ import { COMMAND_REGISTRY } from './commands/registry.js';
 import { colors } from '../utils/truecolor.js';
 
 const PROMPT = `${colors.cyan('❯')} `;
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const RELEASE_DATE = '2026.4.27';
 
 export interface ReplOptions {

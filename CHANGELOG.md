@@ -2,6 +2,27 @@
 
 All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
+## [1.0.1] - 2026-05-03
+
+Same-day post-launch hardening + the public roadmap.
+
+### Added
+
+- **`ROADMAP.md`** at the repo root. The honest feature inventory: what's working today, what's in flight, what's queued, and what is explicitly NOT on the roadmap. Lives publicly so contributors and prospective operators can decide whether Meridian fits without guessing.
+- **VAPI outbound calling.** `VapiChannel.placeOutboundCall(opts)` posts to `api.vapi.ai/call` with phoneNumberId + assistantId + customer.number. Per-call `firstMessage` and `customerName` overrides via `assistantOverrides` so the agent can open with situational context. Surfaced via:
+  - `POST /vapi/call` gateway endpoint (token-auth) — for signup wizards and automation triggers
+  - `meridian voice call <to>` CLI subcommand — for ad-hoc smoke tests
+- **`skeleton/web/chat.html`** — single-file portable browser chat UI. Zero dependencies, zero build, opens straight from `file://` or any static host. Operator pastes their gateway URL + bearer token (saved to localStorage), starts chatting. Targets the largest UX gap for non-CLI operators: a chat surface they can see immediately.
+
+### Changed
+
+- **`cortex.recall` is hard-capped at 8 seconds per turn.** Voyage rate limits and CORTEX stalls would previously hang turns 3-5 minutes; now the agent proceeds without memory rather than freezing the channel. Timeout is logged explicitly so it surfaces in observability.
+- **Gateway logs CORTEX health at boot.** If the backend is unreachable, the warning lands at startup with the concrete URL and error rather than the operator hitting a generic failure on the first `/chat` call.
+
+### Removed nothing.
+
+[1.0.1]: https://github.com/Rezzyman/meridian/releases/tag/v1.0.1
+
 ## [1.0.0] - 2026-05-03
 
 First public open-source release of Meridian.

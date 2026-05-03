@@ -46,7 +46,7 @@ const program = new Command();
 program
   .name('meridian')
   .description('Meridian: the cognitive agent runtime by ATERNA AI')
-  .version('1.0.0');
+  .version('1.0.1');
 
 program
   .option('-a, --agent <slug>', 'agent slug (overrides MERIDIAN_AGENT env)')
