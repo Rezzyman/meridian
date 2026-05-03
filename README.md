@@ -125,6 +125,7 @@ Bring channels online and start chatting:
 ```bash
 meridian gateway                 # HTTP gateway on :18889 + Telegram + voice
 meridian                         # interactive REPL
+open skeleton/web/chat.html      # browser chat UI (paste your gateway URL + token)
 ```
 
 Add a specialist that inherits the hub's CONTEXT and MEMORY:
