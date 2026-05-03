@@ -233,7 +233,7 @@ The public release uses CORTEX by default. Quartz lives behind the same `MemoryP
 
 ## Status
 
-**v1.2.0**, first public release. Reserve a design-partner slot at [aterna.ai/meridian](https://aterna.ai/meridian).
+**v1.0.0**, first public release. Reserve a design-partner slot at [aterna.ai/meridian](https://aterna.ai/meridian). The full feature inventory (working today, in flight, on roadmap, not on roadmap) lives in [ROADMAP.md](ROADMAP.md).
 
 What's new in 1.2:
 - **MemoryProvider seam.** Pluggable memory backend. CORTEX is the open-source default; ATERNA-licensed Quartz drops in via `MERIDIAN_MEMORY_PROVIDER=quartz` with graceful fallback when absent.
