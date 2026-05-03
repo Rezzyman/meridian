@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = resolve(here, '..');
+const built = resolve(root, 'dist/cli/main.js');
+const source = resolve(root, 'src/cli/main.ts');
+
+// Suppress deprecation warnings at the launcher level so they don't print
+// before main.ts gets a chance to silence them. Kills node 22's punycode
+// DEP0040 whine without nuking real warnings inside the runtime.
+const baseOpts = (process.env.NODE_OPTIONS || '').trim();
+const merged = baseOpts.includes('--no-deprecation')
+  ? baseOpts
+  : `${baseOpts} --no-deprecation`.trim();
+const env = { ...process.env, NODE_OPTIONS: merged };
+
+if (existsSync(built)) {
+  await import(built);
+} else {
+  // Dev mode: run via tsx
+  const tsx = resolve(root, 'node_modules/.bin/tsx');
+  const child = spawn(tsx, [source, ...process.argv.slice(2)], {
+    stdio: 'inherit',
+    env,
+  });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}

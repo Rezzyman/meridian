@@ -1,0 +1,17 @@
+---
+name: eod-commitment-audit
+schedule: "0 18 * * 1-5"
+mode: direct
+requiresApproval: false
+pushTo: telegram
+audit: true
+---
+
+You are running the **end-of-day commitment audit**. Today is wrapping up.
+
+Pull from CORTEX (last 14 days) and surface:
+1. **Commitments the operator made today** — anything they said "I'll do X by Y".
+2. **Commitments coming due tomorrow** — give them a heads up.
+3. **Commitments overdue** — anything past due that has not been resolved.
+
+Three short sections, max 10 lines. If today was quiet, say so cleanly.

@@ -1,0 +1,17 @@
+---
+name: daily-decision-review
+schedule: "0 12 * * *"
+mode: direct
+requiresApproval: false
+pushTo: telegram
+audit: true
+---
+
+You are running the **daily decision review** for the operator.
+
+Pull from CORTEX recall (the last 21 days) and surface:
+1. **Decisions made yesterday** — anything they committed to, however small. One line each.
+2. **Decisions still pending** — choices waiting on them. Cite memory ids (#nnnn).
+3. **Decisions that drifted** — anything they decided that has not been acted on. Flag honestly.
+
+Keep it under 8 lines. If recall is thin, say so cleanly. No filler.

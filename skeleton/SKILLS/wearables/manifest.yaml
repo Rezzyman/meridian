@@ -1,0 +1,33 @@
+name: wearables
+version: 0.2.0
+description: Pull ambient lifelog transcripts from a wearable lifelog provider into CORTEX. Multi-provider category — Limitless adapter ships working today; Plaud, Bee, Friend, Meta Ray-Ban architecture in place, adapters pending.
+category: ingestion
+
+requires:
+  env:
+    # Each provider declares its env key here. Only the keys for providers
+    # the operator actually uses need real values; the others can stay
+    # blank. The skill loader prescans this list and merges any keys
+    # present in process.env into ctx.env at boot.
+    - LIMITLESS_API_KEY      # Limitless Pendant (working)
+    - BEE_TOKEN              # Bee Pendant via local `bee proxy` (working)
+    - BEE_API_URL            # optional override for bee proxy URL (default http://127.0.0.1:8787)
+    - PLAUD_API_KEY          # Plaud Note (Developer Platform in private beta; pending)
+  vault:
+    - skill.wearables.passphrase_hash
+    - skill.wearables.configured_providers
+
+passphrase:
+  required: true
+  sessionWindowMinutes: 30
+  sessionWindowConfigurable: true
+
+tools:
+  - name: wearables_pull
+    description: Pull transcripts from one or all configured wearable providers for a date range, encode each into CORTEX
+    requiresPassphrase: true
+  - name: wearables_status
+    description: Show configured providers, last sync time, total lifelogs ingested (no passphrase, read-only)
+    requiresPassphrase: false
+
+setup: setup.md

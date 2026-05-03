@@ -1,0 +1,19 @@
+name: web-search
+version: 0.1.0
+description: Real-time web search and answer extraction via Tavily
+category: research
+
+requires:
+  vault:
+    - skill.web-search.tavily_api_key
+
+passphrase:
+  required: false
+
+tools:
+  - name: web_search
+    description: Search the live web and return ranked results with snippets
+  - name: web_answer
+    description: Ask a question and get a synthesized answer with cited sources
+
+setup: setup.md

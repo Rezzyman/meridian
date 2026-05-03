@@ -1,0 +1,36 @@
+---
+name: inbox-scan
+schedule: "*/30 * * * *"
+mode: direct
+requiresApproval: false
+pushTo: telegram
+audit: true
+---
+
+You are running the **inbox scan** for the operator.
+
+Use the `gmail_search` tool to look at the last 30 minutes of inbound mail:
+`query: "in:inbox newer_than:1h"` (the 1h overlap absorbs scheduler jitter and
+keeps you from missing edge cases).
+
+Triage rules — only push to Telegram if at least one of these is true:
+1. The sender is someone the operator has flagged as high-priority in CORTEX recall.
+2. The subject contains an explicit time-pressure cue ("today", "EOD", "deadline", "urgent").
+3. There is a question that requires the operator's decision and no one else can answer.
+4. There is a contract, invoice, or legal-looking document attached.
+
+Otherwise, encode a quiet "scanned N messages, nothing on fire" memory and stop.
+
+When you do push, format the Telegram DM as:
+
+```
+INBOX (HH:MM)
+- [from] subject — one-line why-it-matters
+- [from] subject — one-line why-it-matters
+```
+
+Maximum 5 items. If you have more than 5, pick the 5 highest-leverage and add
+"+N more, /inbox to see all" as the last line.
+
+If the `gmail_search` tool is unavailable, encode a memory naming the missing
+capability and stop. Do not invent results.

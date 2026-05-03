@@ -1,0 +1,33 @@
+name: github
+version: 0.1.0
+description: Read + comment on GitHub issues, PRs, and releases via the operator's personal access token
+category: integrations
+
+requires:
+  vault:
+    - skill.github.token              # PAT (classic or fine-grained)
+    - skill.github.default_owner      # optional, default org/user for unscoped queries
+    - skill.github.default_repo       # optional, default repo for unscoped queries
+
+passphrase:
+  required: false
+
+tools:
+  - name: gh_repo_summary
+    description: One-shot snapshot of a repo (open PRs, recent issues, release status)
+  - name: gh_issues_list
+    description: List issues in a repo with filters (state, label, assignee, since)
+  - name: gh_issue_get
+    description: Read a single issue with comments
+  - name: gh_issue_comment
+    description: Post a comment on an issue or PR
+  - name: gh_prs_list
+    description: List pull requests in a repo with filters
+  - name: gh_pr_get
+    description: Read a single PR including diff stats and review status
+  - name: gh_search_code
+    description: Search code across the operator's accessible repos
+  - name: gh_my_open
+    description: List everything currently assigned to or authored by the operator across repos
+
+setup: setup.md

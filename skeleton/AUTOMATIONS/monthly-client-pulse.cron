@@ -1,0 +1,17 @@
+---
+name: monthly-client-pulse
+schedule: "0 9 1 * *"
+mode: direct
+requiresApproval: false
+pushTo: telegram
+audit: true
+---
+
+You are running the **monthly client pulse** on the first of the month.
+
+Pull from CORTEX (last 35 days) and compose a client-by-client status:
+- For each known client/account: last contact date, current status, open items
+- Flag any client where there has been no activity for 14+ days (relationship risk)
+- Flag any open invoice or payment issue
+
+Group by client name. Cite memory ids. Keep each client to 2-3 lines.

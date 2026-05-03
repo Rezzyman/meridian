@@ -1,0 +1,406 @@
+/**
+ * Meridian config schemas. Single source of truth for runtime + intake + agent OS layers.
+ * Every config crosses through zod before reaching code paths.
+ */
+
+import { z } from 'zod';
+
+// ─── Per-agent isolation triad (env-loaded) ────────────────────────────────────
+export const AgentEnvSchema = z.object({
+  MERIDIAN_AGENT: z.string().min(1, 'agent slug required'),
+  CORTEX_AGENT_ID: z.string().min(1),
+  NEON_DATABASE_URL: z.string().url('Neon Postgres URL required'),
+  VOYAGE_API_KEY: z.string().min(20, 'Voyage AI key required for embeddings'),
+  OPENROUTER_API_KEY: z.string().min(20).optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),
+
+  // VAPI voice channel (optional but headline)
+  VAPI_API_KEY: z.string().optional(),
+  VAPI_PHONE_NUMBER_ID: z.string().optional(),
+  VAPI_ASSISTANT_ID: z.string().optional(),
+  VAPI_WEBHOOK_SECRET: z.string().optional(),
+
+  // Telegram
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_DEFAULT_CHAT_ID: z.string().optional(),
+
+  // Gateway
+  MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
+  MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
+
+  // CORTEX server URL (used by CortexBind)
+  MERIDIAN_CORTEX_URL: z.string().url().optional(),
+
+  // Memory provider selection. "cortex" is the open-source default;
+  // "quartz" lazy-loads @aterna/quartz and falls back to cortex on failure.
+  MERIDIAN_MEMORY_PROVIDER: z.enum(['cortex', 'quartz']).default('cortex'),
+
+  // ngrok auth token (optional, for tunnel automation)
+  NGROK_AUTHTOKEN: z.string().optional(),
+});
+
+export type AgentEnv = z.infer<typeof AgentEnvSchema>;
+
+// ─── Provider config (runtime) ─────────────────────────────────────────────────
+export const ProviderRefSchema = z.object({
+  provider: z.enum(['openrouter', 'anthropic', 'openai', 'ollama']),
+  model: z.string(),
+  alias: z.string().optional(),
+});
+export type ProviderRef = z.infer<typeof ProviderRefSchema>;
+
+export const ModelChainSchema = z.object({
+  primary: z.string(), // e.g. "openrouter/anthropic/claude-haiku-4.5"
+  fallbacks: z.array(z.string()).default([]),
+  smartRouting: z
+    .object({
+      enabled: z.boolean().default(true),
+      maxSimpleChars: z.number().default(200),
+      maxSimpleWords: z.number().default(35),
+      cheapModel: z.string().default('openrouter/anthropic/claude-haiku-4.5'),
+    })
+    .default({
+      enabled: true,
+      maxSimpleChars: 200,
+      maxSimpleWords: 35,
+      cheapModel: 'openrouter/anthropic/claude-haiku-4.5',
+    }),
+});
+export type ModelChain = z.infer<typeof ModelChainSchema>;
+
+// ─── Heartbeat & active hours ──────────────────────────────────────────────────
+export const HeartbeatSchema = z.object({
+  enabled: z.boolean().default(true),
+  every: z.string().default('2h'),
+  activeHours: z.object({
+    start: z.string().default('06:00'),
+    end: z.string().default('23:30'),
+  }),
+  model: z.string().default('openrouter/anthropic/claude-haiku-4.5'),
+  target: z.string().default('last'),
+  ackMaxChars: z.number().default(500),
+});
+export type Heartbeat = z.infer<typeof HeartbeatSchema>;
+
+// ─── Channels ──────────────────────────────────────────────────────────────────
+export const ChannelConfigSchema = z.object({
+  cli: z.object({ enabled: z.boolean().default(true) }).default({ enabled: true }),
+  telegram: z
+    .object({
+      enabled: z.boolean().default(false),
+      defaultChatId: z.string().optional(),
+    })
+    .default({ enabled: false }),
+  vapi: z
+    .object({
+      enabled: z.boolean().default(false),
+      phoneNumberId: z.string().optional(),
+      assistantId: z.string().optional(),
+      voicePersona: z
+        .enum(['warm_professional', 'friendly_casual', 'authoritative', 'energetic', 'calm_concierge'])
+        .default('warm_professional'),
+    })
+    .default({ enabled: false }),
+  gateway: z
+    .object({
+      enabled: z.boolean().default(false),
+      port: z.number().default(18889),
+    })
+    .default({ enabled: false }),
+});
+export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
+
+// ─── Dream cycle config ────────────────────────────────────────────────────────
+export const DreamConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  schedule: z.string().default('0 2 * * *'), // 02:00 nightly
+  mode: z.enum(['full', 'first-deploy', 'consolidate-only']).default('full'),
+  inProcess: z.boolean().default(true),
+});
+export type DreamConfig = z.infer<typeof DreamConfigSchema>;
+
+// ─── Per-agent tool allowlist ──────────────────────────────────────────────────
+// Tools an agent can actually call, scoped by channel. The chat surface
+// (voice, telegram, gateway HTTP) defaults to a safe conversational set;
+// the REPL defaults to the full power-user set.
+//
+// Why this exists: Sonnet 4.6 will reach for `bash` on any "look up X"
+// prompt and hallucinate results when it returns empty. A chat agent
+// should never have shell. A DevOps agent on REPL might want it. This
+// schema makes that an explicit per-agent decision instead of a hardcoded
+// default.
+const CHAT_SAFE_DEFAULT = ['web_fetch', 'voice_status', 'cortex_dream', 'telegram_dm'] as const;
+const CLI_SAFE_DEFAULT = [
+  'web_fetch',
+  'voice_status',
+  'cortex_dream',
+  'telegram_dm',
+  'bash',
+  'read',
+  'write',
+] as const;
+export const ToolsConfigSchema = z.object({
+  chat: z.array(z.string()).default([...CHAT_SAFE_DEFAULT]),
+  cli: z.array(z.string()).default([...CLI_SAFE_DEFAULT]),
+});
+export type ToolsConfig = z.infer<typeof ToolsConfigSchema>;
+export const TOOLS_CHAT_DEFAULT = CHAT_SAFE_DEFAULT;
+export const TOOLS_CLI_DEFAULT = CLI_SAFE_DEFAULT;
+
+// ─── Proactive sentinel config ─────────────────────────────────────────────────
+// What turns the agent from "responsive" into "real partner". Scheduled
+// recall passes that surface things on the operator's behalf without being
+// asked. Off by default for new agents; explicitly enabled per-agent.
+export const ProactiveConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  morningBriefSchedule: z.string().default('0 7 * * *'), // 07:00 local daily
+  hourlyNudgesEnabled: z.boolean().default(false),
+  hourlyNudgeSchedule: z.string().default('0 9-21 * * *'), // 09:00..21:00 hourly
+});
+export type ProactiveConfig = z.infer<typeof ProactiveConfigSchema>;
+
+// ─── Operator (the human the agent answers to) ────────────────────────────────
+// One canonical operator per agent. Used to stitch sessions across channels —
+// a voice call from a known number, a Telegram message from a trusted chat ID,
+// and a REPL invocation by a known OS user all resolve to the same operator
+// and share one continuous Conversation. This is what makes Meridian's
+// agents feel like real partners across surfaces, not chatbots-per-channel.
+export const OperatorConfigSchema = z.object({
+  id: z.string().min(1).default('primary'),
+  name: z.string().optional(),
+  email: z.string().email().optional(),
+  channels: z
+    .object({
+      telegram: z.array(z.string()).default([]),
+      voice: z.array(z.string()).default([]),
+      cli: z.array(z.string()).default([]),
+    })
+    .default({ telegram: [], voice: [], cli: [] }),
+});
+export type OperatorConfig = z.infer<typeof OperatorConfigSchema>;
+
+// ─── Top-level agent config (config.yaml) ──────────────────────────────────────
+export const AgentConfigSchema = z.object({
+  agent: z.object({
+    slug: z.string().min(1),
+    name: z.string().min(1),
+    role: z.string().default('assistant'),
+    template: z.string().optional(), // e.g. "chief_of_staff"
+    inheritsFrom: z.string().optional(), // hub agent slug
+    maxTurns: z.number().int().default(60),
+    gatewayTimeoutSec: z.number().int().default(1800),
+    reasoningEffort: z.enum(['off', 'low', 'medium', 'high']).default('medium'),
+  }),
+  operator: OperatorConfigSchema.optional(),
+  models: ModelChainSchema,
+  channels: ChannelConfigSchema,
+  heartbeat: HeartbeatSchema,
+  dream: DreamConfigSchema,
+  proactive: ProactiveConfigSchema.optional(),
+  tools: ToolsConfigSchema.optional(),
+  cortex: z.object({
+    agentId: z.string(),
+    recallTopK: z.number().int().default(8),
+    encodeOnTurn: z.boolean().default(true),
+    valenceInference: z.boolean().default(true),
+  }),
+});
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+
+// ─── Seven-layer AgentOS spine ─────────────────────────────────────────────────
+export const AgentOSLayerName = z.enum([
+  'IDENTITY',
+  'CONTEXT',
+  'SKILLS',
+  'MEMORY',
+  'CONNECTIONS',
+  'VERIFICATION',
+  'AUTOMATIONS',
+]);
+export type AgentOSLayerName = z.infer<typeof AgentOSLayerName>;
+
+export const ContextFileFrontmatterSchema = z.object({
+  title: z.string(),
+  owner: z.string().default('user'),
+  lastUpdated: z.string(), // ISO date
+  stalenessThresholdDays: z.number().int().default(30),
+  tags: z.array(z.string()).default([]),
+});
+
+export const SkillManifestSchema = z.object({
+  name: z.string().min(1),
+  description: z.string(),
+  category: z.string().default('general'),
+  trigger: z.string().optional(),
+  sources: z.array(z.string()).default([]),
+  output_format: z.string().optional(),
+  version: z.string().default('0.1.0'),
+  runtime: z.enum(['markdown', 'ts', 'py', 'sh']).default('markdown'),
+  entrypoint: z.string().optional(),
+});
+export type SkillManifest = z.infer<typeof SkillManifestSchema>;
+
+// ─── Skill manifest v2 (manifest.yaml) ─────────────────────────────────────────
+// Skills with executable code ship a manifest.yaml alongside SKILL.md. The
+// manifest declares: required env vars, required vault entries (secrets),
+// required OAuth flow, passphrase guard config, and the named tools the
+// skill provides. This is what makes a skill installable, configurable,
+// and walkthrough-aware.
+export const SkillManifestV2Schema = z.object({
+  name: z.string().min(1),
+  version: z.string().default('0.1.0'),
+  description: z.string(),
+  category: z.string().default('general'),
+  requires: z
+    .object({
+      env: z.array(z.string()).default([]),
+      vault: z.array(z.string()).default([]),
+      oauth: z
+        .object({
+          provider: z.string(),
+          scopes: z.array(z.string()).default([]),
+          authUrl: z.string().url().optional(),
+          tokenUrl: z.string().url().optional(),
+        })
+        .optional(),
+    })
+    .default({ env: [], vault: [] }),
+  passphrase: z
+    .object({
+      required: z.boolean().default(false),
+      sessionWindowMinutes: z.number().int().default(30),
+      sessionWindowConfigurable: z.boolean().default(true),
+    })
+    .optional(),
+  tools: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        requiresPassphrase: z.boolean().default(false),
+      }),
+    )
+    .default([]),
+  setup: z.string().optional(), // path to setup walkthrough markdown
+});
+export type SkillManifestV2 = z.infer<typeof SkillManifestV2Schema>;
+
+export const VerificationCheckSchema = z.object({
+  name: z.string().min(1),
+  skill: z.string().min(1),
+  trigger: z.enum(['always', 'on_output', 'on_tool_use']).default('on_output'),
+  helper: z.enum([
+    'tone_match',
+    'factual_check',
+    'numeric_validation',
+    'policy_compliance',
+    'pii_redaction',
+    'custom',
+  ]),
+  severity: z.enum(['block', 'warn']).default('warn'),
+  config: z.record(z.unknown()).default({}),
+});
+export type VerificationCheck = z.infer<typeof VerificationCheckSchema>;
+
+export const AutomationJobSchema = z.object({
+  name: z.string().min(1),
+  schedule: z.string(), // cron expression
+  prompt: z.string(),
+  mode: z.enum(['draft', 'direct']).default('draft'),
+  requiresApproval: z.boolean().default(true),
+  audit: z.boolean().default(true),
+  trustGraduation: z
+    .object({
+      minRuns: z.number().int().default(10),
+      minApprovalRate: z.number().default(0.95),
+    })
+    .optional(),
+});
+export type AutomationJob = z.infer<typeof AutomationJobSchema>;
+
+export const ConnectionConfigSchema = z.object({
+  system: z.string(), // calendar | inbox | slack | jira | salesforce | custom
+  mode: z.enum(['read', 'read-write']).default('read'),
+  audit: z.boolean().default(true),
+  scopes: z.array(z.string()).default([]),
+  secret_ref: z.string().optional(),
+});
+export type ConnectionConfig = z.infer<typeof ConnectionConfigSchema>;
+
+// ─── 10-question intake (drives meridian deploy) ───────────────────────────────
+export const IntakeSchema = z.object({
+  q1_business_name: z.string().min(1),
+  q2_business_one_liner: z.string().min(10),
+  q3_agent_name: z.string().min(1),
+  q4_agent_role: z.enum([
+    'receptionist',
+    'sales_qualifier',
+    'support_triage',
+    'booking_concierge',
+    'outbound_caller',
+    'chief_of_staff',
+    'custom',
+  ]),
+  q5_phone_strategy: z.enum(['new_vapi_number', 'port_existing', 'no_voice']),
+  q6_voice_persona: z.enum([
+    'warm_professional',
+    'friendly_casual',
+    'authoritative',
+    'energetic',
+    'calm_concierge',
+  ]),
+  q7_business_hours: z.string(),
+  q8_knowledge_seed: z.string(),
+  q9_handoff_human: z.object({
+    name: z.string(),
+    phone: z.string(),
+    email: z.string().email(),
+    triggers: z.array(z.string()),
+  }),
+  q10_extra_channels: z.array(z.enum(['telegram', 'slack', 'sms', 'email', 'none'])).default([]),
+});
+export type Intake = z.infer<typeof IntakeSchema>;
+
+// ─── Defaults helper ───────────────────────────────────────────────────────────
+export const defaultAgentConfig = (slug: string, name: string): AgentConfig => ({
+  agent: {
+    slug,
+    name,
+    role: 'assistant',
+    maxTurns: 60,
+    gatewayTimeoutSec: 1800,
+    reasoningEffort: 'medium',
+  },
+  models: {
+    primary: 'openrouter/anthropic/claude-haiku-4.5',
+    fallbacks: [
+      'openrouter/anthropic/claude-sonnet-4.6',
+      'ollama/qwen2.5:14b',
+      'ollama/hermes3:8b',
+    ],
+    smartRouting: {
+      enabled: true,
+      maxSimpleChars: 200,
+      maxSimpleWords: 35,
+      cheapModel: 'openrouter/anthropic/claude-haiku-4.5',
+    },
+  },
+  channels: {
+    cli: { enabled: true },
+    telegram: { enabled: false },
+    vapi: { enabled: false, voicePersona: 'warm_professional' },
+    gateway: { enabled: false, port: 18889 },
+  },
+  heartbeat: {
+    enabled: true,
+    every: '2h',
+    activeHours: { start: '06:00', end: '23:30' },
+    model: 'openrouter/anthropic/claude-haiku-4.5',
+    target: 'last',
+    ackMaxChars: 500,
+  },
+  dream: { enabled: true, schedule: '0 2 * * *', mode: 'full', inProcess: true },
+  cortex: { agentId: slug, recallTopK: 8, encodeOnTurn: true, valenceInference: true },
+});

@@ -1,0 +1,34 @@
+name: google
+version: 0.2.0
+description: Read + draft for Gmail, Google Calendar, Google Drive via the bundled gog CLI
+category: integrations
+
+requires:
+  vault:
+    - skill.google.accounts        # JSON array of authorized {email, scopes} objects
+    - skill.google.client          # optional override; defaults to <agent>-meridian
+  tools:
+    - gog                          # bundled by Meridian's gog resolver (steipete/gogcli, MIT)
+
+passphrase:
+  required: false
+
+tools:
+  - name: gmail_search
+    description: Search a Gmail mailbox by query
+  - name: gmail_get
+    description: Fetch full body of a Gmail message
+  - name: gmail_draft
+    description: Create a Gmail draft (never sends)
+  - name: gcal_today
+    description: List today's calendar events
+  - name: gcal_upcoming
+    description: List upcoming calendar events for the next N days
+  - name: gcal_schedule
+    description: Draft (or with confirm:true, create) a calendar event
+  - name: gdrive_search
+    description: Search Google Drive
+  - name: gdrive_read
+    description: Read the contents of a Drive file
+
+setup: setup.md
