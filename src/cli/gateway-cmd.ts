@@ -62,6 +62,38 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
   const cortex = bindCortex(env.CORTEX_AGENT_ID, env.MERIDIAN_CORTEX_URL);
   const router = new ProviderRouter(env);
 
+  // Boot-time CORTEX health check. If the backend is unreachable at start,
+  // log a clear warning so the operator knows recall + encode will fail
+  // until CORTEX comes online. Don't refuse to boot — the gateway is still
+  // useful for setup commands, doctor, etc. when CORTEX is down. But the
+  // first turn will be louder about why memory isn't working.
+  try {
+    const bootHealth = await Promise.race([
+      cortex.health(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('cortex health probe timed out (3s)')), 3000),
+      ),
+    ]);
+    if (bootHealth.status === 'ok') {
+      logger.info({ event: 'cortex.health', status: 'ok', url: cortex.baseUrl, msg: 'CORTEX backend reachable' });
+    } else {
+      logger.warn({
+        event: 'cortex.health',
+        status: bootHealth.status,
+        url: cortex.baseUrl,
+        msg: `CORTEX backend reports degraded/down at boot — recall + encode may fail`,
+      });
+    }
+  } catch (err) {
+    logger.warn({
+      event: 'cortex.health',
+      status: 'unreachable',
+      url: cortex.baseUrl,
+      err: (err as Error).message,
+      msg: 'CORTEX backend unreachable at boot — recall + encode will fail until it comes online',
+    });
+  }
+
   // Memory provider seam (Phase 4). MERIDIAN_MEMORY_PROVIDER=quartz lights
   // the proprietary recall pipeline up on every conversation turn through
   // the gateway (Telegram, voice, VAPI, web channels). Encode + dream still

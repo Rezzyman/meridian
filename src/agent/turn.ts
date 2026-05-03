@@ -127,13 +127,24 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // 1500 token budget: enough to seed deep context, small enough to keep
   // Sonnet generation snappy. The model can fetch more via cortex_search
   // tool if it needs depth.
+  //
+  // Hard-cap recall at RECALL_TIMEOUT_MS (default 8s). Voyage rate limits
+  // and CORTEX server stalls can otherwise hang the entire turn for 3-5
+  // minutes, blocking the channel from responding. If recall times out we
+  // proceed without memory rather than freezing the operator.
+  const RECALL_TIMEOUT_MS = 8000;
   let recallSummary = '';
   let recallCount = 0;
   let recallMemoryIds: number[] = [];
   let recallArtifactIds: number[] = [];
   let recallTokenCount = 0;
   try {
-    const r = await ctx.cortex.recall(userInput, { tokenBudget: 1500, sensitivityFilter });
+    const r = await Promise.race([
+      ctx.cortex.recall(userInput, { tokenBudget: 1500, sensitivityFilter }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`cortex recall timed out after ${RECALL_TIMEOUT_MS}ms`)), RECALL_TIMEOUT_MS),
+      ),
+    ]);
     recallSummary = r.context;
     recallCount = r.memories.length;
     recallMemoryIds = r.memories.map((m) => m.id);
@@ -141,7 +152,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     recallTokenCount = r.tokenCount ?? 0;
     ctx.logger.debug({ msg: 'cortex recall', tokens: r.tokenCount, memories: r.memories.length, sensitivityFilter });
   } catch (err) {
-    ctx.logger.warn({ msg: 'cortex recall failed; proceeding without memory', err });
+    ctx.logger.warn({ msg: 'cortex recall failed or timed out; proceeding without memory', err: (err as Error).message });
   }
 
   // 2) Compose system prompt with recall injection
