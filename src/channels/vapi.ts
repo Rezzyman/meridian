@@ -83,11 +83,98 @@ export class VapiChannel implements ChannelAdapter {
     telegramDM?: (text: string) => Promise<void>;
     executeTool?: VapiToolExecutor;
     voiceGuard?: VoiceSessionGuard;
+    /** VAPI API key for outbound calls. Required when placeOutboundCall() is used. */
+    vapiApiKey?: string;
+    /** Default phoneNumberId for outbound calls. Optional override per call. */
+    phoneNumberId?: string;
+    /** Default assistantId for outbound calls. Optional override per call. */
+    assistantId?: string;
   }) {
     this.cortex = opts.cortex;
     this.telegramDM = opts.telegramDM;
     this.executeTool = opts.executeTool;
     this.voiceGuard = opts.voiceGuard;
+  }
+
+  /**
+   * Place an outbound voice call via VAPI. Required for the onboarding
+   * "agent calls you to introduce itself" moment, after-hours proactive
+   * follow-ups, and any flow where Meridian initiates the conversation.
+   *
+   * Caller supplies the target E.164 number and optional per-call overrides
+   * (assistant override for a call-specific persona, custom firstMessage so
+   * the agent opens with context the caller hasn't given yet).
+   */
+  async placeOutboundCall(opts: {
+    /** E.164 number, e.g. "+13035551234". */
+    to: string;
+    /** Override the configured phoneNumberId for this call. */
+    phoneNumberId?: string;
+    /** Override the configured assistantId for this call. */
+    assistantId?: string;
+    /** First spoken message; if omitted, the assistant uses its configured opener. */
+    firstMessage?: string;
+    /** Customer name passed to the assistant for personalized greetings. */
+    customerName?: string;
+    /** Free-form metadata stamped on the call record (operator id, signup flow id, etc). */
+    metadata?: Record<string, unknown>;
+  }): Promise<{ id: string; status: string }> {
+    const apiKey = this.opts.vapiApiKey;
+    if (!apiKey) {
+      throw new Error(
+        'VAPI_API_KEY not configured on the channel. Set it in the agent .env and rebuild the gateway with the key passed into VapiChannel options.',
+      );
+    }
+    const phoneNumberId = opts.phoneNumberId ?? this.opts.phoneNumberId;
+    const assistantId = opts.assistantId ?? this.opts.assistantId;
+    if (!phoneNumberId) throw new Error('phoneNumberId required for outbound call (set VAPI_PHONE_NUMBER_ID in env or pass per-call).');
+    if (!assistantId) throw new Error('assistantId required for outbound call (set VAPI_ASSISTANT_ID in env or pass per-call).');
+
+    const body: Record<string, unknown> = {
+      phoneNumberId,
+      assistantId,
+      customer: {
+        number: opts.to,
+        ...(opts.customerName ? { name: opts.customerName } : {}),
+      },
+    };
+
+    // Per-call overrides — used when the calling-context (signup wizard,
+    // proactive follow-up) wants the agent to open with a specific line
+    // tailored to the situation. Both are optional.
+    if (opts.firstMessage || opts.customerName) {
+      body.assistantOverrides = {
+        ...(opts.firstMessage ? { firstMessage: opts.firstMessage } : {}),
+        ...(opts.customerName
+          ? { variableValues: { customerName: opts.customerName } }
+          : {}),
+      };
+    }
+    if (opts.metadata) body.metadata = opts.metadata;
+
+    const res = await fetch('https://api.vapi.ai/call', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`VAPI outbound call failed (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const json = (await res.json()) as { id?: string; status?: string };
+    if (!json.id) throw new Error(`VAPI returned no call id; payload: ${JSON.stringify(json).slice(0, 200)}`);
+    this.opts.logger.info({
+      msg: 'vapi outbound call placed',
+      callId: json.id,
+      to: opts.to,
+      assistantId,
+      hasOverride: !!body.assistantOverrides,
+    });
+    return { id: json.id, status: json.status ?? 'queued' };
   }
 
   /** Expose the guard to the gateway so executeTool can check unlock state. */

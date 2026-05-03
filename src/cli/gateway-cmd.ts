@@ -308,6 +308,9 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     vapi = new VapiChannel({
       logger,
       webhookSecret: env.VAPI_WEBHOOK_SECRET,
+      vapiApiKey: env.VAPI_API_KEY,
+      phoneNumberId: env.VAPI_PHONE_NUMBER_ID,
+      assistantId: env.VAPI_ASSISTANT_ID,
       cortex,
       voiceGuard,
       telegramDM: telegram && env.TELEGRAM_DEFAULT_CHAT_ID

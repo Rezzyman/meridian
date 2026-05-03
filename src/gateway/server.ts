@@ -74,6 +74,46 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     return result;
   });
 
+  // Place an outbound voice call via VAPI. Token-gated. Used by the
+  // signup wizard's "agent calls you to introduce itself" moment, by
+  // automations that should reach the operator by phone, and for ad-hoc
+  // tests via `meridian voice call`.
+  app.post<{
+    Body: {
+      to: string;
+      assistantId?: string;
+      phoneNumberId?: string;
+      firstMessage?: string;
+      customerName?: string;
+      metadata?: Record<string, unknown>;
+    };
+    Headers: { authorization?: string };
+  }>('/vapi/call', async (req, reply) => {
+    if (opts.token) {
+      const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (got !== opts.token) {
+        reply.code(401);
+        return { error: 'unauthorized' };
+      }
+    }
+    if (!opts.vapi) {
+      reply.code(404);
+      return { error: 'vapi channel not configured' };
+    }
+    const { to } = req.body ?? { to: '' };
+    if (!to || typeof to !== 'string') {
+      reply.code(400);
+      return { error: 'to (E.164 phone number) required' };
+    }
+    try {
+      const result = await opts.vapi.placeOutboundCall(req.body);
+      return result;
+    } catch (err) {
+      reply.code(500);
+      return { error: (err as Error).message };
+    }
+  });
+
   app.get('/heartbeat', async () => ({
     ok: true,
     ts: new Date().toISOString(),

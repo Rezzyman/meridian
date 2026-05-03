@@ -80,3 +80,62 @@ export function runVoiceStatus(): void {
     console.log(colors.muted('  run `meridian voice passphrase` to configure'));
   }
 }
+
+/**
+ * `meridian voice call <e164-number>` — place an outbound call.
+ *
+ * Calls the active agent's running gateway over HTTP /vapi/call. Requires
+ * the gateway to be running and the agent's .env to have VAPI_API_KEY,
+ * VAPI_PHONE_NUMBER_ID, VAPI_ASSISTANT_ID, MERIDIAN_GATEWAY_TOKEN, and
+ * MERIDIAN_GATEWAY_PORT set.
+ *
+ * Use cases: smoke-test the outbound flow, manually trigger a follow-up
+ * call to a stakeholder, or kick off the onboarding-call moment for a
+ * new operator from the CLI.
+ */
+export async function runVoiceCall(opts: {
+  to: string;
+  firstMessage?: string;
+  customerName?: string;
+}): Promise<void> {
+  const slug = activeAgentSlug();
+  const home = ensureAgentHome(slug);
+  const { loadAgentEnv } = await import('../config/loader.js');
+  const env = loadAgentEnv(home);
+
+  if (!env.VAPI_API_KEY) {
+    console.log(colors.err('VAPI_API_KEY not set in this agent\'s .env'));
+    process.exit(1);
+  }
+  if (!env.MERIDIAN_GATEWAY_TOKEN) {
+    console.log(colors.err('MERIDIAN_GATEWAY_TOKEN not set; gateway HTTP endpoints would be unauthorized'));
+    process.exit(1);
+  }
+  const port = env.MERIDIAN_GATEWAY_PORT ?? 18889;
+  const url = `http://127.0.0.1:${port}/vapi/call`;
+  console.log(colors.muted(`POST ${url} → outbound call to ${opts.to}`));
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.MERIDIAN_GATEWAY_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: opts.to,
+        firstMessage: opts.firstMessage,
+        customerName: opts.customerName,
+      }),
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      console.log(colors.err(`gateway returned ${res.status}: ${body}`));
+      process.exit(1);
+    }
+    console.log(colors.ok(`call queued: ${body}`));
+  } catch (err) {
+    console.log(colors.err(`failed to reach gateway at ${url}: ${(err as Error).message}`));
+    console.log(colors.muted('is the gateway running? (`meridian gateway`)'));
+    process.exit(1);
+  }
+}

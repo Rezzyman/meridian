@@ -40,7 +40,7 @@ import { runOnboard } from './onboard-cmd.js';
 import { pickAgentInteractive } from './agent-picker.js';
 import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup } from './skills-cmd.js';
 import { runIngest } from './ingest-cmd.js';
-import { runVoicePassphrase, runVoiceStatus } from './voice-cmd.js';
+import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
 
 const program = new Command();
 program
@@ -162,6 +162,14 @@ voiceCmd
   .command('status')
   .description('Show whether a voice passphrase is configured')
   .action(() => runVoiceStatus());
+voiceCmd
+  .command('call <to>')
+  .description('Place an outbound voice call to an E.164 number (requires the gateway to be running)')
+  .option('--first-message <text>', 'override the assistant\'s opening line for this call')
+  .option('--customer-name <name>', 'pass a name to the assistant for personalized greetings')
+  .action(async (to: string, opts: { firstMessage?: string; customerName?: string }) => {
+    await runVoiceCall({ to, firstMessage: opts.firstMessage, customerName: opts.customerName });
+  });
 
 // `meridian skills` — list / install / remove skill manifests.
 const skillsCmd = program
