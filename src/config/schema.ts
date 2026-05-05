@@ -14,6 +14,7 @@ export const AgentEnvSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(20).optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
+  GROQ_API_KEY: z.string().optional(),
   OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),
 
   // VAPI voice channel (optional but headline)
@@ -45,7 +46,7 @@ export type AgentEnv = z.infer<typeof AgentEnvSchema>;
 
 // ─── Provider config (runtime) ─────────────────────────────────────────────────
 export const ProviderRefSchema = z.object({
-  provider: z.enum(['openrouter', 'anthropic', 'openai', 'ollama']),
+  provider: z.enum(['openrouter', 'anthropic', 'openai', 'groq', 'ollama']),
   model: z.string(),
   alias: z.string().optional(),
 });

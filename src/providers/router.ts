@@ -11,10 +11,11 @@ import type { LanguageModel } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createGroq } from '@ai-sdk/groq';
 import { createOllama } from 'ollama-ai-provider-v2';
 import type { AgentEnv, ModelChain } from '../config/schema.js';
 
-export type ProviderName = 'openrouter' | 'anthropic' | 'openai' | 'ollama';
+export type ProviderName = 'openrouter' | 'anthropic' | 'openai' | 'groq' | 'ollama';
 
 export interface ResolvedProvider {
   provider: ProviderName;
@@ -66,6 +67,13 @@ export class ProviderRouter {
         }
         const o = createOpenAI({ apiKey: this.env.OPENAI_API_KEY });
         return o(modelId);
+      }
+      case 'groq': {
+        if (!this.env.GROQ_API_KEY) {
+          throw new Error('GROQ_API_KEY missing for groq provider');
+        }
+        const g = createGroq({ apiKey: this.env.GROQ_API_KEY });
+        return g(modelId);
       }
       case 'ollama': {
         const o = createOllama({ baseURL: `${this.env.OLLAMA_BASE_URL}/api` });

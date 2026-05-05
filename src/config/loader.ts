@@ -21,6 +21,7 @@ export function loadAgentEnv(home: MeridianHome): AgentEnv {
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
     OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
     VAPI_API_KEY: process.env.VAPI_API_KEY,
     VAPI_PHONE_NUMBER_ID: process.env.VAPI_PHONE_NUMBER_ID,
@@ -72,6 +73,8 @@ NEON_DATABASE_URL=
 VOYAGE_API_KEY=
 
 # Model providers (at least one required)
+# Groq: free tier, fastest inference. Get a key at https://console.groq.com
+GROQ_API_KEY=
 OPENROUTER_API_KEY=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=

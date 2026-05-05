@@ -2,6 +2,35 @@
 
 All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
+## [1.1.0] - 2026-05-05
+
+Groq added as a first-class model provider.
+
+### Added
+
+- **`groq` provider** in the model router. Set `GROQ_API_KEY` in your agent's `.env` and reference models with the canonical `groq/<model-id>` ref (e.g. `groq/llama-3.3-70b-versatile`). Works everywhere a model ref is accepted: `models.primary`, `models.fallbacks`, `smartRouting.cheapModel`, `heartbeat.model`, skill-level overrides.
+- **`doctor` command checks Groq key uniqueness** alongside Neon, Voyage, and OpenRouter. Sharing a Groq key across agents triggers the same fail signal: rate limits and usage attribution apply to the free tier just as they do to paid providers.
+
+### Why
+
+Groq's free tier (Llama 3.3 70B, Llama 3.1 8B, Mixtral, Gemma) gives operators a real zero-cost path to running an agent end-to-end. Latency on Groq's LPU hardware is markedly lower than the major paid providers, which feels especially good on voice-channel turns and short-prompt classification work. OpenRouter and Anthropic remain first-class for tool-using main-brain models where Sonnet-class reasoning is worth the spend.
+
+### Recommended chain shape
+
+For operators who want premium reasoning plus free fast routing on short turns:
+
+```yaml
+models:
+  primary: openrouter/anthropic/claude-sonnet-4.6
+  fallbacks:
+    - groq/llama-3.3-70b-versatile
+  smartRouting:
+    enabled: true
+    cheapModel: groq/llama-3.3-70b-versatile
+```
+
+[1.1.0]: https://github.com/Rezzyman/meridian/releases/tag/v1.1.0
+
 ## [1.0.1] - 2026-05-03
 
 Same-day post-launch hardening + the public roadmap.

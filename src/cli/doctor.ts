@@ -79,6 +79,7 @@ export async function runDoctor(): Promise<number> {
   const seenNeon = new Map<string, string>();
   const seenVoyage = new Map<string, string>();
   const seenOpenRouter = new Map<string, string>();
+  const seenGroq = new Map<string, string>();
   const triadIssues: string[] = [];
   for (const slug of agents) {
     const home = resolveHome(slug);
@@ -103,6 +104,13 @@ export async function runDoctor(): Promise<number> {
           `OpenRouter key shared between ${seenOpenRouter.get(env.OPENROUTER_API_KEY)} and ${slug}`,
         );
       else seenOpenRouter.set(env.OPENROUTER_API_KEY, slug);
+    }
+    if (env.GROQ_API_KEY) {
+      if (seenGroq.has(env.GROQ_API_KEY))
+        triadIssues.push(
+          `Groq key shared between ${seenGroq.get(env.GROQ_API_KEY)} and ${slug}`,
+        );
+      else seenGroq.set(env.GROQ_API_KEY, slug);
     }
   }
   rows.push(
