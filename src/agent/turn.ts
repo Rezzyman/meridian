@@ -138,12 +138,16 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   let recallMemoryIds: number[] = [];
   let recallArtifactIds: number[] = [];
   let recallTokenCount = 0;
+  let recallTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const r = await Promise.race([
       ctx.cortex.recall(userInput, { tokenBudget: 1500, sensitivityFilter }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`cortex recall timed out after ${RECALL_TIMEOUT_MS}ms`)), RECALL_TIMEOUT_MS),
-      ),
+      new Promise<never>((_, reject) => {
+        recallTimer = setTimeout(
+          () => reject(new Error(`cortex recall timed out after ${RECALL_TIMEOUT_MS}ms`)),
+          RECALL_TIMEOUT_MS,
+        );
+      }),
     ]);
     recallSummary = r.context;
     _recallCount = r.memories.length;
@@ -153,6 +157,10 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     ctx.logger.debug({ msg: 'cortex recall', tokens: r.tokenCount, memories: r.memories.length, sensitivityFilter });
   } catch (err) {
     ctx.logger.warn({ msg: 'cortex recall failed or timed out; proceeding without memory', err: (err as Error).message });
+  } finally {
+    // The race leaves the loser's timer live; clear it so a fast recall
+    // doesn't strand an 8s timer per turn (event-loop noise, test latency).
+    clearTimeout(recallTimer);
   }
 
   // 2) Compose system prompt with recall injection
@@ -222,7 +230,16 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
 
   for (const provider of chain) {
     try {
+      // streamText (ai@4.x) does NOT throw on provider failure: errors are
+      // routed to onError and textStream completes empty. Without capturing
+      // them here the catch below never fires and the fallback chain is
+      // dead code — a failing primary would surface as "All providers
+      // failed" even with healthy fallbacks configured.
+      let streamError: unknown;
       const stream = streamText({
+        onError: ({ error }) => {
+          streamError = error;
+        },
         model: provider.model,
         system,
         messages,
@@ -272,6 +289,9 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       let out = '';
       for await (const delta of stream.textStream) {
         out += delta;
+      }
+      if (streamError !== undefined) {
+        throw streamError instanceof Error ? streamError : new Error(String(streamError));
       }
       reply = out;
       providerUsed = provider.ref;
