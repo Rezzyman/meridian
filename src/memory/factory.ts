@@ -24,6 +24,8 @@ export interface CreateMemoryProviderOptions {
   cortexBaseUrl?: string;
   /** Reuse an existing CortexBind instead of constructing a new one; preferred during boot. */
   cortex?: CortexBind;
+  /** JSONL path for the embedded provider; required when provider=embedded. */
+  embeddedDbPath?: string;
   /** Logger callback for boot-panel observability; defaults to console.warn for fallback notices. */
   log?: (level: 'info' | 'warn', msg: string) => void;
 }
@@ -31,7 +33,7 @@ export interface CreateMemoryProviderOptions {
 export interface CreateMemoryProviderResult {
   provider: MemoryProvider;
   /** Which provider actually ended up active after fallback handling. */
-  selected: 'cortex' | 'quartz';
+  selected: 'cortex' | 'quartz' | 'embedded';
   /** Set when a Quartz selection fell back to CORTEX; useful for the boot panel. */
   fallbackReason?: string;
 }
@@ -40,6 +42,25 @@ export async function createMemoryProvider(
   opts: CreateMemoryProviderOptions,
 ): Promise<CreateMemoryProviderResult> {
   const log = opts.log ?? defaultLog;
+
+  // Embedded: zero-config local memory. No CORTEX bind, no Neon, no Voyage.
+  if (opts.env.MERIDIAN_MEMORY_PROVIDER === 'embedded') {
+    const dbPath = opts.embeddedDbPath;
+    if (!dbPath) {
+      throw new Error('MERIDIAN_MEMORY_PROVIDER=embedded requires embeddedDbPath');
+    }
+    const { EmbeddedMemoryProvider } = await import('./embedded-memory-provider.js');
+    log('info', 'memory provider: embedded (zero-config local; no server/keys)');
+    return {
+      provider: new EmbeddedMemoryProvider({
+        agentId: opts.env.CORTEX_AGENT_ID,
+        dbPath,
+        log,
+      }),
+      selected: 'embedded',
+    };
+  }
+
   const baseUrl = opts.cortexBaseUrl ?? opts.env.MERIDIAN_CORTEX_URL;
   const cortex = opts.cortex ?? bindCortex(opts.env.CORTEX_AGENT_ID, baseUrl);
 
@@ -96,6 +117,11 @@ async function loadQuartzPipeline(input: LoadQuartzInput): Promise<QuartzLib> {
     throw new Error('@aterna/quartz did not export QuartzMemoryProvider');
   }
 
+  // VOYAGE_API_KEY is schema-optional (embedded needs none) but the
+  // superRefine guarantees it for the quartz path; assert clearly if absent.
+  if (!input.env.VOYAGE_API_KEY) {
+    throw new Error('VOYAGE_API_KEY required for the quartz memory provider');
+  }
   const backend = new CortexBackendAdapter({
     cortex: input.cortex,
     router: input.router,

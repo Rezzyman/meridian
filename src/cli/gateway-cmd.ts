@@ -103,6 +103,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     env,
     router,
     cortex,
+    embeddedDbPath: join(home.layer('MEMORY'), 'embedded.jsonl'),
     log: (level, msg) => {
       if (level === 'warn') logger.warn({ event: 'memory.provider.fallback', msg });
       else logger.info({ event: 'memory.provider.selected', msg }, msg);
@@ -143,8 +144,10 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
 
   const systemBase = readSystemBase(home, config.agent.name);
 
+  // DreamWeaver consolidates CORTEX memory; the embedded provider has no
+  // consolidation pipeline, so skip it in zero-config mode.
   const dream = new DreamWeaver({ cortex, config: config.dream, logger });
-  dream.start();
+  if (memorySelection.selected !== 'embedded') dream.start();
 
   // ── Persistent session store ──
   // Every turn writes to ~/.meridian/<agent>/state.db so conversations

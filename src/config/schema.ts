@@ -6,11 +6,16 @@
 import { z } from 'zod';
 
 // ─── Per-agent isolation triad (env-loaded) ────────────────────────────────────
-export const AgentEnvSchema = z.object({
+export const AgentEnvSchema = z
+  .object({
   MERIDIAN_AGENT: z.string().min(1, 'agent slug required'),
   CORTEX_AGENT_ID: z.string().min(1),
-  NEON_DATABASE_URL: z.string().url('Neon Postgres URL required'),
-  VOYAGE_API_KEY: z.string().min(20, 'Voyage AI key required for embeddings'),
+  // NEON + VOYAGE power the CORTEX/Quartz backends. They are OPTIONAL so the
+  // zero-config embedded provider (MERIDIAN_MEMORY_PROVIDER=embedded) boots
+  // with no external keys at all; a superRefine below still requires them for
+  // the cortex/quartz providers.
+  NEON_DATABASE_URL: z.string().url('Neon Postgres URL required').optional(),
+  VOYAGE_API_KEY: z.string().min(20, 'Voyage AI key required for embeddings').optional(),
   OPENROUTER_API_KEY: z.string().min(20).optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
@@ -35,12 +40,33 @@ export const AgentEnvSchema = z.object({
   MERIDIAN_CORTEX_URL: z.string().url().optional(),
 
   // Memory provider selection. "cortex" is the open-source default;
-  // "quartz" lazy-loads @aterna/quartz and falls back to cortex on failure.
-  MERIDIAN_MEMORY_PROVIDER: z.enum(['cortex', 'quartz']).default('cortex'),
+  // "quartz" lazy-loads @aterna/quartz and falls back to cortex on failure;
+  // "embedded" is the zero-config local provider (no server, no keys).
+  MERIDIAN_MEMORY_PROVIDER: z.enum(['cortex', 'quartz', 'embedded']).default('cortex'),
 
   // ngrok auth token (optional, for tunnel automation)
   NGROK_AUTHTOKEN: z.string().optional(),
-});
+  })
+  .superRefine((env, ctx) => {
+    // CORTEX + Quartz need the dedicated Neon DB + Voyage key; embedded needs
+    // neither. Enforce the triad only when the active provider uses it.
+    if (env.MERIDIAN_MEMORY_PROVIDER !== 'embedded') {
+      if (!env.NEON_DATABASE_URL) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['NEON_DATABASE_URL'],
+          message: 'Neon Postgres URL required (or set MERIDIAN_MEMORY_PROVIDER=embedded)',
+        });
+      }
+      if (!env.VOYAGE_API_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['VOYAGE_API_KEY'],
+          message: 'Voyage AI key required (or set MERIDIAN_MEMORY_PROVIDER=embedded)',
+        });
+      }
+    }
+  });
 
 export type AgentEnv = z.infer<typeof AgentEnvSchema>;
 
@@ -250,6 +276,14 @@ export const AgentConfigSchema = z.object({
     recallTopK: z.number().int().default(8),
     encodeOnTurn: z.boolean().default(true),
     valenceInference: z.boolean().default(true),
+    /**
+     * Defense-in-depth for memory poisoning. The always-on regex screen
+     * catches explicit/lexical directives for free; this enables the optional
+     * LLM-judge second pass that also catches non-lexicon languages, encoded
+     * payloads, and fact-shaped semantic directives — at the cost of a model
+     * call on recall turns that surface untrusted memories. Off by default.
+     */
+    memoryLlmJudge: z.boolean().default(false),
   }),
 });
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
@@ -447,5 +481,11 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     ackMaxChars: 500,
   },
   dream: { enabled: true, schedule: '0 2 * * *', mode: 'full', inProcess: true },
-  cortex: { agentId: slug, recallTopK: 8, encodeOnTurn: true, valenceInference: true },
+  cortex: {
+    agentId: slug,
+    recallTopK: 8,
+    encodeOnTurn: true,
+    valenceInference: true,
+    memoryLlmJudge: false,
+  },
 });

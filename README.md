@@ -255,9 +255,10 @@ What's new in 1.2:
 - **Bundled plugins ship 24 tools across `google`, `github`, `web-search`, `wearables`.** Every install is a bundled-binary or paste-the-key flow; nothing requires a separate harness.
 
 What's working today:
-- **Memory-poisoning resistance** — recall-stage provenance screening that quarantines injected directives before they reach the model; measured 100%→0% poisoning success on the open MemPoisonBench (`scripts/mempoison/`)
+- **Memory-poisoning resistance** — two-tier recall-stage defense (an always-on provenance + mood-aware screen, plus an optional LLM judge for non-lexicon/encoded/semantic attacks) that quarantines injected directives before they reach the model. Measured **100%→0%** poisoning success on the open, reproducible [MemPoisonBench](docs/memory-poisoning.md) (`scripts/mempoison/`), 0 false positives. The only OSS agent harness that ships a benchmarked memory-poisoning defense.
+- **Zero-config quickstart** — `meridian init demo --embedded` then `meridian`: a talking agent that remembers you across restarts in under a minute, no CORTEX server, no Neon/Voyage, no keys (local memory + ollama). Upgrade to CORTEX/Quartz with a config flag.
 - **Runtime VERIFICATION layer** — operator checks that withhold a reply on a block-severity failure
-- Real test suite (228 tests) + green CI (typecheck + lint + test + build, Node 22/24)
+- Real test suite (259 tests) + green CI (typecheck + lint + test + build, Node 22/24)
 - MCP both directions: consume external MCP servers as channel-gated first-class tools; serve CORTEX recall to any MCP client (`meridian mcp serve`)
 - SSE streaming gateway (`/chat/stream`) with a streaming browser UI
 - Bounded `delegate` sub-agents (structural depth, token + wall-clock caps) behind a provider circuit breaker

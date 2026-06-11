@@ -16,6 +16,7 @@
 process.removeAllListeners('warning');
 
 import { Command } from 'commander';
+import { join } from 'node:path';
 import { existsSync, writeFileSync } from 'node:fs';
 import { activeAgentSlug, ensureAgentHome, listAgents, loadAgentConfig, setActiveAgent } from '../config/home.js';
 import { loadAgentEnv, envFileTemplate } from '../config/loader.js';
@@ -60,7 +61,8 @@ program
   .description('Initialize a new agent home with the seven-layer AgentOS scaffold')
   .option('--template <name>', 'starter template (frontdesk | receptionist | sales | concierge)')
   .option('--inherits <slug>', 'inherit CONTEXT, MEMORY, CONNECTIONS from a hub agent')
-  .action(async (slug: string, opts: { template?: string; inherits?: string; guided?: boolean }) => {
+  .option('--embedded', 'zero-config: local embedded memory, no CORTEX server or keys')
+  .action(async (slug: string, opts: { template?: string; inherits?: string; guided?: boolean; embedded?: boolean }) => {
     await initAgent(slug, opts);
   });
 
@@ -259,6 +261,7 @@ async function openChat(): Promise<void> {
     env,
     router,
     cortex,
+    embeddedDbPath: join(home.layer('MEMORY'), 'embedded.jsonl'),
     log: (level, msg) => {
       if (level === 'warn') console.log(colors.warn(`! ${msg}`));
       else logger.info({ event: 'memory.provider.selected', msg }, msg);
@@ -311,8 +314,10 @@ async function openChat(): Promise<void> {
     verificationChecks,
     store,
   });
+  // DreamWeaver consolidates CORTEX memory; the embedded provider has no
+  // consolidation pipeline, so skip it in zero-config mode.
   const dream = new DreamWeaver({ cortex, config: config.dream, logger });
-  dream.start();
+  if (memorySelection.selected !== 'embedded') dream.start();
 
   store.startSession(conversation.snapshot());
   let turnIdx = 0;
