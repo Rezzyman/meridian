@@ -58,7 +58,7 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
   lines.push('## Channels armed');
   if (config.channels.telegram?.enabled && env.TELEGRAM_BOT_TOKEN) {
     const handle = process.env.TELEGRAM_BOT_USERNAME
-      ? '@' + process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')
+      ? `@${process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')}`
       : 'live';
     lines.push(`- Telegram — ${handle}`);
   }
@@ -158,6 +158,6 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
 
   const path = join(home.layer('CONTEXT'), '_runtime-loadout.md');
   mkdirSync(home.layer('CONTEXT'), { recursive: true });
-  writeFileSync(path, lines.join('\n') + '\n');
+  writeFileSync(path, `${lines.join('\n')}\n`);
   return path;
 }

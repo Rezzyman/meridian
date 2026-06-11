@@ -59,7 +59,7 @@ function chunk(text: string): string[] {
   const out: string[] = [];
   let buf = '';
   for (const p of paragraphs) {
-    if ((buf + '\n\n' + p).length > MAX_CHUNK_CHARS && buf.length > MIN_CHUNK_CHARS) {
+    if ((`${buf}\n\n${p}`).length > MAX_CHUNK_CHARS && buf.length > MIN_CHUNK_CHARS) {
       out.push(buf.trim());
       buf = p;
     } else {

@@ -134,7 +134,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // proceed without memory rather than freezing the operator.
   const RECALL_TIMEOUT_MS = 8000;
   let recallSummary = '';
-  let recallCount = 0;
+  let _recallCount = 0;
   let recallMemoryIds: number[] = [];
   let recallArtifactIds: number[] = [];
   let recallTokenCount = 0;
@@ -146,7 +146,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       ),
     ]);
     recallSummary = r.context;
-    recallCount = r.memories.length;
+    _recallCount = r.memories.length;
     recallMemoryIds = r.memories.map((m) => m.id);
     recallArtifactIds = (r.artifacts ?? []).map((a) => a.id);
     recallTokenCount = r.tokenCount ?? 0;
@@ -333,8 +333,8 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   const TEXT_CHANNELS: Array<MeridianTurn['channel']> = ['cli', 'telegram', 'gateway'];
   if (commitmentDetected && TEXT_CHANNELS.includes(ctx.channel)) {
     const trimQuote =
-      commitmentQuote.length > 80 ? commitmentQuote.slice(0, 79) + '…' : commitmentQuote;
-    reply = reply.trimEnd() + `\n\n${'✓ logged: ' + trimQuote}`;
+      commitmentQuote.length > 80 ? `${commitmentQuote.slice(0, 79)}…` : commitmentQuote;
+    reply = `${reply.trimEnd()}\n\n✓ logged: ${trimQuote}`;
   }
 
   // 4) CORTEX encode (post-turn) — fire-and-forget so the reply lands fast.

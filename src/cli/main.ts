@@ -17,7 +17,6 @@ process.removeAllListeners('warning');
 
 import { Command } from 'commander';
 import { existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { activeAgentSlug, ensureAgentHome, listAgents, loadAgentConfig, setActiveAgent } from '../config/home.js';
 import { loadAgentEnv, envFileTemplate } from '../config/loader.js';
 import { bindCortex } from '../cortex/bind.js';
@@ -128,7 +127,7 @@ program
     const report = runAudit(home);
     const path = writeReport(home, report);
     console.log(colors.ok(`audit written to ${path}`));
-    if (opts.print) console.log('\n' + renderReport(report));
+    if (opts.print) console.log(`\n${renderReport(report)}`);
   });
 
 program
@@ -224,7 +223,7 @@ async function openChat(): Promise<void> {
     process.exit(1);
   }
 
-  let env;
+  let env: ReturnType<typeof loadAgentEnv>;
   try {
     env = loadAgentEnv(home);
   } catch (err) {

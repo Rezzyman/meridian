@@ -465,12 +465,12 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
   });
 
   console.log(colors.ok(`Meridian gateway live on :${port} for agent ${slug}`));
-  console.log(colors.muted('  channels: ' + [
+  console.log(colors.muted(`  channels: ${[
     'cli (REPL)',
     env.TELEGRAM_BOT_TOKEN ? 'telegram (gated)' : null,
     vapi ? 'voice (VAPI webhook ready)' : null,
     'http /chat',
-  ].filter(Boolean).join(', ')));
+  ].filter(Boolean).join(', ')}`));
 
   // Block forever
   await new Promise(() => {});

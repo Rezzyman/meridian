@@ -23,7 +23,6 @@
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
-  createReadStream,
   createWriteStream,
   existsSync,
   mkdirSync,
@@ -33,7 +32,6 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
-import { createGunzip } from 'node:zlib';
 
 export const GOG_VERSION = '0.14.0';
 

@@ -10,7 +10,7 @@
  * Exit code 0 = all green. 1 = at least one fail. Warns are non-blocking.
  */
 
-import { existsSync, statSync, writeFileSync, unlinkSync, statfsSync } from 'node:fs';
+import { existsSync, writeFileSync, unlinkSync, statfsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   activeAgentSlug,
@@ -141,7 +141,7 @@ export async function runDoctor(): Promise<number> {
     activeSlug = agents[0]!;
   }
   const home = ensureAgentHome(activeSlug);
-  let config;
+  let config: ReturnType<typeof loadAgentConfig>;
   try {
     config = loadAgentConfig(home);
   } catch {
@@ -284,7 +284,7 @@ export async function runDoctor(): Promise<number> {
   // 10. LLM provider chain dry-run — burn ~10 tokens to confirm the chain
   // actually works end-to-end. Uses a 1-word prompt so cost is negligible.
   try {
-    let agentEnv;
+    let agentEnv: ReturnType<typeof loadAgentEnv>;
     try {
       agentEnv = loadAgentEnv(home);
     } catch {

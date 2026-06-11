@@ -7,7 +7,7 @@
  * shelf life of maybe eight weeks before everything goes stale."
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MeridianHome } from '../config/home.js';
 import type { SessionStore } from '../session/store.js';
@@ -29,7 +29,7 @@ function ageDaysOf(path: string): number {
   return Math.floor(ageMs / (1000 * 60 * 60 * 24));
 }
 
-export function runAudit(home: MeridianHome, store?: SessionStore): AuditReport {
+export function runAudit(home: MeridianHome, _store?: SessionStore): AuditReport {
   const report: AuditReport = {
     agent: home.agentSlug,
     generatedAt: new Date().toISOString(),

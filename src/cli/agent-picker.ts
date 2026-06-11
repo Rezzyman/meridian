@@ -13,7 +13,7 @@ import { colors } from '../utils/truecolor.js';
 
 export async function pickAgentInteractive(envOverride?: string): Promise<string> {
   // Explicit override wins — used by /usr/local/bin/<agent> shortcuts and CI.
-  if (envOverride && envOverride.trim()) return envOverride.trim();
+  if (envOverride?.trim()) return envOverride.trim();
 
   const agents = describeAgents();
   if (agents.length === 0) {

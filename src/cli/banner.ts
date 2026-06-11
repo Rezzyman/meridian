@@ -11,7 +11,7 @@
 
 // boxen replaced with manual frameBox below for predictable whitespace handling
 import { colors, fg, gradient } from '../utils/truecolor.js';
-import type { CortexHealth, CortexStats } from '../cortex/types.js';
+import type { CortexHealth, } from '../cortex/types.js';
 
 // ─── "MERIDIAN" wordmark ──────────────────────────────────────────────────────
 // 8 rows. Same proportions as the public ATERNA Meridian wordmark.
@@ -45,23 +45,23 @@ export const MERIDIAN_WORDMARK_LINES: readonly string[] = [
 const EYE_PAD = 10;
 
 const SUNBURST_TOP: readonly string[] = [
-  ' '.repeat(EYE_PAD) + '                         │                         ',
-  ' '.repeat(EYE_PAD) + '                      ╲  │  ╱                      ',
-  ' '.repeat(EYE_PAD) + '                ╲        │        ╱                ',
-  ' '.repeat(EYE_PAD) + '          ╲              │              ╱          ',
-  ' '.repeat(EYE_PAD) + '   ╲                     │                     ╱   ',
-  ' '.repeat(EYE_PAD) + ' ·                       │                       · ',
-  ' '.repeat(EYE_PAD) + '·                                                 ·',
+  `${' '.repeat(EYE_PAD)}                         │                         `,
+  `${' '.repeat(EYE_PAD)}                      ╲  │  ╱                      `,
+  `${' '.repeat(EYE_PAD)}                ╲        │        ╱                `,
+  `${' '.repeat(EYE_PAD)}          ╲              │              ╱          `,
+  `${' '.repeat(EYE_PAD)}   ╲                     │                     ╱   `,
+  `${' '.repeat(EYE_PAD)} ·                       │                       · `,
+  `${' '.repeat(EYE_PAD)}·                                                 ·`,
 ];
 
 const SUNBURST_BOTTOM: readonly string[] = [
-  ' '.repeat(EYE_PAD) + '·                                                 ·',
-  ' '.repeat(EYE_PAD) + ' ·                       │                       · ',
-  ' '.repeat(EYE_PAD) + '   ╱                     │                     ╲   ',
-  ' '.repeat(EYE_PAD) + '          ╱              │              ╲          ',
-  ' '.repeat(EYE_PAD) + '                ╱        │        ╲                ',
-  ' '.repeat(EYE_PAD) + '                      ╱  │  ╲                      ',
-  ' '.repeat(EYE_PAD) + '                         │                         ',
+  `${' '.repeat(EYE_PAD)}·                                                 ·`,
+  `${' '.repeat(EYE_PAD)} ·                       │                       · `,
+  `${' '.repeat(EYE_PAD)}   ╱                     │                     ╲   `,
+  `${' '.repeat(EYE_PAD)}          ╱              │              ╲          `,
+  `${' '.repeat(EYE_PAD)}                ╱        │        ╲                `,
+  `${' '.repeat(EYE_PAD)}                      ╱  │  ╲                      `,
+  `${' '.repeat(EYE_PAD)}                         │                         `,
 ];
 
 // ─── ATERNA brand mark for the boot panel left column ────────────────────────
@@ -335,7 +335,7 @@ export function renderAternaMark(): string {
   // Anything alphanumeric (or the middle-dot brand separator) in a pyramid
   // row is treated as an etched letter, so the AI play renders bright
   // against the cyan body.
-  const isEtchChar = (ch: string) => /[A-Za-z0-9/\\|_·\-]/.test(ch);
+  const isEtchChar = (ch: string) => /[A-Za-z0-9/\\|_·-]/.test(ch);
 
   for (let i = 0; i < ATERNA_MARK.length; i++) {
     const line = ATERNA_MARK[i]!;
@@ -430,7 +430,7 @@ export interface BootPanelData {
 
 // Strip ANSI escape codes to compute visible width.
 function visibleWidth(s: string): number {
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI escapes is the point
   return s.replace(/\x1b\[[0-9;]*m/g, '').replace(/ /g, ' ').length;
 }
 
@@ -455,22 +455,22 @@ export function renderBootPanel(data: BootPanelData): string {
     const id = data.identity;
     left.push('');
     if (id.agentRole) {
-      left.push(' ' + c.steel(id.agentRole));
+      left.push(` ${c.steel(id.agentRole)}`);
     }
     if (id.model) {
       // Show the last `/`-segment so long model paths fit the left column.
       const modelShort = id.model.includes('/') ? id.model.split('/').pop()! : id.model;
-      const provider = id.provider ? `  ${c.muted('· ' + id.provider)}` : '';
-      left.push(' ' + c.muted(modelShort) + provider);
+      const provider = id.provider ? `  ${c.muted(`· ${id.provider}`)}` : '';
+      left.push(` ${c.muted(modelShort)}${provider}`);
     }
     if (id.cwd) {
-      const trimmed = id.cwd.length > 24 ? '…' + id.cwd.slice(-23) : id.cwd;
-      left.push(' ' + c.muted(trimmed));
+      const trimmed = id.cwd.length > 24 ? `…${id.cwd.slice(-23)}` : id.cwd;
+      left.push(` ${c.muted(trimmed)}`);
     }
     if (id.sessionId) {
       // Truncate to the first 8 hex chars — enough to disambiguate at a glance.
       const shortId = id.sessionId.replace(/^t_/, '').slice(0, 8);
-      left.push(' ' + c.muted('session ' + shortId));
+      left.push(` ${c.muted(`session ${shortId}`)}`);
     }
   }
 
@@ -517,7 +517,7 @@ export function renderBootPanel(data: BootPanelData): string {
   right.push('');
 
   // ─── Channels (where the agent can be reached) ──
-  if (data.channels && data.channels.length) {
+  if (data.channels?.length) {
     right.push(c.cyan('Channels'));
     for (const ch of data.channels) {
       const dot =
@@ -576,7 +576,7 @@ export function renderBootPanel(data: BootPanelData): string {
       const head = items.slice(0, 3).join(', ');
       const more = items.length > 3 ? `  +${items.length - 3}` : '';
       const tail = head + more;
-      const trimmed = visibleWidth(tail) > 50 ? tail.slice(0, 49) + '…' : tail;
+      const trimmed = visibleWidth(tail) > 50 ? `${tail.slice(0, 49)}…` : tail;
       right.push(`  ${c.steel(cat.padEnd(20, ' '))}  ${c.muted(trimmed)}`);
     }
     right.push('');
@@ -625,11 +625,11 @@ function frameBox(lines: string[], title: string, contentWidth: number): string 
     let vw = visibleWidth(line);
     if (vw > contentWidth) {
       // Truncate to fit; ellipsis appended.
-      display = line.slice(0, contentWidth - 1) + '…';
+      display = `${line.slice(0, contentWidth - 1)}…`;
       vw = contentWidth;
     }
     const pad = ' '.repeat(Math.max(0, contentWidth - vw));
-    out.push(c.cyan('│') + '  ' + display + pad + '  ' + c.cyan('│'));
+    out.push(`${c.cyan('│')}  ${display}${pad}  ${c.cyan('│')}`);
   }
   out.push(blank);
   out.push(bot);
@@ -795,20 +795,23 @@ const CATEGORY_ORDER = [
 export function renderCommandCheatSheet(commands: readonly CheatSheetCommand[]): string {
   const c = colors;
   const grouped: Record<string, CheatSheetCommand[]> = {};
-  for (const cmd of commands) (grouped[cmd.category] ??= []).push(cmd);
+  for (const cmd of commands) {
+    if (!grouped[cmd.category]) grouped[cmd.category] = [];
+    grouped[cmd.category].push(cmd);
+  }
 
   const lines: string[] = [];
   lines.push('');
-  lines.push(c.bold + 'Slash commands' + c.reset + c.muted('  ·  type any of these inside the REPL'));
+  lines.push(`${c.bold}Slash commands${c.reset}${c.muted('  ·  type any of these inside the REPL')}`);
   for (const cat of CATEGORY_ORDER) {
     const items = grouped[cat];
     if (!items || items.length === 0) continue;
     lines.push('');
-    lines.push('  ' + c.cyan(cat));
+    lines.push(`  ${c.cyan(cat)}`);
     for (const cmd of items) {
-      const slash = c.steel('/' + cmd.name);
-      const args = cmd.argsHint ? c.muted(' ' + cmd.argsHint) : '';
-      const visibleHead = '/' + cmd.name + (cmd.argsHint ? ' ' + cmd.argsHint : '');
+      const slash = c.steel(`/${cmd.name}`);
+      const args = cmd.argsHint ? c.muted(` ${cmd.argsHint}`) : '';
+      const visibleHead = `/${cmd.name}${cmd.argsHint ? ` ${cmd.argsHint}` : ''}`;
       const padding = ' '.repeat(Math.max(2, 24 - visibleHead.length));
       lines.push(`    ${slash}${args}${padding}${c.muted(cmd.description)}`);
     }

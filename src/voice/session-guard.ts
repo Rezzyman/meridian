@@ -168,7 +168,7 @@ function stripPhraseFromTranscript(transcript: string, phrase: string): string {
         let afterStart = wordIdx[end] + 1;
         while (afterStart < parts.length && /^[.,!?;:\s]+$/.test(parts[afterStart])) afterStart++;
         const after = parts.slice(afterStart).join('');
-        return (before + ' ' + after).replace(/\s+/g, ' ').trim();
+        return (`${before} ${after}`).replace(/\s+/g, ' ').trim();
       }
     }
   }

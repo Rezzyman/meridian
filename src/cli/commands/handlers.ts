@@ -82,6 +82,7 @@ export async function dispatch(line: string, ctx: HandlerCtx): Promise<string | 
     case 'clear':
       ctx.conversation.reset();
       return colors.ok('session reset');
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: process.exit never returns
     case 'quit':
       process.exit(0);
     default:
@@ -201,7 +202,8 @@ async function renderMemoryDigest(ctx: HandlerCtx, topic: string): Promise<strin
   const bySource: Record<string, typeof r.memories> = {};
   for (const m of r.memories) {
     const key = (m.source || 'unattributed').split('/').pop() || 'unattributed';
-    (bySource[key] ??= []).push(m);
+    if (!bySource[key]) bySource[key] = [];
+    bySource[key].push(m);
   }
   // Best-scoring source first; then most recent within source.
   const ordered = Object.entries(bySource).sort((a, b) => {
@@ -270,13 +272,13 @@ async function renderTrace(ctx: HandlerCtx, arg: string): Promise<string> {
     return colors.muted(`no trace found for "${arg}". try /trace last or /trace <turn-id>`);
   }
   const c = colors;
-  const memCites = target.recallMemoryIds && target.recallMemoryIds.length
+  const memCites = target.recallMemoryIds?.length
     ? target.recallMemoryIds.slice(0, 12).map((id) => `#${id}`).join(', ')
     : '(none)';
-  const artCites = target.recallArtifactIds && target.recallArtifactIds.length
+  const artCites = target.recallArtifactIds?.length
     ? target.recallArtifactIds.slice(0, 6).map((id) => `#${id}`).join(', ')
     : '(none)';
-  const tools = target.toolCalls && target.toolCalls.length
+  const tools = target.toolCalls?.length
     ? target.toolCalls.map((t) => `${t.stepType}:${t.name}`).join(' → ')
     : '(no tool calls)';
   const lines = [
