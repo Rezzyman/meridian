@@ -203,6 +203,25 @@ export const OperatorConfigSchema = z.object({
       cli: z.array(z.string()).default([]),
     })
     .default({ telegram: [], voice: [], cli: [] }),
+  /**
+   * Sacred-topic policy: content the agent must never surface on an
+   * untrusted channel (the public voice line, external callers). The
+   * operator owns this list — `meridian onboard` populates it. The runtime
+   * ships ZERO hardcoded names; an operator's private entities live only in
+   * their own config, never in framework source.
+   *
+   *   topics   — plain phrases ("my kids' school", a family name); matched
+   *              case-insensitively as whole words
+   *   patterns — advanced: raw regex sources for operators who want them
+   *   refusal  — what the agent says instead of leaking (defaults generic)
+   */
+  sensitivity: z
+    .object({
+      sacredTopics: z.array(z.string()).default([]),
+      sacredPatterns: z.array(z.string()).default([]),
+      refusal: z.string().optional(),
+    })
+    .optional(),
 });
 export type OperatorConfig = z.infer<typeof OperatorConfigSchema>;
 

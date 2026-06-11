@@ -67,7 +67,7 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
   }
   if (config.channels.vapi.enabled && env.VAPI_API_KEY) {
     const phone = process.env.VAPI_PHONE_NUMBER || 'live';
-    lines.push(`- ATERNA Voice — ${phone}`);
+    lines.push(`- Voice (VAPI) — ${phone}`);
   }
   lines.push('- CLI (REPL)');
   if (config.channels.gateway?.enabled) {

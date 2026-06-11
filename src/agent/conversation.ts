@@ -12,6 +12,7 @@ import type { AgentConfig } from '../config/schema.js';
 import type { Logger } from 'pino';
 import type { MeridianTurn, MeridianSession } from './types.js';
 import { runTurn, type TurnStreamEvent } from './turn.js';
+import type { VerificationCheck } from '../config/schema.js';
 import type { SessionStore, TurnTrace } from '../session/store.js';
 
 export interface ConversationOptions {
@@ -28,6 +29,8 @@ export interface ConversationOptions {
   skillToolNames?: Set<string>;
   /** MCP tool channel gate — see TurnContext.mcpGate. */
   mcpGate?: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Operator verification checks (VERIFICATION/*.checks.md), loaded at boot. */
+  verificationChecks?: VerificationCheck[];
   resume?: MeridianSession;
   /** When set, every turn's reasoning trace is persisted to this store
    *  so /why and /trace can answer "what backed that claim?" later. */
@@ -90,6 +93,7 @@ export class Conversation {
         tools: this.opts.tools,
         skillToolNames: this.opts.skillToolNames,
         mcpGate: this.opts.mcpGate,
+        verificationChecks: this.opts.verificationChecks,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,

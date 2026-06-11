@@ -13,7 +13,11 @@ import {
   TOOLS_CHAT_DEFAULT,
   TOOLS_CLI_DEFAULT,
   type AgentConfig,
+  type VerificationCheck,
 } from '../config/schema.js';
+import { screenRecall, type QuarantinedMemory } from '../verification/memory-integrity.js';
+import { buildSacredGuard, sacredViolation } from '../verification/sacred.js';
+import { runChecks, blocking, type CheckResult } from '../verification/runtime.js';
 import type { Logger } from 'pino';
 import type { MeridianTurn } from './types.js';
 
@@ -111,6 +115,10 @@ export interface TurnContext {
     /** Cap on generated tokens — streamText maxTokens. */
     maxOutputTokens?: number;
   };
+  /** Operator-authored verification checks, loaded from VERIFICATION/ at
+   *  boot and passed in (runTurn stays home/fs-free). Run after reply
+   *  assembly; a `block`-severity failure replaces the reply with a refusal. */
+  verificationChecks?: VerificationCheck[];
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -138,6 +146,10 @@ export interface TurnResult {
     recallTokenCount: number;
     toolCalls: Array<{ name: string; stepType: string; ts: string }>;
     model?: string;
+    /** Memories pulled from the model's view by the integrity screen. */
+    quarantinedMemories: QuarantinedMemory[];
+    /** Operator verification-check results for this turn. */
+    verifications: CheckResult[];
   };
 }
 
@@ -165,6 +177,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   let recallMemoryIds: number[] = [];
   let recallArtifactIds: number[] = [];
   let recallTokenCount = 0;
+  let quarantinedMemories: QuarantinedMemory[] = [];
   let recallTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const r = await Promise.race([
@@ -176,12 +189,26 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         );
       }),
     ]);
-    recallSummary = r.context;
-    _recallCount = r.memories.length;
-    recallMemoryIds = r.memories.map((m) => m.id);
+    // ── Memory-integrity screen (poisoning defense) ──
+    // Quarantine recalled memories that read like a standing directive AND
+    // arrived from untrusted provenance, before they ever reach the model.
+    // On a clean recall this is a byte-for-byte pass-through.
+    const screen = screenRecall(r.memories, r.context);
+    recallSummary = screen.safeContext;
+    quarantinedMemories = screen.quarantined;
+    _recallCount = screen.kept.length;
+    recallMemoryIds = screen.kept.map((m) => m.id);
     recallArtifactIds = (r.artifacts ?? []).map((a) => a.id);
     recallTokenCount = r.tokenCount ?? 0;
-    ctx.logger.debug({ msg: 'cortex recall', tokens: r.tokenCount, memories: r.memories.length, sensitivityFilter });
+    if (screen.quarantined.length > 0) {
+      ctx.logger.warn({
+        msg: 'memory-integrity: quarantined poisoning-suspect memories from recall',
+        count: screen.quarantined.length,
+        ids: screen.quarantined.map((q) => q.id),
+        sources: screen.quarantined.map((q) => q.source),
+      });
+    }
+    ctx.logger.debug({ msg: 'cortex recall', tokens: r.tokenCount, memories: screen.kept.length, quarantined: screen.quarantined.length, sensitivityFilter });
   } catch (err) {
     ctx.logger.warn({ msg: 'cortex recall failed or timed out; proceeding without memory', err: (err as Error).message });
   } finally {
@@ -363,27 +390,44 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   }
 
   // ─── Sacred-topic guardrail (voice channel only) ──
-  // Family names + a small set of explicitly-sacred entities never appear on a public voice line.
-  // If the model drafts a reply containing any of these, replace with a polite refusal.
+  // The operator's private entities never appear on the public voice line.
+  // WHICH entities are sacred is operator-owned config (operator.sensitivity),
+  // not hardcoded framework source — the runtime ships only identity-free
+  // universal defaults. If the model drafts a reply matching the guard,
+  // replace it with a refusal.
   if (ctx.channel === 'voice') {
-    const SACRED_PATTERNS: RegExp[] = [
-      /\b(Hank|Henrick|Reya|Rey|Rickilee|Ricki)\b/i,
-      /\bRon Harrison\b/i,
-      /\bIRGC\b/i,
-      /\$[0-9,]{3,}/, // dollar figures
-      /\b(my wife|my kid|my son|my daughter|my family)\b/i,
-    ];
-    for (const p of SACRED_PATTERNS) {
-      if (p.test(reply)) {
-        ctx.logger.warn({
-          msg: 'sacred-topic guardrail fired on voice reply; replacing with refusal',
-          pattern: p.source,
-        });
-        reply =
-          'That is private information I do not share publicly. Want me to take a message for Atanasio so he can follow up directly?';
-        break;
-      }
+    const guard = buildSacredGuard(ctx.config.operator);
+    const hit = sacredViolation(reply, guard);
+    if (hit) {
+      ctx.logger.warn({
+        msg: 'sacred-topic guardrail fired on voice reply; replacing with refusal',
+        pattern: hit.source,
+      });
+      reply = guard.refusal;
     }
+  }
+
+  // ─── Verification checks (operator-authored, VERIFICATION/*.checks.md) ──
+  // Run the operator's per-output checks on the assembled reply. A
+  // `block`-severity failure is a hard stop: the reply is withheld and
+  // replaced with a refusal rather than sent (the documented contract —
+  // block → don't send, warn → record for audit). No checks → no-op, so a
+  // healthy turn is unchanged.
+  const verifications: CheckResult[] = ctx.verificationChecks?.length
+    ? runChecks(ctx.verificationChecks, {
+        output: reply,
+        toolCalls: toolCallTrace.map((t) => ({ name: t.name, args: undefined })),
+      })
+    : [];
+  const blockedChecks = blocking(verifications);
+  if (blockedChecks.length > 0) {
+    ctx.logger.warn({
+      msg: 'verification block: reply withheld',
+      failures: blockedChecks.map((b) => ({ check: b.name, note: b.note })),
+    });
+    reply = `I drafted a reply but it did not pass this agent's verification checks, so I am not sending it (${blockedChecks
+      .map((b) => b.name)
+      .join(', ')}).`;
   }
 
   // Commitment detection — when the user makes a commitment ("I will…",
@@ -445,6 +489,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     channel: ctx.channel,
     ts: new Date().toISOString(),
     memoryId,
+    verifications: verifications.length > 0 ? verifications : undefined,
   };
 
   return {
@@ -460,6 +505,8 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       recallTokenCount,
       toolCalls: toolCallTrace,
       model: providerUsed,
+      quarantinedMemories,
+      verifications,
     },
   };
 }
