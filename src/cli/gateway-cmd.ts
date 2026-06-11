@@ -17,7 +17,7 @@ import { createMemoryProvider } from '../memory/index.js';
 import { ProviderRouter } from '../providers/router.js';
 import { Conversation } from '../agent/conversation.js';
 import { DreamWeaver } from '../dream/weaver.js';
-import { builtinTools } from '../skills/builtin/index.js';
+import { buildToolSurface } from '../agent/tool-surface.js';
 import { createLogger } from '../logger/pino.js';
 import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
@@ -109,57 +109,15 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     },
   });
 
-  const builtin = builtinTools({ cortex, env });
-
-  // Skills v2: open vault + build SkillToolContext + load skills with their
-  // tools.ts-defined tools registered. Skill tools join the agent's tool
-  // surface and are subject to the same chat allowlist (Tier 5) as builtins.
-  const { openAgentVault } = await import('../secrets/vault.js');
-  const { PassphraseGuard } = await import('../skills/runtime.js');
-  const { loadSkills, prescanManifestEnvKeys } = await import('../skills/loader.js');
-  const { collectSkillEnv } = await import('../config/loader.js');
-  const { tool: aiTool } = await import('ai');
-  const { z: zod } = await import('zod');
-  const { runGog, runGogJson, listAccounts: gogListAccounts } = await import('../tools/gog.js');
-  const vault = openAgentVault({ envPath: home.envPath, vaultPath: home.vaultPath });
-  const guard = new PassphraseGuard(vault);
-
-  // Skill manifests declare their env requirements (LIMITLESS_API_KEY,
-  // SLACK_BOT_TOKEN, etc.). Prescan all manifests to gather the union,
-  // then merge those keys from process.env onto the typed AgentEnv at
-  // runtime. The TS shape stays as AgentEnv (the merged keys aren't
-  // visible in the strict type), but they're present at runtime so skill
-  // code reads them via the loose ctx.env declared inside each tools.ts.
-  // Result: new env-using skills only edit their manifest.yaml.
-  const mergedEnv = Object.assign({}, env, collectSkillEnv(prescanManifestEnvKeys(home))) as typeof env;
-
-  const skillCtx = {
-    cortex,
-    vault,
-    env: mergedEnv,
-    logger,
-    requirePassphrase: (skillName: string, candidate?: string) =>
-      guard.require(skillName, candidate),
-    hashPassphrase: (raw: string) => PassphraseGuard.hash(raw),
-    grantPassphraseSession: (skillName: string, windowMinutes?: number) =>
-      guard.grant(skillName, windowMinutes ?? 30),
-    tool: aiTool,
-    z: zod,
-    tools: {
-      gog: { run: runGog, runJson: runGogJson, listAccounts: gogListAccounts },
-    },
-  };
-  const skills = await loadSkills(home, { ctx: skillCtx });
-  const tools = { ...builtin, ...skills.asTools() };
+  // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
+  // place shared with the REPL (src/agent/tool-surface.ts).
+  const surface = await buildToolSurface({ home, config, env, cortex, logger });
+  const { tools, skillToolNames, skills, vault } = surface;
 
   // Voice session guard — passphrase-gated unlock for the public voice line.
   // Vault stores the phrase; transcript scanner strips it before the model sees it;
   // executeTool checks unlock state per-callId before running privileged tools.
   const voiceGuard = new VoiceSessionGuard(vault, logger);
-  const skillToolNames = new Set<string>();
-  for (const s of skills.list()) {
-    if (s.dynamicTools) for (const k of Object.keys(s.dynamicTools)) skillToolNames.add(k);
-  }
 
   // ── Pre-build the runtime loadout file BEFORE reading the system base ──
   // The loadout is a CONTEXT file the agent reads on every turn. Writing it
@@ -175,7 +133,8 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
       env,
       skills,
       automations: loadAutomationDefs(home),
-      builtinToolNames: Object.keys(builtin),
+      builtinToolNames: surface.builtinToolNames,
+      mcpTools: surface.mcpStatus.flatMap((st) => st.tools.map((t) => ({ name: t, server: st.server }))),
       cortexStats: cortexStats ?? undefined,
     });
   } catch (err) {
@@ -213,6 +172,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
       router, logger,
       systemBase, channel, tools,
       skillToolNames,
+      mcpGate: surface.mcpGate,
       resume,
       store,
     });

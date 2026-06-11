@@ -30,6 +30,8 @@ export interface LoadoutInputs {
   skills: SkillRegistry;
   automations: AutomationDef[];
   builtinToolNames: string[];
+  /** MCP tools discovered at boot: name + source server. */
+  mcpTools?: Array<{ name: string; server: string }>;
   cortexStats?: {
     memoryCount?: number | null;
     synapseCount?: number | null;
@@ -38,7 +40,8 @@ export interface LoadoutInputs {
 }
 
 export function writeLoadoutFile(inputs: LoadoutInputs): string {
-  const { home, config, env, skills, automations, builtinToolNames, cortexStats } = inputs;
+  const { home, config, env, skills, automations, builtinToolNames, mcpTools, cortexStats } =
+    inputs;
   const lines: string[] = [];
 
   lines.push('# Runtime loadout');
@@ -119,6 +122,9 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
   }
   for (const t of skillTools) {
     lines.push(`- \`${t}\` (from skill)`);
+  }
+  for (const t of mcpTools ?? []) {
+    lines.push(`- \`${t.name}\` (MCP: ${t.server})`);
   }
   lines.push('');
   lines.push(

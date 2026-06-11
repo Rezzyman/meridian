@@ -26,6 +26,8 @@ export interface ConversationOptions {
   /** Tool names sourced from v2 skills — auto-allowed in chat regardless
    *  of config.tools.chat (installation is the opt-in). */
   skillToolNames?: Set<string>;
+  /** MCP tool channel gate — see TurnContext.mcpGate. */
+  mcpGate?: ReadonlyMap<string, ReadonlySet<string>>;
   resume?: MeridianSession;
   /** When set, every turn's reasoning trace is persisted to this store
    *  so /why and /trace can answer "what backed that claim?" later. */
@@ -84,6 +86,7 @@ export class Conversation {
         logger: this.opts.logger,
         tools: this.opts.tools,
         skillToolNames: this.opts.skillToolNames,
+        mcpGate: this.opts.mcpGate,
         history: [...this.history],
         channel: this.opts.channel,
         systemBase: this.opts.systemBase,

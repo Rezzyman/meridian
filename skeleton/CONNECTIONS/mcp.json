@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "name": "example-filesystem",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "enabled": false,
+      "channels": ["cli", "gateway", "telegram", "system"]
+    }
+  ]
+}

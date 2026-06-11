@@ -90,6 +90,11 @@ export interface TurnContext {
    *  config.tools.chat — installing a skill IS the operator's
    *  opt-in for that skill's tools. */
   skillToolNames?: Set<string>;
+  /** MCP tool gating: toolName → channels allowed to see it. Declaring a
+   *  server in CONNECTIONS/mcp.json is the opt-in (like skill install),
+   *  but scoped per channel — voice never gains MCP tools unless the
+   *  operator lists 'voice' on that server explicitly. */
+  mcpGate?: ReadonlyMap<string, ReadonlySet<string>>;
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -208,10 +213,18 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   if (ctx.skillToolNames) {
     for (const name of ctx.skillToolNames) allow.add(name);
   }
+  // MCP tools carry their own per-channel gate (set per server in
+  // CONNECTIONS/mcp.json). A gated name is visible iff the current channel
+  // is in its set — independent of config.tools, which stays the operator
+  // surface for builtins.
+  const mcpAllowed = (name: string): boolean => ctx.mcpGate?.get(name)?.has(ctx.channel) === true;
   const turnTools: ToolSet | undefined = ctx.tools
     ? Object.fromEntries(
         Object.entries(ctx.tools).filter(
-          ([k]) => k !== 'cortex_recall' && k !== 'cortex_encode' && allow.has(k),
+          ([k]) =>
+            k !== 'cortex_recall' &&
+            k !== 'cortex_encode' &&
+            (ctx.mcpGate?.has(k) ? mcpAllowed(k) : allow.has(k)),
         ),
       )
     : undefined;
