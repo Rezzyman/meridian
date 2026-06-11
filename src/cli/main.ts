@@ -41,6 +41,7 @@ import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup } from
 import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
 import { runMcpList, runMcpServe } from './mcp-cmd.js';
+import { runDemo } from './demo-cmd.js';
 
 const program = new Command();
 program
@@ -100,6 +101,13 @@ program
   .action((slug: string) => {
     setActiveAgent(slug);
     console.log(colors.ok(`active agent: ${slug}`));
+  });
+
+program
+  .command('demo')
+  .description('90-second proof: persistent memory + memory-poisoning defense, zero setup')
+  .action(async () => {
+    await runDemo();
   });
 
 const mcp = program.command('mcp').description('Model Context Protocol — consume servers, or serve this agent');

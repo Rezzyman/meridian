@@ -25,6 +25,25 @@ Built by [ATERNA AI](https://aterna.ai). Ships under MIT. Powers ATERNA's produc
 
 ---
 
+## See it in 90 seconds — zero setup
+
+```bash
+git clone https://github.com/Rezzyman/meridian && cd meridian && pnpm install
+npx tsx src/cli/main.ts demo      # or: meridian demo  (after `pnpm link --global`)
+```
+
+No model, no keys, no server. The demo shows the agent **remember you across a
+restart**, **refuse a live memory-poisoning attack** before it reaches the
+model, then runs the open [MemPoisonBench](docs/memory-poisoning.md) in front of
+you — **poisoning success 100% → 0%**, 0 false positives.
+
+That last part is the headline: MERIDIAN is the only open-source agent harness
+that ships a *measured, reproducible* defense against cross-session memory
+poisoning — the attack class that turns "your agent remembers everything" from a
+feature into a liability. Run the benchmark against us, and against anyone else.
+
+---
+
 ## What makes Meridian different
 
 | | LangChain / Mastra / CrewAI | Mem0 / Letta / Zep | voice-only platforms | **Meridian** |
