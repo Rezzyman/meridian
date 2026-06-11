@@ -218,10 +218,11 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     channel: ChannelKind,
     from: string,
     text: string,
+    sendOpts?: Parameters<Conversation['send']>[1],
   ): Promise<string> {
     const { convo, sessionId } = getSession(channel, from);
     const startedTurns = convo.historyCount; // approximate index
-    const t = await convo.send(text);
+    const t = await convo.send(text, sendOpts);
     // Append BOTH user + assistant turns to the store with monotonic idx
     // so loadSession returns them in send order.
     const userTurnId = `t_${Date.now().toString(36)}_${randomUUID().slice(0, 4)}u`;
@@ -401,8 +402,8 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
   const httpConvoFacade = {
     sessionId: 'gateway-http',
     historyCount: 0,
-    send: async (text: string) => {
-      const reply = await turn('gateway', 'http', text);
+    send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) => {
+      const reply = await turn('gateway', 'http', text, sendOpts);
       return {
         id: `t_${Date.now().toString(36)}`,
         sessionId: 'gateway-http',

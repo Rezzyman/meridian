@@ -11,7 +11,7 @@ import type { ProviderRouter } from '../providers/router.js';
 import type { AgentConfig } from '../config/schema.js';
 import type { Logger } from 'pino';
 import type { MeridianTurn, MeridianSession } from './types.js';
-import { runTurn } from './turn.js';
+import { runTurn, type TurnStreamEvent } from './turn.js';
 import type { SessionStore, TurnTrace } from '../session/store.js';
 
 export interface ConversationOptions {
@@ -66,7 +66,10 @@ export class Conversation {
     }
   }
 
-  async send(userInput: string): Promise<MeridianTurn> {
+  async send(
+    userInput: string,
+    sendOpts?: { onStreamEvent?: (ev: TurnStreamEvent) => void },
+  ): Promise<MeridianTurn> {
     const userTurn: MeridianTurn = {
       id: `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       sessionId: this.sessionId,
@@ -87,6 +90,7 @@ export class Conversation {
         tools: this.opts.tools,
         skillToolNames: this.opts.skillToolNames,
         mcpGate: this.opts.mcpGate,
+        onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,
         systemBase: this.opts.systemBase,

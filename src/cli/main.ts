@@ -316,8 +316,8 @@ async function openChat(): Promise<void> {
   store.startSession(conversation.snapshot());
   let turnIdx = 0;
   const origSend = conversation.send.bind(conversation);
-  conversation.send = async (input) => {
-    const turn = await origSend(input);
+  conversation.send = async (input, sendOpts) => {
+    const turn = await origSend(input, sendOpts);
     store.appendTurn({ ...turn, role: 'user', content: input }, turnIdx++);
     store.appendTurn(turn, turnIdx++);
     return turn;

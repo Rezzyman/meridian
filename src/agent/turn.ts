@@ -95,11 +95,28 @@ export interface TurnContext {
    *  but scoped per channel — voice never gains MCP tools unless the
    *  operator lists 'voice' on that server explicitly. */
   mcpGate?: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Live stream observer (SSE gateway). Receives raw model deltas AS THEY
+   * ARRIVE — i.e. BEFORE the post-stream pipeline (voice sacred-topic
+   * guardrail, commitment footer). Consumers MUST treat the turn's final
+   * reply as canonical and replace their accumulated buffer with it:
+   *   delta  — next text chunk of the CURRENT provider attempt
+   *   reset  — the attempt that produced prior deltas failed mid-stream;
+   *            discard the buffer, a fallback provider starts fresh
+   *   tool   — a tool call fired (UI affordance)
+   */
+  onStreamEvent?: (ev: TurnStreamEvent) => void;
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
   systemBase: string;
 }
+
+/** Events surfaced to TurnContext.onStreamEvent during the provider loop. */
+export type TurnStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'reset' }
+  | { type: 'tool'; name: string };
 
 export interface TurnResult {
   turn: MeridianTurn;
@@ -241,6 +258,11 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   const toolCallTrace: Array<{ name: string; stepType: string; ts: string }> = [];
   let providerUsed: string | undefined;
 
+  // Deltas forwarded for the CURRENT provider attempt. If that attempt
+  // dies mid-stream and a fallback takes over, the observer gets a reset
+  // so it can discard the partial buffer (hazard: double emission).
+  let deltasEmittedThisAttempt = 0;
+
   for (const provider of chain) {
     try {
       // streamText (ai@4.x) does NOT throw on provider failure: errors are
@@ -274,6 +296,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
             const ts = new Date().toISOString();
             for (const t of toolCalls) {
               toolCallTrace.push({ name: t.toolName, stepType, ts });
+              ctx.onStreamEvent?.({ type: 'tool', name: t.toolName });
             }
           }
           if (toolResults && toolResults.length > 0) {
@@ -302,6 +325,10 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       let out = '';
       for await (const delta of stream.textStream) {
         out += delta;
+        if (delta) {
+          deltasEmittedThisAttempt++;
+          ctx.onStreamEvent?.({ type: 'delta', text: delta });
+        }
       }
       if (streamError !== undefined) {
         throw streamError instanceof Error ? streamError : new Error(String(streamError));
@@ -313,6 +340,10 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       const message = err instanceof Error ? err.message : String(err);
       providerErrors.push({ ref: provider.ref, message: message || '(no message)' });
       ctx.logger.warn({ msg: 'provider failed; trying fallback', provider: provider.ref, err });
+      if (deltasEmittedThisAttempt > 0) {
+        deltasEmittedThisAttempt = 0;
+        ctx.onStreamEvent?.({ type: 'reset' });
+      }
     }
   }
   if (!reply) {
