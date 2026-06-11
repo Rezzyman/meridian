@@ -219,7 +219,7 @@ async function openChat(): Promise<void> {
   // Agent resolution order:
   //   1. --agent <slug> on the CLI (sets MERIDIAN_AGENT before this runs)
   //   2. MERIDIAN_AGENT env var (set by the per-agent shortcuts in /usr/local/bin)
-  //   3. Interactive picker — always asks; no silent default per Atanasio's
+  //   3. Interactive picker — always asks; no silent default — agent
   //      UX rule. On a fresh install with one agent, picker still shows so
   //      identity is explicit.
   const slug = await pickAgentInteractive(process.env.MERIDIAN_AGENT);
@@ -268,7 +268,7 @@ async function openChat(): Promise<void> {
   // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
   // place shared with the gateway (src/agent/tool-surface.ts).
   const surface = await buildToolSurface({ home, config, env, cortex, logger, router, memory: memorySelection.provider });
-  const { tools, skillToolNames, skills, guard } = surface;
+  const { tools, skillToolNames, skills, guard, verificationChecks } = surface;
 
   // ── Runtime loadout — regenerate at every REPL boot ──
   // Auto-writes a CONTEXT file with current channels, automations, skills,
@@ -308,6 +308,7 @@ async function openChat(): Promise<void> {
     tools,
     skillToolNames,
     mcpGate: surface.mcpGate,
+    verificationChecks,
     store,
   });
   const dream = new DreamWeaver({ cortex, config: config.dream, logger });

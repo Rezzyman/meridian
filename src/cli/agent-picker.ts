@@ -3,7 +3,7 @@
  * an explicit --agent flag or MERIDIAN_AGENT env var. Lists every agent
  * found under ~/.meridian/<slug>/ and prompts the user to choose.
  *
- * Always asks (per Atanasio's preference) so the agent identity is
+ * Always asks (no silent default) so the agent identity is
  * explicit on every launch, even on a single-agent home.
  */
 
@@ -41,7 +41,7 @@ export async function pickAgentInteractive(envOverride?: string): Promise<string
 
   while (true) {
     const ans = (await ask(`${colors.cyan('❯')} pick [1-${agents.length}] or slug: `)).trim();
-    // Empty → repeat (no silent default — explicit per Atanasio's UX rule)
+    // Empty → repeat (no silent default — identity is always explicit)
     if (!ans) continue;
     // Number?
     if (/^\d+$/.test(ans)) {

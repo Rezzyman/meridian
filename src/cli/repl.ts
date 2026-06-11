@@ -180,7 +180,7 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
         ...(config.channels.vapi.enabled
           ? [
               {
-                name: 'ATERNA Voice',
+                name: 'Voice (VAPI)',
                 binding: process.env.VAPI_PHONE_NUMBER || 'phone bound',
                 status: 'live' as const,
               },

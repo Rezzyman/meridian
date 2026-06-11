@@ -255,7 +255,9 @@ What's new in 1.2:
 - **Bundled plugins ship 24 tools across `google`, `github`, `web-search`, `wearables`.** Every install is a bundled-binary or paste-the-key flow; nothing requires a separate harness.
 
 What's working today:
-- Real test suite (191 tests) + green CI (typecheck + lint + test + build, Node 22/24)
+- **Memory-poisoning resistance** — recall-stage provenance screening that quarantines injected directives before they reach the model; measured 100%→0% poisoning success on the open MemPoisonBench (`scripts/mempoison/`)
+- **Runtime VERIFICATION layer** — operator checks that withhold a reply on a block-severity failure
+- Real test suite (228 tests) + green CI (typecheck + lint + test + build, Node 22/24)
 - MCP both directions: consume external MCP servers as channel-gated first-class tools; serve CORTEX recall to any MCP client (`meridian mcp serve`)
 - SSE streaming gateway (`/chat/stream`) with a streaming browser UI
 - Bounded `delegate` sub-agents (structural depth, token + wall-clock caps) behind a provider circuit breaker

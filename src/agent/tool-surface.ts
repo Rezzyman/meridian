@@ -26,6 +26,8 @@ import { openAgentVault, type Vault } from '../secrets/vault.js';
 import { builtinTools } from '../skills/builtin/index.js';
 import { loadSkills, prescanManifestEnvKeys } from '../skills/loader.js';
 import { PassphraseGuard } from '../skills/runtime.js';
+import { loadChecks } from '../verification/runtime.js';
+import type { VerificationCheck } from '../config/schema.js';
 import { defineTool } from '../skills/toolkit.js';
 import type { SkillRegistry } from '../skills/types.js';
 import { listAccounts as gogListAccounts, runGog, runGogJson } from '../tools/gog.js';
@@ -55,6 +57,8 @@ export interface ToolSurface {
   mcpGate: ReadonlyMap<string, ReadonlySet<string>>;
   /** Per-server MCP connection status for doctor / `meridian mcp list`. */
   mcpStatus: McpToolSurface['status'];
+  /** Operator verification checks loaded from VERIFICATION/*.checks.md. */
+  verificationChecks: VerificationCheck[];
   skills: SkillRegistry;
   vault: Vault;
   guard: PassphraseGuard;
@@ -135,9 +139,19 @@ export async function buildToolSurface(inputs: ToolSurfaceInputs): Promise<ToolS
     }
   }
 
+  // Operator verification checks (VERIFICATION/*.checks.md) — loaded once at
+  // boot; runTurn receives them via TurnContext and stays fs-free.
+  let verificationChecks: VerificationCheck[] = [];
+  try {
+    verificationChecks = loadChecks(home);
+  } catch (err) {
+    logger.warn({ msg: 'verification checks load failed', err: (err as Error).message });
+  }
+
   assembled = { ...builtin, ...skills.asTools(), ...mcp.tools };
   return {
     tools: assembled,
+    verificationChecks,
     skillToolNames,
     mcpGate: mcp.channelGate,
     mcpStatus: mcp.status,
