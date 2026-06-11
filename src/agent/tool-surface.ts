@@ -26,6 +26,7 @@ import { openAgentVault, type Vault } from '../secrets/vault.js';
 import { builtinTools } from '../skills/builtin/index.js';
 import { loadSkills, prescanManifestEnvKeys } from '../skills/loader.js';
 import { PassphraseGuard } from '../skills/runtime.js';
+import { defineTool } from '../skills/toolkit.js';
 import type { SkillRegistry } from '../skills/types.js';
 import { listAccounts as gogListAccounts, runGog, runGogJson } from '../tools/gog.js';
 
@@ -103,6 +104,7 @@ export async function buildToolSurface(inputs: ToolSurfaceInputs): Promise<ToolS
       guard.grant(skillName, windowMinutes ?? 30),
     tool: aiTool,
     z: zod,
+    defineTool,
     tools: {
       gog: { run: runGog, runJson: runGogJson, listAccounts: gogListAccounts },
     },

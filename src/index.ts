@@ -16,3 +16,14 @@ export * from './verification/index.js';
 export * from './audit/index.js';
 export * from './dream/weaver.js';
 export * from './heartbeat/index.js';
+
+// MCP (client + server), delegation, structured output — parity surface.
+export * from './mcp/index.js';
+export { delegateTools, type DelegateDeps } from './skills/builtin/delegate-tools.js';
+export { defineTool, type DefineToolOptions, type ExecutionFailure, type OutputValidationFailure } from './skills/toolkit.js';
+export {
+  generateStructured,
+  StructuredOutputError,
+  type GenerateStructuredOptions,
+  type StructuredResult,
+} from './agent/structured.js';
