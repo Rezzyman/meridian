@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
 import { ensureAgentHome, resolveHome, setActiveAgent } from '../config/home.js';
 import { defaultAgentConfig } from '../config/schema.js';
-import { envFileTemplate } from '../config/loader.js';
+import { envFileTemplate, embeddedEnvFileTemplate } from '../config/loader.js';
 import { colors } from '../utils/truecolor.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +23,7 @@ export interface InitOptions {
   template?: string;
   inherits?: string;
   guided?: boolean;
+  embedded?: boolean;
 }
 
 function copyDirRecursive(from: string, to: string, overwrite = false): void {
@@ -49,9 +50,10 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
     writeFileSync(home.configPath, stringifyYaml(config));
   }
 
-  // .env template
+  // .env template — embedded mode writes a zero-config env (no Neon/Voyage,
+  // local memory, ollama default) so the agent runs with no external setup.
   if (!existsSync(home.envPath)) {
-    writeFileSync(home.envPath, envFileTemplate(slug));
+    writeFileSync(home.envPath, opts.embedded ? embeddedEnvFileTemplate(slug) : envFileTemplate(slug));
   }
 
   // Copy skeleton seven-layer files

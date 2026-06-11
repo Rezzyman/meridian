@@ -59,6 +59,32 @@ export function collectSkillEnv(declaredKeys: Iterable<string>): Record<string, 
   return out;
 }
 
+/** Zero-config .env: embedded local memory, ollama by default — no external
+ *  servers, no API keys required. The 60-second quickstart. */
+export function embeddedEnvFileTemplate(slug: string): string {
+  return `# Meridian agent env: ${slug} (zero-config / embedded memory)
+# No CORTEX server, no Neon, no Voyage. Memory persists locally in
+# MEMORY/embedded.jsonl. Upgrade to CORTEX/Quartz later by flipping
+# MERIDIAN_MEMORY_PROVIDER and filling in NEON_DATABASE_URL + VOYAGE_API_KEY.
+
+MERIDIAN_AGENT=${slug}
+CORTEX_AGENT_ID=${slug}
+MERIDIAN_MEMORY_PROVIDER=embedded
+
+# Model provider — local ollama needs no key (install: https://ollama.com,
+# then \`ollama pull qwen2.5\`). Or paste a key for any provider below.
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+GROQ_API_KEY=
+OPENROUTER_API_KEY=
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+
+# Gateway
+MERIDIAN_GATEWAY_TOKEN=
+MERIDIAN_GATEWAY_PORT=18889
+`;
+}
+
 export function envFileTemplate(slug: string): string {
   return `# Meridian agent env: ${slug}
 # Per-agent isolation triad. NEVER share these across agents.
