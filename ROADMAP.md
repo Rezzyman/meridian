@@ -28,6 +28,8 @@ This file lives at the repo root because the OSS framework and the upcoming mana
 - **Bounded sub-agents** — `delegate` built-in: scoped sub-turn, structural depth limit, output-token + wall-clock caps, explicit tool grants, no memory encode by default
 - **Provider circuit breaker** — per-ref open/half-open/closed with an all-open failsafe, fed from the turn loop
 - **Schema-enforced output** — `defineTool` (Zod-validated tool results) + `generateStructured` (validated JSON from the model chain with repair-retries)
+- **Memory-poisoning defense** — recall-stage provenance screening quarantines injected directives from untrusted sources before they reach the model; scored on the open, reproducible MemPoisonBench (100%→0% poisoning success, known gaps published as the roadmap)
+- **Runtime VERIFICATION layer** — operator-authored checks run every turn; block-severity withholds the reply, warn-severity records for audit
 
 ### Channels
 

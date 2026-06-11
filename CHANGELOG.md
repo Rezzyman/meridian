@@ -9,6 +9,27 @@ sub-agents, schema-enforced output. Full writeup in the PR.
 
 ### Added
 
+- **Memory-poisoning defense (the differentiator).** Independent security
+  research (arXiv 2603.11619) demonstrated durable cross-session memory
+  poisoning against other persistent-memory harnesses: a fabricated directive
+  written to memory via a low-trust surface steers later behavior. Meridian's
+  recall now screens every memory (`src/verification/memory-integrity.ts`) —
+  an imperative-authority directive from untrusted provenance is quarantined
+  before it reaches the model, with provenance matched structurally so
+  prefix-laundering can't ride a trusted-looking source. Legit operator rules
+  and plain facts pass clean; a healthy recall is byte-for-byte unchanged.
+- **MemPoisonBench** — an open, reproducible benchmark for memory-poisoning
+  resistance (`scripts/mempoison/`), the first any agent harness publishes.
+  MERIDIAN scores 100%→0% poisoning success across 16 targeted vectors, 0
+  false positives, with 7 honestly-documented known gaps as the roadmap.
+- **Live VERIFICATION layer.** The seven-layer spec's VERIFICATION checks
+  (`loadChecks`/`runChecks`/`blocking`) were exported but never called; they
+  now run in the turn loop after reply assembly — a block-severity failure
+  withholds the reply, warn-severity records to audit.
+- **Operator-owned sacred topics.** The voice privacy guard is now driven by
+  `operator.sensitivity` config (populated by `meridian onboard`) instead of
+  hardcoded values; framework source ships only identity-free defaults.
+
 - **Test suite + CI.** 191 tests (`node:test` + tsx, DI-only — no module mocking)
   across the turn loop, conversation/operator, skills loader, CortexBind HTTP
   contract, memory provider factory, vault, provider router, verification
