@@ -276,6 +276,14 @@ export const AgentConfigSchema = z.object({
     recallTopK: z.number().int().default(8),
     encodeOnTurn: z.boolean().default(true),
     valenceInference: z.boolean().default(true),
+    /**
+     * Defense-in-depth for memory poisoning. The always-on regex screen
+     * catches explicit/lexical directives for free; this enables the optional
+     * LLM-judge second pass that also catches non-lexicon languages, encoded
+     * payloads, and fact-shaped semantic directives — at the cost of a model
+     * call on recall turns that surface untrusted memories. Off by default.
+     */
+    memoryLlmJudge: z.boolean().default(false),
   }),
 });
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
@@ -473,5 +481,11 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     ackMaxChars: 500,
   },
   dream: { enabled: true, schedule: '0 2 * * *', mode: 'full', inProcess: true },
-  cortex: { agentId: slug, recallTopK: 8, encodeOnTurn: true, valenceInference: true },
+  cortex: {
+    agentId: slug,
+    recallTopK: 8,
+    encodeOnTurn: true,
+    valenceInference: true,
+    memoryLlmJudge: false,
+  },
 });

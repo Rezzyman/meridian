@@ -55,14 +55,49 @@ const CONFUSABLES: Record<string, string> = {
 
 const ZERO_WIDTH = /[​-‍⁠﻿­]/g;
 
-/** Fold a string to a canonical lowercase form for evasion-resistant matching:
- *  NFKC → strip zero-width/soft-hyphen → fold confusables → collapse repeated
- *  whitespace → lowercase. */
+// Leetspeak substitutions, applied only to alpha-dominant tokens so account
+// numbers and dollar figures are never mangled (see normalizeForMatch).
+const LEET: Record<string, string> = {
+  '4': 'a', '3': 'e', '0': 'o', '1': 'i', '5': 's', '7': 't', '@': 'a', $: 's', '8': 'b', '9': 'g',
+};
+
+function hasConfusable(tok: string): boolean {
+  for (const c of tok) if (CONFUSABLES[c]) return true;
+  return false;
+}
+function letterCount(tok: string): number {
+  return (tok.match(/[a-z]/gi) ?? []).length;
+}
+function hasLeet(tok: string): boolean {
+  for (const c of tok) if (LEET[c]) return true;
+  return false;
+}
+
+/**
+ * Fold a string to a canonical lowercase form for evasion-resistant matching.
+ * NFKC + zero-width strip globally, then PER TOKEN:
+ *   - confusable folding only on MIXED-script tokens (the homoglyph-attack
+ *     signature — "Аlways"). A pure-Cyrillic/Greek word is genuine foreign
+ *     text, left intact so it is not mangled into noise (the LLM judge, not
+ *     this regex pass, handles real foreign-language directives).
+ *   - leetspeak folding only on alpha-dominant tokens (≥2 Latin letters) so
+ *     "4lw4ys" → "always" while "4471" and "$5,000" are untouched.
+ */
 export function normalizeForMatch(s: string): string {
   const nfkc = s.normalize('NFKC').replace(ZERO_WIDTH, '');
-  let folded = '';
-  for (const ch of nfkc) folded += CONFUSABLES[ch] ?? ch;
-  return folded.replace(/\s+/g, ' ').toLowerCase();
+  const parts = nfkc.split(/(\s+)/);
+  const out = parts.map((tok) => {
+    if (!tok || /^\s+$/.test(tok)) return tok;
+    let t = tok;
+    if (hasConfusable(t) && /[a-z]/i.test(t)) {
+      t = [...t].map((c) => CONFUSABLES[c] ?? c).join('');
+    }
+    if (hasLeet(t) && letterCount(t) >= 2) {
+      t = [...t].map((c) => LEET[c] ?? c).join('');
+    }
+    return t;
+  });
+  return out.join('').replace(/\s+/g, ' ').toLowerCase();
 }
 
 // ─── Layer 2: multilingual directive markers ──────────────────────────────────

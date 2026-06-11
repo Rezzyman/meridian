@@ -9,6 +9,20 @@ sub-agents, schema-enforced output. Full writeup in the PR.
 
 ### Added
 
+- **Zero-config embedded memory.** `meridian init <slug> --embedded` runs a
+  talking agent with persistent cross-session memory and **no external
+  dependencies** — no CORTEX server, no Neon, no Voyage, no keys (pure-JS
+  local provider + ollama). `MERIDIAN_MEMORY_PROVIDER=embedded`; upgrade to
+  CORTEX/Quartz with a config flag, not a rewrite.
+- **Two-tier memory-poisoning defense, hardened.** The recall screen now
+  closes the homoglyph / leetspeak / non-English / soft-framing / laundering /
+  gradual-subversion evasions an adversarial pass found, via Unicode
+  confusable folding, a multilingual lexicon, imperative-mood gating, and
+  cross-memory clustering. An **optional LLM-judge layer**
+  (`config.cortex.memoryLlmJudge`) covers the residual a regex screen
+  structurally cannot — directives in unsupported languages, behind an
+  encoding, or worn as a plain fact. Threat model + benchmark:
+  [docs/memory-poisoning.md](docs/memory-poisoning.md).
 - **Memory-poisoning defense (the differentiator).** Independent security
   research (arXiv 2603.11619) demonstrated durable cross-session memory
   poisoning against other persistent-memory harnesses: a fabricated directive

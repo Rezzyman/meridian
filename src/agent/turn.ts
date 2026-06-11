@@ -16,6 +16,7 @@ import {
   type VerificationCheck,
 } from '../config/schema.js';
 import { screenRecall, type QuarantinedMemory } from '../verification/memory-integrity.js';
+import { makeModelJudge, screenRecallDeep } from '../verification/memory-judge.js';
 import { buildSacredGuard, sacredViolation } from '../verification/sacred.js';
 import { runChecks, blocking, type CheckResult } from '../verification/runtime.js';
 import type { Logger } from 'pino';
@@ -192,8 +193,18 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     // ── Memory-integrity screen (poisoning defense) ──
     // Quarantine recalled memories that read like a standing directive AND
     // arrived from untrusted provenance, before they ever reach the model.
-    // On a clean recall this is a byte-for-byte pass-through.
-    const screen = screenRecall(r.memories, r.context);
+    // On a clean recall this is a byte-for-byte pass-through. With the
+    // optional LLM-judge enabled, a second pass also catches non-lexicon /
+    // encoded / semantic directives the regex screen can't see.
+    const screen = ctx.config.cortex.memoryLlmJudge
+      ? await screenRecallDeep(r.memories, r.context, {
+          judge: makeModelJudge({
+            router: ctx.router,
+            models: ctx.config.models,
+            logger: ctx.logger,
+          }),
+        })
+      : screenRecall(r.memories, r.context);
     recallSummary = screen.safeContext;
     quarantinedMemories = screen.quarantined;
     _recallCount = screen.kept.length;

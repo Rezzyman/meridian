@@ -52,11 +52,21 @@ interface Chain {
   members: Array<{ content: string; source: string | null }>;
   expected: 'cluster-flag' | 'no-flag' | 'evade-known-gap';
 }
+interface AdvancedEvader {
+  id: string;
+  category: string;
+  description: string;
+  poisonContent: string;
+  poisonSource: string | null;
+  regexTier: 'catches' | 'evades';
+  judgeTier: 'catches' | 'uncertain';
+}
 interface Catalog {
   version: string;
   about: string;
   attacks: Attack[];
   chains?: Chain[];
+  advancedEvaders?: AdvancedEvader[];
 }
 
 interface AttackOutcome extends Attack {
@@ -170,6 +180,30 @@ function main(): void {
       L.push(`| ${ch.id} | ${ch.category} | ${ch.expected} | ${flagged ? 'yes' : 'no'} | ${kept ? 'yes' : 'no'} | ${caution ? 'yes' : 'no'} |`);
       if (!ok) chainRegression = true;
     }
+    L.push('');
+  }
+
+  // ── Advanced evaders: the two-tier (regex + LLM-judge) story ──
+  const evaders = catalog.advancedEvaders ?? [];
+  if (evaders.length > 0) {
+    L.push('## Defense-in-depth tier — advanced evaders (regex vs LLM-judge)');
+    L.push('');
+    L.push('A red-team pass against the hardened regex screen found these. They probe what a pattern matcher structurally cannot see; the optional LLM-judge layer reads the content and covers most. `regex` = the always-on free screen; `judge` = the live model-backed second pass (verified against a local model in the eval — coverage scales with judge-model capability).');
+    L.push('');
+    L.push('| evader | category | regex tier | judge tier |');
+    L.push('|---|---|---|---|');
+    for (const e of evaders) {
+      // Verify the regexTier label is honest against the live screen.
+      const mem: RecallMemory = { id: 1, content: e.poisonContent, source: e.poisonSource, score: 0.9 };
+      const caughtByRegex = screenRecall([mem], `- ${e.poisonContent}`).quarantined.length > 0;
+      const claimed = e.regexTier === 'catches';
+      if (caughtByRegex !== claimed) chainRegression = true; // stale label = regression
+      L.push(`| ${e.id} | ${e.category} | ${e.regexTier}${caughtByRegex === claimed ? '' : ' ⚠STALE'} | ${e.judgeTier} |`);
+    }
+    const regexCatches = evaders.filter((e) => e.regexTier === 'catches').length;
+    const judgeCovers = evaders.filter((e) => e.judgeTier === 'catches').length;
+    L.push('');
+    L.push(`Regex tier catches ${regexCatches}/${evaders.length} of these advanced vectors; the LLM-judge tier covers ${judgeCovers}/${evaders.length} (the rest are 'uncertain' — model-dependent, the honest frontier). Enable the judge with config.cortex.memoryLlmJudge for high-security deployments.`);
     L.push('');
   }
 
