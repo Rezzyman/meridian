@@ -106,6 +106,11 @@ export interface TurnContext {
    *   tool   — a tool call fired (UI affordance)
    */
   onStreamEvent?: (ev: TurnStreamEvent) => void;
+  /** Hard runtime bounds for this turn (used by delegate sub-turns). */
+  limits?: {
+    /** Cap on generated tokens — streamText maxTokens. */
+    maxOutputTokens?: number;
+  };
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -279,6 +284,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         system,
         messages,
         tools: turnTools,
+        maxTokens: ctx.limits?.maxOutputTokens,
         maxRetries: 1,
         // Multi-step: model can call a tool then continue writing. Capped
         // at 3 — enough for legitimate fetch+summarize, not enough for
@@ -335,11 +341,16 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       }
       reply = out;
       providerUsed = provider.ref;
+      // Close the breaker circuit for this ref (mock routers may not have it).
+      ctx.router.reportSuccess?.(provider.ref);
       break;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       providerErrors.push({ ref: provider.ref, message: message || '(no message)' });
       ctx.logger.warn({ msg: 'provider failed; trying fallback', provider: provider.ref, err });
+      // Feed the breaker so repeated failures open the circuit and spare
+      // future turns (and sub-agent fan-outs) the dead-provider timeout.
+      ctx.router.reportFailure?.(provider.ref);
       if (deltasEmittedThisAttempt > 0) {
         deltasEmittedThisAttempt = 0;
         ctx.onStreamEvent?.({ type: 'reset' });

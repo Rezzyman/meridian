@@ -267,7 +267,7 @@ async function openChat(): Promise<void> {
 
   // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
   // place shared with the gateway (src/agent/tool-surface.ts).
-  const surface = await buildToolSurface({ home, config, env, cortex, logger });
+  const surface = await buildToolSurface({ home, config, env, cortex, logger, router, memory: memorySelection.provider });
   const { tools, skillToolNames, skills, guard } = surface;
 
   // ── Runtime loadout — regenerate at every REPL boot ──

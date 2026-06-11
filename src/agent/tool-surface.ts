@@ -18,6 +18,8 @@ import { z as zod } from 'zod';
 import type { CortexBind } from '../cortex/bind.js';
 import type { MeridianHome } from '../config/home.js';
 import type { AgentConfig, AgentEnv } from '../config/schema.js';
+import type { MemoryProvider } from '../memory/provider.js';
+import type { ProviderRouter } from '../providers/router.js';
 import { collectSkillEnv } from '../config/loader.js';
 import { connectMcpServers, loadMcpConnections, type McpToolSurface } from '../mcp/index.js';
 import { openAgentVault, type Vault } from '../secrets/vault.js';
@@ -33,6 +35,11 @@ export interface ToolSurfaceInputs {
   env: AgentEnv;
   cortex: CortexBind;
   logger: Logger;
+  /** Provider router — enables the `delegate` sub-agent tool. */
+  router?: ProviderRouter;
+  /** Active memory provider for delegate sub-turns (Quartz-aware). Falls
+   *  back to the raw CortexBind when not supplied. */
+  memory?: MemoryProvider;
   /** Skip MCP connections (e.g. `meridian mcp serve` must not recursively
    *  dial out, and tests that don't care about MCP stay hermetic). */
   skipMcp?: boolean;
@@ -56,9 +63,25 @@ export interface ToolSurface {
 }
 
 export async function buildToolSurface(inputs: ToolSurfaceInputs): Promise<ToolSurface> {
-  const { home, env, cortex, logger } = inputs;
+  const { home, config, env, cortex, logger } = inputs;
 
-  const builtin = builtinTools({ cortex, env });
+  // Delegate needs the FULL assembled surface (skills + MCP included) to
+  // grant child subsets from; resolved lazily through this ref after the
+  // merge below.
+  let assembled: ToolSet = {};
+  const builtin = builtinTools({
+    cortex,
+    env,
+    delegation: inputs.router
+      ? {
+          config,
+          memory: inputs.memory ?? cortex,
+          router: inputs.router,
+          logger,
+          getParentTools: () => assembled,
+        }
+      : undefined,
+  });
 
   // Skills v2: open the encrypted vault, build a SkillToolContext, and let
   // the loader instantiate any tools.ts-defined tools. Skill manifests
@@ -110,8 +133,9 @@ export async function buildToolSurface(inputs: ToolSurfaceInputs): Promise<ToolS
     }
   }
 
+  assembled = { ...builtin, ...skills.asTools(), ...mcp.tools };
   return {
-    tools: { ...builtin, ...skills.asTools(), ...mcp.tools },
+    tools: assembled,
     skillToolNames,
     mcpGate: mcp.channelGate,
     mcpStatus: mcp.status,

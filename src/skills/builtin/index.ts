@@ -8,6 +8,7 @@ import type { CortexBind } from '../../cortex/bind.js';
 import type { AgentEnv } from '../../config/schema.js';
 import { coreTools } from './core-tools.js';
 import { cortexTools } from './cortex-tools.js';
+import { type DelegateDeps, delegateTools } from './delegate-tools.js';
 import { voiceTools } from './vapi-tools.js';
 import { telegramTools } from './telegram-tools.js';
 
@@ -17,6 +18,8 @@ export interface BuiltinToolsOptions {
   allowBash?: boolean;
   allowWrite?: boolean;
   allowVoice?: boolean;
+  /** When provided, the bounded `delegate` sub-agent tool is registered. */
+  delegation?: DelegateDeps;
 }
 
 export function builtinTools(opts: BuiltinToolsOptions): ToolSet {
@@ -31,6 +34,9 @@ export function builtinTools(opts: BuiltinToolsOptions): ToolSet {
   }
   if (opts.env.TELEGRAM_BOT_TOKEN) {
     for (const [k, v] of Object.entries(telegramTools(opts.env))) out[k] = v;
+  }
+  if (opts.delegation) {
+    for (const [k, v] of Object.entries(delegateTools(opts.delegation))) out[k] = v;
   }
   return out;
 }
