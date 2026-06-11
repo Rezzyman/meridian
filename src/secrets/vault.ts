@@ -92,7 +92,7 @@ export class Vault {
     const match = env.match(/^MERIDIAN_VAULT_KEY=(.+)$/m);
     if (match) return match[1]!.trim();
     const key = randomBytes(32).toString('hex');
-    writeFileSync(envPath, env.trimEnd() + `\nMERIDIAN_VAULT_KEY=${key}\n`, { mode: 0o600 });
+    writeFileSync(envPath, `${env.trimEnd()}\nMERIDIAN_VAULT_KEY=${key}\n`, { mode: 0o600 });
     return key;
   }
 
@@ -143,7 +143,7 @@ export class Vault {
       ciphertext,
     ]);
     mkdirSync(dirname(this.path), { recursive: true });
-    writeFileSync(this.path, buf.toString('base64') + '\n', { mode: 0o600 });
+    writeFileSync(this.path, `${buf.toString('base64')}\n`, { mode: 0o600 });
     try {
       chmodSync(this.path, 0o600);
     } catch {

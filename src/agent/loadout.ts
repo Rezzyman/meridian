@@ -30,6 +30,8 @@ export interface LoadoutInputs {
   skills: SkillRegistry;
   automations: AutomationDef[];
   builtinToolNames: string[];
+  /** MCP tools discovered at boot: name + source server. */
+  mcpTools?: Array<{ name: string; server: string }>;
   cortexStats?: {
     memoryCount?: number | null;
     synapseCount?: number | null;
@@ -38,7 +40,8 @@ export interface LoadoutInputs {
 }
 
 export function writeLoadoutFile(inputs: LoadoutInputs): string {
-  const { home, config, env, skills, automations, builtinToolNames, cortexStats } = inputs;
+  const { home, config, env, skills, automations, builtinToolNames, mcpTools, cortexStats } =
+    inputs;
   const lines: string[] = [];
 
   lines.push('# Runtime loadout');
@@ -58,7 +61,7 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
   lines.push('## Channels armed');
   if (config.channels.telegram?.enabled && env.TELEGRAM_BOT_TOKEN) {
     const handle = process.env.TELEGRAM_BOT_USERNAME
-      ? '@' + process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')
+      ? `@${process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')}`
       : 'live';
     lines.push(`- Telegram — ${handle}`);
   }
@@ -120,6 +123,9 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
   for (const t of skillTools) {
     lines.push(`- \`${t}\` (from skill)`);
   }
+  for (const t of mcpTools ?? []) {
+    lines.push(`- \`${t.name}\` (MCP: ${t.server})`);
+  }
   lines.push('');
   lines.push(
     '_When the operator asks me to do something, I check this list first. If the right tool is here, I call it. If it is not, I say so honestly and ask what they want me to do with what I have._',
@@ -158,6 +164,6 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
 
   const path = join(home.layer('CONTEXT'), '_runtime-loadout.md');
   mkdirSync(home.layer('CONTEXT'), { recursive: true });
-  writeFileSync(path, lines.join('\n') + '\n');
+  writeFileSync(path, `${lines.join('\n')}\n`);
   return path;
 }

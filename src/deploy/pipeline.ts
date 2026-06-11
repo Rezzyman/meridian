@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
-import { ensureAgentHome, resolveHome, setActiveAgent } from '../config/home.js';
+import { ensureAgentHome, setActiveAgent } from '../config/home.js';
 import { IntakeSchema, defaultAgentConfig } from '../config/schema.js';
 import type { Intake } from '../config/schema.js';
 import { envFileTemplate } from '../config/loader.js';

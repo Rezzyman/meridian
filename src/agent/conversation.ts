@@ -11,7 +11,7 @@ import type { ProviderRouter } from '../providers/router.js';
 import type { AgentConfig } from '../config/schema.js';
 import type { Logger } from 'pino';
 import type { MeridianTurn, MeridianSession } from './types.js';
-import { runTurn } from './turn.js';
+import { runTurn, type TurnStreamEvent } from './turn.js';
 import type { SessionStore, TurnTrace } from '../session/store.js';
 
 export interface ConversationOptions {
@@ -26,6 +26,8 @@ export interface ConversationOptions {
   /** Tool names sourced from v2 skills — auto-allowed in chat regardless
    *  of config.tools.chat (installation is the opt-in). */
   skillToolNames?: Set<string>;
+  /** MCP tool channel gate — see TurnContext.mcpGate. */
+  mcpGate?: ReadonlyMap<string, ReadonlySet<string>>;
   resume?: MeridianSession;
   /** When set, every turn's reasoning trace is persisted to this store
    *  so /why and /trace can answer "what backed that claim?" later. */
@@ -64,7 +66,10 @@ export class Conversation {
     }
   }
 
-  async send(userInput: string): Promise<MeridianTurn> {
+  async send(
+    userInput: string,
+    sendOpts?: { onStreamEvent?: (ev: TurnStreamEvent) => void },
+  ): Promise<MeridianTurn> {
     const userTurn: MeridianTurn = {
       id: `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       sessionId: this.sessionId,
@@ -84,6 +89,8 @@ export class Conversation {
         logger: this.opts.logger,
         tools: this.opts.tools,
         skillToolNames: this.opts.skillToolNames,
+        mcpGate: this.opts.mcpGate,
+        onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,
         systemBase: this.opts.systemBase,

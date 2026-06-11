@@ -104,8 +104,8 @@ for (let cursor = new Date(since); cursor <= until; ) {
 
   for (let day = new Date(cursor); day < batchEnd; day.setDate(day.getDate() + 1)) {
     const dayIso = isoDate(day);
-    let pageCursor: string | undefined = undefined;
-    let dayPagesProcessed = 0;
+    let pageCursor: string | undefined ;
+    let _dayPagesProcessed = 0;
     let dayLifelogs = 0;
     let dayEncoded = 0;
     let dayDup = 0;
@@ -120,7 +120,7 @@ for (let cursor = new Date(since); cursor <= until; ) {
         console.log(`  [error] ${msg}`);
         break;
       }
-      dayPagesProcessed++;
+      _dayPagesProcessed++;
       dayLifelogs += resp.lifelogs.length;
       totalSeen += resp.lifelogs.length;
 

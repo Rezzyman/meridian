@@ -90,11 +90,38 @@ export interface TurnContext {
    *  config.tools.chat — installing a skill IS the operator's
    *  opt-in for that skill's tools. */
   skillToolNames?: Set<string>;
+  /** MCP tool gating: toolName → channels allowed to see it. Declaring a
+   *  server in CONNECTIONS/mcp.json is the opt-in (like skill install),
+   *  but scoped per channel — voice never gains MCP tools unless the
+   *  operator lists 'voice' on that server explicitly. */
+  mcpGate?: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Live stream observer (SSE gateway). Receives raw model deltas AS THEY
+   * ARRIVE — i.e. BEFORE the post-stream pipeline (voice sacred-topic
+   * guardrail, commitment footer). Consumers MUST treat the turn's final
+   * reply as canonical and replace their accumulated buffer with it:
+   *   delta  — next text chunk of the CURRENT provider attempt
+   *   reset  — the attempt that produced prior deltas failed mid-stream;
+   *            discard the buffer, a fallback provider starts fresh
+   *   tool   — a tool call fired (UI affordance)
+   */
+  onStreamEvent?: (ev: TurnStreamEvent) => void;
+  /** Hard runtime bounds for this turn (used by delegate sub-turns). */
+  limits?: {
+    /** Cap on generated tokens — streamText maxTokens. */
+    maxOutputTokens?: number;
+  };
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
   systemBase: string;
 }
+
+/** Events surfaced to TurnContext.onStreamEvent during the provider loop. */
+export type TurnStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'reset' }
+  | { type: 'tool'; name: string };
 
 export interface TurnResult {
   turn: MeridianTurn;
@@ -134,25 +161,33 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // proceed without memory rather than freezing the operator.
   const RECALL_TIMEOUT_MS = 8000;
   let recallSummary = '';
-  let recallCount = 0;
+  let _recallCount = 0;
   let recallMemoryIds: number[] = [];
   let recallArtifactIds: number[] = [];
   let recallTokenCount = 0;
+  let recallTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const r = await Promise.race([
       ctx.cortex.recall(userInput, { tokenBudget: 1500, sensitivityFilter }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`cortex recall timed out after ${RECALL_TIMEOUT_MS}ms`)), RECALL_TIMEOUT_MS),
-      ),
+      new Promise<never>((_, reject) => {
+        recallTimer = setTimeout(
+          () => reject(new Error(`cortex recall timed out after ${RECALL_TIMEOUT_MS}ms`)),
+          RECALL_TIMEOUT_MS,
+        );
+      }),
     ]);
     recallSummary = r.context;
-    recallCount = r.memories.length;
+    _recallCount = r.memories.length;
     recallMemoryIds = r.memories.map((m) => m.id);
     recallArtifactIds = (r.artifacts ?? []).map((a) => a.id);
     recallTokenCount = r.tokenCount ?? 0;
     ctx.logger.debug({ msg: 'cortex recall', tokens: r.tokenCount, memories: r.memories.length, sensitivityFilter });
   } catch (err) {
     ctx.logger.warn({ msg: 'cortex recall failed or timed out; proceeding without memory', err: (err as Error).message });
+  } finally {
+    // The race leaves the loser's timer live; clear it so a fast recall
+    // doesn't strand an 8s timer per turn (event-loop noise, test latency).
+    clearTimeout(recallTimer);
   }
 
   // 2) Compose system prompt with recall injection
@@ -200,10 +235,18 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   if (ctx.skillToolNames) {
     for (const name of ctx.skillToolNames) allow.add(name);
   }
+  // MCP tools carry their own per-channel gate (set per server in
+  // CONNECTIONS/mcp.json). A gated name is visible iff the current channel
+  // is in its set — independent of config.tools, which stays the operator
+  // surface for builtins.
+  const mcpAllowed = (name: string): boolean => ctx.mcpGate?.get(name)?.has(ctx.channel) === true;
   const turnTools: ToolSet | undefined = ctx.tools
     ? Object.fromEntries(
         Object.entries(ctx.tools).filter(
-          ([k]) => k !== 'cortex_recall' && k !== 'cortex_encode' && allow.has(k),
+          ([k]) =>
+            k !== 'cortex_recall' &&
+            k !== 'cortex_encode' &&
+            (ctx.mcpGate?.has(k) ? mcpAllowed(k) : allow.has(k)),
         ),
       )
     : undefined;
@@ -220,13 +263,28 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   const toolCallTrace: Array<{ name: string; stepType: string; ts: string }> = [];
   let providerUsed: string | undefined;
 
+  // Deltas forwarded for the CURRENT provider attempt. If that attempt
+  // dies mid-stream and a fallback takes over, the observer gets a reset
+  // so it can discard the partial buffer (hazard: double emission).
+  let deltasEmittedThisAttempt = 0;
+
   for (const provider of chain) {
     try {
+      // streamText (ai@4.x) does NOT throw on provider failure: errors are
+      // routed to onError and textStream completes empty. Without capturing
+      // them here the catch below never fires and the fallback chain is
+      // dead code — a failing primary would surface as "All providers
+      // failed" even with healthy fallbacks configured.
+      let streamError: unknown;
       const stream = streamText({
+        onError: ({ error }) => {
+          streamError = error;
+        },
         model: provider.model,
         system,
         messages,
         tools: turnTools,
+        maxTokens: ctx.limits?.maxOutputTokens,
         maxRetries: 1,
         // Multi-step: model can call a tool then continue writing. Capped
         // at 3 — enough for legitimate fetch+summarize, not enough for
@@ -244,6 +302,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
             const ts = new Date().toISOString();
             for (const t of toolCalls) {
               toolCallTrace.push({ name: t.toolName, stepType, ts });
+              ctx.onStreamEvent?.({ type: 'tool', name: t.toolName });
             }
           }
           if (toolResults && toolResults.length > 0) {
@@ -272,14 +331,30 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       let out = '';
       for await (const delta of stream.textStream) {
         out += delta;
+        if (delta) {
+          deltasEmittedThisAttempt++;
+          ctx.onStreamEvent?.({ type: 'delta', text: delta });
+        }
+      }
+      if (streamError !== undefined) {
+        throw streamError instanceof Error ? streamError : new Error(String(streamError));
       }
       reply = out;
       providerUsed = provider.ref;
+      // Close the breaker circuit for this ref (mock routers may not have it).
+      ctx.router.reportSuccess?.(provider.ref);
       break;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       providerErrors.push({ ref: provider.ref, message: message || '(no message)' });
       ctx.logger.warn({ msg: 'provider failed; trying fallback', provider: provider.ref, err });
+      // Feed the breaker so repeated failures open the circuit and spare
+      // future turns (and sub-agent fan-outs) the dead-provider timeout.
+      ctx.router.reportFailure?.(provider.ref);
+      if (deltasEmittedThisAttempt > 0) {
+        deltasEmittedThisAttempt = 0;
+        ctx.onStreamEvent?.({ type: 'reset' });
+      }
     }
   }
   if (!reply) {
@@ -333,8 +408,8 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   const TEXT_CHANNELS: Array<MeridianTurn['channel']> = ['cli', 'telegram', 'gateway'];
   if (commitmentDetected && TEXT_CHANNELS.includes(ctx.channel)) {
     const trimQuote =
-      commitmentQuote.length > 80 ? commitmentQuote.slice(0, 79) + '…' : commitmentQuote;
-    reply = reply.trimEnd() + `\n\n${'✓ logged: ' + trimQuote}`;
+      commitmentQuote.length > 80 ? `${commitmentQuote.slice(0, 79)}…` : commitmentQuote;
+    reply = `${reply.trimEnd()}\n\n✓ logged: ${trimQuote}`;
   }
 
   // 4) CORTEX encode (post-turn) — fire-and-forget so the reply lands fast.

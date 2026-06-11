@@ -275,6 +275,13 @@
       if (typingEl) { typingEl.remove(); typingEl = null; }
     }
 
+    // Streaming-first: POST /chat/stream and render SSE deltas live.
+    // Contract (see gateway/server.ts):
+    //   delta → append text   reset → discard buffer (provider fallback)
+    //   tool  → status note   done  → REPLACE buffer with canonical reply
+    //   error → show error
+    // Falls back to blocking /chat if the stream endpoint is missing (older
+    // gateway) or errors at the transport level.
     async function sendMessage(text) {
       const url = (localStorage.getItem(LS.url) || '').replace(/\/$/, '');
       const token = localStorage.getItem(LS.token) || '';
@@ -287,21 +294,8 @@
       showTyping();
       sendBtn.disabled = true;
       try {
-        const res = await fetch(url + '/chat', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ input: text }),
-        });
-        if (!res.ok) {
-          const body = await res.text();
-          addErrorMessage('Gateway returned ' + res.status + ': ' + body.slice(0, 200));
-          return;
-        }
-        const json = await res.json();
-        addMessage('agent', json.reply || '(empty reply)');
+        const streamed = await sendStreaming(url, token, text);
+        if (!streamed) await sendBlocking(url, token, text);
       } catch (err) {
         addErrorMessage('Failed to reach gateway: ' + err.message);
       } finally {
@@ -309,6 +303,94 @@
         sendBtn.disabled = false;
         input.focus();
       }
+    }
+
+    /** Returns true if the streaming path handled the message. */
+    async function sendStreaming(url, token, text) {
+      const res = await fetch(url + '/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ input: text }),
+      });
+      if (res.status === 404) return false; // older gateway — use /chat
+      if (!res.ok) {
+        const body = await res.text();
+        addErrorMessage('Gateway returned ' + res.status + ': ' + body.slice(0, 200));
+        return true;
+      }
+
+      hideTyping();
+      let agentEl = null;
+      let buffer = '';
+      const ensureEl = () => {
+        if (!agentEl) agentEl = addMessage('agent', '');
+        return agentEl;
+      };
+      const render = () => {
+        ensureEl().textContent = buffer || '…';
+        messages.scrollTop = messages.scrollHeight;
+      };
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, { stream: true });
+        // SSE frames are separated by a blank line.
+        const frames = pending.split('\n\n');
+        pending = frames.pop();
+        for (const frame of frames) {
+          let event = 'message';
+          let data = '';
+          for (const line of frame.split('\n')) {
+            if (line.startsWith('event: ')) event = line.slice(7).trim();
+            else if (line.startsWith('data: ')) data += line.slice(6);
+          }
+          let body = {};
+          try { body = data ? JSON.parse(data) : {}; } catch { /* keep {} */ }
+          if (event === 'delta') {
+            buffer += body.text || '';
+            render();
+          } else if (event === 'reset') {
+            buffer = '';
+            render();
+            addSystemMessage('provider fell back — restarting reply');
+          } else if (event === 'tool') {
+            addSystemMessage('⚙ ' + (body.name || 'tool'));
+          } else if (event === 'done') {
+            // The server's reply is canonical (post-guardrail/footer).
+            buffer = body.reply || buffer;
+            render();
+          } else if (event === 'error') {
+            if (agentEl && !buffer) { agentEl.remove(); agentEl = null; }
+            addErrorMessage(body.error || 'stream error');
+          }
+        }
+      }
+      return true;
+    }
+
+    async function sendBlocking(url, token, text) {
+      const res = await fetch(url + '/chat', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ input: text }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        addErrorMessage('Gateway returned ' + res.status + ': ' + body.slice(0, 200));
+        return;
+      }
+      const json = await res.json();
+      addMessage('agent', json.reply || '(empty reply)');
     }
 
     form.addEventListener('submit', (e) => {

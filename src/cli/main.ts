@@ -17,7 +17,6 @@ process.removeAllListeners('warning');
 
 import { Command } from 'commander';
 import { existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { activeAgentSlug, ensureAgentHome, listAgents, loadAgentConfig, setActiveAgent } from '../config/home.js';
 import { loadAgentEnv, envFileTemplate } from '../config/loader.js';
 import { bindCortex } from '../cortex/bind.js';
@@ -25,8 +24,7 @@ import { createMemoryProvider } from '../memory/index.js';
 import { ProviderRouter } from '../providers/router.js';
 import { Conversation } from '../agent/conversation.js';
 import { DreamWeaver } from '../dream/weaver.js';
-import { loadSkills } from '../skills/loader.js';
-import { builtinTools } from '../skills/builtin/index.js';
+import { buildToolSurface } from '../agent/tool-surface.js';
 import { createLogger } from '../logger/pino.js';
 import { SessionStore } from '../session/store.js';
 import { runRepl } from './repl.js';
@@ -41,6 +39,7 @@ import { pickAgentInteractive } from './agent-picker.js';
 import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup } from './skills-cmd.js';
 import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
+import { runMcpList, runMcpServe } from './mcp-cmd.js';
 
 const program = new Command();
 program
@@ -101,6 +100,21 @@ program
     console.log(colors.ok(`active agent: ${slug}`));
   });
 
+const mcp = program.command('mcp').description('Model Context Protocol — consume servers, or serve this agent');
+mcp
+  .command('list')
+  .description('Probe MCP servers declared in CONNECTIONS/mcp.json and list their tools')
+  .action(async () => {
+    process.exit(await runMcpList());
+  });
+mcp
+  .command('serve')
+  .description('Expose this agent over MCP on stdio (CORTEX recall as a tool)')
+  .option('--allow-encode', 'also expose memory_encode (write access)')
+  .action(async (opts: { allowEncode?: boolean }) => {
+    await runMcpServe(opts);
+  });
+
 program
   .command('doctor')
   .description('Run end-to-end health checks across the AgentOS')
@@ -128,7 +142,7 @@ program
     const report = runAudit(home);
     const path = writeReport(home, report);
     console.log(colors.ok(`audit written to ${path}`));
-    if (opts.print) console.log('\n' + renderReport(report));
+    if (opts.print) console.log(`\n${renderReport(report)}`);
   });
 
 program
@@ -224,7 +238,7 @@ async function openChat(): Promise<void> {
     process.exit(1);
   }
 
-  let env;
+  let env: ReturnType<typeof loadAgentEnv>;
   try {
     env = loadAgentEnv(home);
   } catch (err) {
@@ -251,48 +265,10 @@ async function openChat(): Promise<void> {
     },
   });
 
-  const builtin = builtinTools({ cortex, env });
-
-  // Skills v2: open the encrypted vault, build a SkillToolContext, and let
-  // the loader instantiate any tools.ts-defined tools. Bundled markdown
-  // skills + dynamic tools both flow into the agent's tool surface.
-  const { openAgentVault } = await import('../secrets/vault.js');
-  const { PassphraseGuard } = await import('../skills/runtime.js');
-  const { prescanManifestEnvKeys } = await import('../skills/loader.js');
-  const { collectSkillEnv } = await import('../config/loader.js');
-  const { tool: aiTool } = await import('ai');
-  const { z: zod } = await import('zod');
-  const { runGog, runGogJson, listAccounts: gogListAccounts } = await import('../tools/gog.js');
-  const vault = openAgentVault({ envPath: home.envPath, vaultPath: home.vaultPath });
-  const guard = new PassphraseGuard(vault);
-
-  // Merge skill-manifest-declared env keys (LIMITLESS_API_KEY, etc.) onto
-  // the typed AgentEnv at runtime. TS shape stays AgentEnv; merged keys
-  // are accessible via the loose ctx.env in each skill's tools.ts.
-  const mergedEnv = Object.assign({}, env, collectSkillEnv(prescanManifestEnvKeys(home))) as typeof env;
-
-  const skillCtx = {
-    cortex,
-    vault,
-    env: mergedEnv,
-    logger,
-    requirePassphrase: (skillName: string, candidate?: string) =>
-      guard.require(skillName, candidate),
-    hashPassphrase: (raw: string) => PassphraseGuard.hash(raw),
-    grantPassphraseSession: (skillName: string, windowMinutes?: number) =>
-      guard.grant(skillName, windowMinutes ?? 30),
-    tool: aiTool,
-    z: zod,
-    tools: {
-      gog: { run: runGog, runJson: runGogJson, listAccounts: gogListAccounts },
-    },
-  };
-  const skills = await loadSkills(home, { ctx: skillCtx });
-  const tools = { ...builtin, ...skills.asTools() };
-  const skillToolNames = new Set<string>();
-  for (const s of skills.list()) {
-    if (s.dynamicTools) for (const k of Object.keys(s.dynamicTools)) skillToolNames.add(k);
-  }
+  // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
+  // place shared with the gateway (src/agent/tool-surface.ts).
+  const surface = await buildToolSurface({ home, config, env, cortex, logger, router, memory: memorySelection.provider });
+  const { tools, skillToolNames, skills, guard } = surface;
 
   // ── Runtime loadout — regenerate at every REPL boot ──
   // Auto-writes a CONTEXT file with current channels, automations, skills,
@@ -308,7 +284,8 @@ async function openChat(): Promise<void> {
       env,
       skills,
       automations: loadAutomationDefs(home),
-      builtinToolNames: Object.keys(builtin),
+      builtinToolNames: surface.builtinToolNames,
+      mcpTools: surface.mcpStatus.flatMap((st) => st.tools.map((t) => ({ name: t, server: st.server }))),
       cortexStats: cortexStats ?? undefined,
     });
   } catch (err) {
@@ -330,6 +307,7 @@ async function openChat(): Promise<void> {
     channel: 'cli',
     tools,
     skillToolNames,
+    mcpGate: surface.mcpGate,
     store,
   });
   const dream = new DreamWeaver({ cortex, config: config.dream, logger });
@@ -338,8 +316,8 @@ async function openChat(): Promise<void> {
   store.startSession(conversation.snapshot());
   let turnIdx = 0;
   const origSend = conversation.send.bind(conversation);
-  conversation.send = async (input) => {
-    const turn = await origSend(input);
+  conversation.send = async (input, sendOpts) => {
+    const turn = await origSend(input, sendOpts);
     store.appendTurn({ ...turn, role: 'user', content: input }, turnIdx++);
     store.appendTurn(turn, turnIdx++);
     return turn;
@@ -348,6 +326,7 @@ async function openChat(): Promise<void> {
   await runRepl({ home, config, conversation, cortex, dream, skills, store, passphraseGuard: guard });
   dream.stop();
   store.close();
+  await surface.close();
 }
 
 program.parseAsync(process.argv).catch((err) => {

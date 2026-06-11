@@ -1,7 +1,8 @@
 /**
  * HTTP gateway. Fastify on port 18889 by default. Hosts:
  *   /health        — public liveness probe
- *   /chat          — token-auth chat completion
+ *   /chat          — token-auth chat completion (blocking JSON)
+ *   /chat/stream   — token-auth SSE: live token deltas + canonical done event
  *   /vapi/webhook  — VAPI voice events; routes to VapiChannel
  *   /heartbeat     — internal ping
  *
@@ -13,6 +14,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import type { VapiChannel } from '../channels/vapi.js';
 import type { Conversation } from '../agent/conversation.js';
+import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
 import type { AutomationManager } from '../automations/manager.js';
 
@@ -53,6 +55,61 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       }
       const turn = await opts.conversation.send(input);
       return { reply: turn.content, turnId: turn.id, memoryId: turn.memoryId };
+    },
+  );
+
+  // ── SSE streaming chat ──
+  // Same auth + body contract as /chat, but the model's tokens arrive live:
+  //   event: delta  data: {"text":"..."}      raw model output, incremental
+  //   event: reset  data: {}                  provider fell back mid-stream;
+  //                                           client discards its buffer
+  //   event: tool   data: {"name":"..."}      a tool call fired
+  //   event: done   data: {"reply","turnId"}  CANONICAL post-processed reply —
+  //                                           clients MUST replace their
+  //                                           accumulated text with this
+  //   event: error  data: {"error":"..."}     turn failed
+  // /chat stays untouched for back-compat.
+  app.post<{ Body: { input: string }; Headers: { authorization?: string } }>(
+    '/chat/stream',
+    async (req, reply): Promise<void> => {
+      if (opts.token) {
+        const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+        if (got !== opts.token) {
+          await reply.code(401).send({ error: 'unauthorized' });
+          return;
+        }
+      }
+      const { input } = req.body ?? { input: '' };
+      if (!input || typeof input !== 'string') {
+        await reply.code(400).send({ error: 'input required' });
+        return;
+      }
+
+      // From here we own the raw socket; Fastify must not serialize a body.
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+        'x-accel-buffering': 'no',
+      });
+      const emit = (event: string, data: unknown): void => {
+        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+
+      try {
+        const turn = await opts.conversation.send(input, {
+          onStreamEvent: (ev: TurnStreamEvent) => {
+            if (ev.type === 'delta') emit('delta', { text: ev.text });
+            else if (ev.type === 'reset') emit('reset', {});
+            else emit('tool', { name: ev.name });
+          },
+        });
+        emit('done', { reply: turn.content, turnId: turn.id, ts: turn.ts });
+      } catch (err) {
+        emit('error', { error: (err as Error).message });
+      }
+      reply.raw.end();
     },
   );
 

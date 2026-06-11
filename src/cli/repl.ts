@@ -91,7 +91,7 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
   const bootStart = Date.now();
 
   // Wordmark
-  console.log('\n' + renderLogo() + '\n');
+  console.log(`\n${renderLogo()}\n`);
 
   // Live system probes
   const cortexHealth = await cortex.health();
@@ -171,7 +171,7 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
                 name: 'Telegram',
                 binding:
                   process.env.TELEGRAM_BOT_USERNAME
-                    ? '@' + process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')
+                    ? `@${process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')}`
                     : 'bot live',
                 status: 'live' as const,
               },
@@ -220,12 +220,12 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
 
   console.log(`\n${welcomeLine(config.agent.name)}\n`);
   console.log(
-    renderStatusBar({
+    `${renderStatusBar({
       ctxPct: 0,
       dreamState: 'idle',
       agent: home.agentSlug,
       elapsedSec: 0,
-    }) + '\n',
+    })}\n`,
   );
 
   const systemBase = readSystemBase(home, config.agent.name);
@@ -259,12 +259,12 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
         console.log(`\n${turn.content}\n`);
         const elapsed = (Date.now() - started) / 1000;
         process.stdout.write(
-          renderStatusBar({
+          `${renderStatusBar({
             ctxPct: Math.min(100, Math.round((conversation.historyCount / 60) * 100)),
             dreamState: dream.state().running ? 'running' : 'idle',
             agent: home.agentSlug,
             elapsedSec: elapsed,
-          }) + '\n',
+          })}\n`,
         );
       } catch (err) {
         console.log(colors.err(`error: ${(err as Error).message}\n`));

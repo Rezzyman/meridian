@@ -141,6 +141,7 @@ const CLI_SAFE_DEFAULT = [
   'bash',
   'read',
   'write',
+  'delegate',
 ] as const;
 export const ToolsConfigSchema = z.object({
   chat: z.array(z.string()).default([...CHAT_SAFE_DEFAULT]),
@@ -149,6 +150,29 @@ export const ToolsConfigSchema = z.object({
 export type ToolsConfig = z.infer<typeof ToolsConfigSchema>;
 export const TOOLS_CHAT_DEFAULT = CHAT_SAFE_DEFAULT;
 export const TOOLS_CLI_DEFAULT = CLI_SAFE_DEFAULT;
+
+// ─── Delegation (sub-agents) ───────────────────────────────────────────────────
+// The `delegate` built-in runs a scoped sub-turn: constrained toolset, its
+// own output-token budget, its own (shorter) timeout, no memory encode by
+// default. Every limit here is a HARD bound enforced by the runtime — a
+// model cannot talk its way past them.
+export const DelegationConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  /** How many levels may delegate. 1 = the root agent can spawn a child;
+   *  the child cannot re-delegate. Bounded at 4 — fan-out is a feature,
+   *  recursion is an outage. */
+  maxDepth: z.number().int().min(1).max(4).default(1),
+  /** Output-token cap per sub-turn (streamText maxTokens). */
+  maxOutputTokens: z.number().int().min(256).max(32000).default(4000),
+  /** Wall-clock cap per sub-turn. */
+  timeoutSec: z.number().int().min(5).max(600).default(120),
+  /** Tools grantable to a child when the parent doesn't name any. */
+  childTools: z.array(z.string()).default(['web_fetch', 'read']),
+  /** Encode child turns into memory. Off by default: a research fan-out
+   *  shouldn't pollute the agent's episodic memory with scratch work. */
+  encodeSubTurns: z.boolean().default(false),
+});
+export type DelegationConfig = z.infer<typeof DelegationConfigSchema>;
 
 // ─── Proactive sentinel config ─────────────────────────────────────────────────
 // What turns the agent from "responsive" into "real partner". Scheduled
@@ -201,6 +225,7 @@ export const AgentConfigSchema = z.object({
   dream: DreamConfigSchema,
   proactive: ProactiveConfigSchema.optional(),
   tools: ToolsConfigSchema.optional(),
+  delegation: DelegationConfigSchema.optional(),
   cortex: z.object({
     agentId: z.string(),
     recallTopK: z.number().int().default(8),

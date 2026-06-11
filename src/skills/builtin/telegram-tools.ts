@@ -37,7 +37,7 @@ export function telegramTools(env: AgentEnv) {
         if (!target) {
           return { ok: false, error: 'no chat id (set TELEGRAM_DEFAULT_CHAT_ID or pass chatId)' };
         }
-        const body = text.length > 4000 ? text.slice(0, 3990) + '\n…' : text;
+        const body = text.length > 4000 ? `${text.slice(0, 3990)}\n…` : text;
         const res = await fetch(`${TELEGRAM_BASE}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -70,7 +70,8 @@ export function findCommand(name: string): CommandDef | undefined {
 export function commandsByCategory(): Record<string, CommandDef[]> {
   const out: Record<string, CommandDef[]> = {};
   for (const c of COMMAND_REGISTRY) {
-    (out[c.category] ??= []).push(c);
+    if (!out[c.category]) out[c.category] = [];
+    out[c.category].push(c);
   }
   return out;
 }

@@ -12,6 +12,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { tool as aiTool } from 'ai';
 import { z as zod } from 'zod';
 import type { Logger } from 'pino';
+import type { defineTool as defineToolFactory } from './toolkit.js';
 import type { CortexBind } from '../cortex/bind.js';
 import type { Vault } from '../secrets/vault.js';
 import type { AgentEnv } from '../config/schema.js';
@@ -55,6 +56,12 @@ export interface SkillToolContext {
   tool: typeof aiTool;
   /** Zod factory passed through for the same reason. */
   z: typeof zod;
+  /** Output-validated tool factory (skills/toolkit.ts): declare an
+   *  `output` Zod schema and every result is validated before it reaches
+   *  the model — mismatches return { ok:false, error:'output_validation',
+   *  issues } so the model self-corrects. Same import-isolation rationale
+   *  as `tool`/`z`. */
+  defineTool: typeof defineToolFactory;
   /** Meridian-bundled tool binaries (gog, etc.) wrapped so skills never
    *  have to resolve filesystem paths into the meridian source tree. */
   tools: BundledTools;

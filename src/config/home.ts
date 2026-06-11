@@ -6,7 +6,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { AgentConfig } from './schema.js';
 import { AgentConfigSchema, defaultAgentConfig } from './schema.js';

@@ -22,6 +22,12 @@ This file lives at the repo root because the OSS framework and the upcoming mana
 - **DreamWeaver** in-process consolidation cycle
 - **AutomationManager** for cron-scheduled skill runs
 - **SessionStore** persisting turns to SQLite for cross-restart continuity
+- **Test suite + CI** — 191 tests over the core seams (turn loop, memory contract, vault, router, skills, verification, MCP, gateway, delegation, structured output); GitHub Actions runs typecheck + lint + test + build on every push/PR
+- **MCP client** — `CONNECTIONS/mcp.json` servers (stdio / streamable-http / sse) surface as first-class, channel-gated tools (`mcp_<server>_<tool>`); voice excluded by default; `meridian mcp list` probes
+- **MCP server** — `meridian mcp serve` exposes CORTEX recall/stats/health over the protocol (encode opt-in via `--allow-encode`); agentId pinned server-side
+- **Bounded sub-agents** — `delegate` built-in: scoped sub-turn, structural depth limit, output-token + wall-clock caps, explicit tool grants, no memory encode by default
+- **Provider circuit breaker** — per-ref open/half-open/closed with an all-open failsafe, fed from the turn loop
+- **Schema-enforced output** — `defineTool` (Zod-validated tool results) + `generateStructured` (validated JSON from the model chain with repair-retries)
 
 ### Channels
 
@@ -50,7 +56,6 @@ These features are scaffolded in the codebase but require either polish, headles
 
 ### Reliability
 
-- **Web chat UI** — the HTTP `/chat` endpoint exists and returns clean JSON; a browser-facing chat UI for non-CLI users is in active development.
 - **VAPI outbound calls** — required for the "your new agent calls you to introduce itself" onboarding moment. Inbound voice works today; outbound triggering from Meridian is the missing piece.
 - **`meridian skills setup google` headless-server flow** — works fine on Mac (gog handles OAuth via local browser). On a headless server, the operator needs to SSH-port-forward the OAuth callback. The walkthrough is documented; automating it cleanly is in flight.
 - **Live `wearables_pull` end-to-end test** — the `limitless` and `bee` adapters compile and have unit-level smoke tests. A production-scale lifelog backfill against a real Voyage key is queued and will surface any rate-limit or large-payload edge cases that need throttling refinements.
@@ -65,7 +70,7 @@ These features are scaffolded in the codebase but require either polish, headles
 
 ### Channels
 
-- **Web chat UI** — Next.js component shipped as a standalone page operators can host or embed
+- **Web chat UI (hosted)** — Next.js component shipped as a standalone page operators can host or embed. (The single-file `skeleton/web/chat.html` ships today with live SSE streaming.)
 - **iMessage** — via a Mac relay agent or Sendblue/LoopMessage API for non-Mac operators
 - **Slack** — dedicated `slack` skill following the same pattern as `github` (bot token + per-workspace OAuth)
 - **WhatsApp Business** — once we clear Meta's API approval gate

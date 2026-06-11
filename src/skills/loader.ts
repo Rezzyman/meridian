@@ -185,7 +185,8 @@ export async function loadSkills(
     byCategory: () => {
       const out: Record<string, LoadedSkill[]> = {};
       for (const s of list) {
-        (out[s.category] ??= []).push(s);
+        if (!out[s.category]) out[s.category] = [];
+        out[s.category].push(s);
       }
       return out;
     },

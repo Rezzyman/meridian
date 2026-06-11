@@ -95,7 +95,7 @@ export async function runGuidedIntake(slug: string): Promise<IntakeAnswers> {
   };
 }
 
-export function composeIdentity(slug: string, answers: IntakeAnswers): string {
+export function composeIdentity(_slug: string, answers: IntakeAnswers): string {
   const tone = answers.tone.replace(/-/g, ' ');
   const rules = answers.rules.map((r) => `- ${r}`).join('\n');
   return `# ${answers.agentName}

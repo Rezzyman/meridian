@@ -12,7 +12,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createGroq } from '@ai-sdk/groq';
-import { createOllama } from 'ollama-ai-provider-v2';
+import { createOllama } from 'ollama-ai-provider';
 import type { AgentEnv, ModelChain } from '../config/schema.js';
 
 export type ProviderName = 'openrouter' | 'anthropic' | 'openai' | 'groq' | 'ollama';
@@ -24,6 +24,25 @@ export interface ResolvedProvider {
   model: LanguageModel;
 }
 
+/** Route ollama doStream calls by payload: tools → simulated streaming
+ *  (tool calls parse), no tools → true streaming (live tokens). See the
+ *  ollama case in ProviderRouter.build for the full rationale. */
+function hybridOllama(live: LanguageModel, sim: LanguageModel): LanguageModel {
+  return new Proxy(live, {
+    get(target, prop, receiver) {
+      if (prop === 'doStream') {
+        return (options: Parameters<LanguageModel['doStream']>[0]) => {
+          const mode = options.mode as { type?: string; tools?: unknown[] };
+          const hasTools =
+            mode?.type === 'regular' && Array.isArray(mode.tools) && mode.tools.length > 0;
+          return (hasTools ? sim : live).doStream(options);
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+}
+
 function parseRef(ref: string): { provider: ProviderName; modelId: string } {
   const slash = ref.indexOf('/');
   if (slash === -1) throw new Error(`invalid model ref: ${ref}`);
@@ -32,9 +51,72 @@ function parseRef(ref: string): { provider: ProviderName; modelId: string } {
   return { provider, modelId };
 }
 
+export interface CircuitBreakerOptions {
+  /** Consecutive failures before a ref's circuit opens. */
+  failureThreshold?: number;
+  /** How long an open circuit stays open before a retry is allowed. */
+  cooldownMs?: number;
+}
+
+interface BreakerState {
+  consecutiveFailures: number;
+  openUntil: number; // epoch ms; 0 = closed
+}
+
+const BREAKER_DEFAULTS: Required<CircuitBreakerOptions> = {
+  failureThreshold: 3,
+  cooldownMs: 30_000,
+};
+
 export class ProviderRouter {
   private cached = new Map<string, LanguageModel>();
-  constructor(private env: AgentEnv) {}
+  // ── Circuit breaker ──
+  // Sub-agent fan-out multiplies model calls; without a breaker, a dead
+  // provider eats (timeout × fan-out × chain-position) of wall clock on
+  // every turn. Call sites report outcomes; chainFor skips refs whose
+  // circuit is open. Failsafe: if EVERY ref in a chain is open, the chain
+  // is returned unfiltered — the breaker may never make availability worse.
+  private breaker = new Map<string, BreakerState>();
+  private breakerOpts: Required<CircuitBreakerOptions>;
+
+  constructor(
+    private env: AgentEnv,
+    breakerOpts: CircuitBreakerOptions = {},
+  ) {
+    this.breakerOpts = { ...BREAKER_DEFAULTS, ...breakerOpts };
+  }
+
+  /** Call-site report: provider call failed. Opens the circuit at threshold. */
+  reportFailure(ref: string): void {
+    const st = this.breaker.get(ref) ?? { consecutiveFailures: 0, openUntil: 0 };
+    st.consecutiveFailures += 1;
+    if (st.consecutiveFailures >= this.breakerOpts.failureThreshold) {
+      st.openUntil = Date.now() + this.breakerOpts.cooldownMs;
+    }
+    this.breaker.set(ref, st);
+  }
+
+  /** Call-site report: provider call succeeded. Closes the circuit. */
+  reportSuccess(ref: string): void {
+    this.breaker.delete(ref);
+  }
+
+  /** A ref is open while its cooldown is in the future. Expiry closes it
+   *  to half-open: the next attempt either resets (success) or re-opens
+   *  immediately (failure at threshold). */
+  isOpen(ref: string): boolean {
+    const st = this.breaker.get(ref);
+    if (!st) return false;
+    if (st.openUntil === 0) return false;
+    if (Date.now() >= st.openUntil) {
+      // Half-open: allow one probe; stay at threshold so a failure re-opens.
+      st.openUntil = 0;
+      st.consecutiveFailures = this.breakerOpts.failureThreshold - 1;
+      this.breaker.set(ref, st);
+      return false;
+    }
+    return true;
+  }
 
   resolve(ref: string): ResolvedProvider {
     const cached = this.cached.get(ref);
@@ -76,10 +158,21 @@ export class ProviderRouter {
         return g(modelId);
       }
       case 'ollama': {
+        // ollama-ai-provider@1.x speaks LanguageModelV1 (AI SDK 4). The
+        // previous -v2 package emitted V2 models that ai@4.x rejects at
+        // runtime with "Unsupported model version" — every default config
+        // advertising ollama fallbacks was silently broken (caught by the
+        // live eval).
+        //
+        // Hybrid streaming: the provider's TRUE streaming mode drops tool
+        // calls entirely (model consumes tokens, zero parts surface, the
+        // turn dies as "empty reply"), while simulateStreaming parses tool
+        // calls but delivers text as one end burst. So: tool-bearing calls
+        // go through the simulated model, text-only calls keep live
+        // token-by-token streaming. Both verified against a live ollama
+        // in the eval harness (scripts/eval/run-eval.mts).
         const o = createOllama({ baseURL: `${this.env.OLLAMA_BASE_URL}/api` });
-        // ollama-ai-provider-v2 returns LanguageModelV2; AI SDK 4 expects V1.
-        // The runtime tolerates the mismatch (duck-typed). Cast through unknown.
-        return o(modelId) as unknown as LanguageModel;
+        return hybridOllama(o(modelId), o(modelId, { simulateStreaming: true }));
       }
       default:
         throw new Error(`unknown provider: ${provider}`);
@@ -112,7 +205,9 @@ export class ProviderRouter {
     if (out.length === 0) {
       throw new Error('No providers resolvable. Check .env keys.');
     }
-    return out;
+    // Breaker filter — but never to an empty chain (see breaker comment).
+    const live = out.filter((p) => !this.isOpen(p.ref));
+    return live.length > 0 ? live : out;
   }
 
   private isSimple(input: string, chain: ModelChain): boolean {
