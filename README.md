@@ -125,7 +125,14 @@ Bring channels online and start chatting:
 ```bash
 meridian gateway                 # HTTP gateway on :18889 + Telegram + voice
 meridian                         # interactive REPL
-open skeleton/web/chat.html      # browser chat UI (paste your gateway URL + token)
+open skeleton/web/chat.html      # browser chat UI — streams tokens live over SSE
+```
+
+Wire up MCP, both directions:
+
+```bash
+meridian mcp list                # probe servers declared in CONNECTIONS/mcp.json
+meridian mcp serve               # expose THIS agent (CORTEX recall) to any MCP client
 ```
 
 Add a specialist that inherits the hub's CONTEXT and MEMORY:
@@ -166,9 +173,9 @@ CORTEX recall (CA3 pattern completion against the agent's dedicated Neon DB)
    ↓
 recall folded into <cortex_recall> system prompt section
    ↓
-provider call via Vercel AI SDK (primary + fallback chain, smart-routing)
+provider call via Vercel AI SDK (primary + fallback chain, smart-routing, circuit breaker)
    ↓
-tool-use loop (built-ins + filesystem skills + MCP)
+tool-use loop (built-ins + filesystem skills + MCP tools + bounded delegate sub-agents)
    ↓
 postTurn hooks
    ↓
@@ -210,6 +217,11 @@ meridian                        Open the interactive REPL (default)
 
 Inside the REPL: `/help`, `/cortex`, `/recall`, `/encode`, `/dream`, `/audit`, `/skills`, `/quit`.
 
+```
+meridian mcp list               Probe CONNECTIONS/mcp.json servers + their tools
+meridian mcp serve              Serve this agent over MCP (stdio); --allow-encode arms writes
+```
+
 ---
 
 ## Open-source vs commercial
@@ -243,6 +255,11 @@ What's new in 1.2:
 - **Bundled plugins ship 24 tools across `google`, `github`, `web-search`, `wearables`.** Every install is a bundled-binary or paste-the-key flow; nothing requires a separate harness.
 
 What's working today:
+- Real test suite (191 tests) + green CI (typecheck + lint + test + build, Node 22/24)
+- MCP both directions: consume external MCP servers as channel-gated first-class tools; serve CORTEX recall to any MCP client (`meridian mcp serve`)
+- SSE streaming gateway (`/chat/stream`) with a streaming browser UI
+- Bounded `delegate` sub-agents (structural depth, token + wall-clock caps) behind a provider circuit breaker
+- Schema-enforced output: Zod-validated tool results + validated-JSON generation with repair retries
 - Multi-channel agents (CLI, Telegram, voice via VAPI) with cross-channel memory
 - Skills v2 with bundled plugins and OAuth-via-CLI patterns
 - Encrypted vault, passphrase-gated tools, voice unlock guard

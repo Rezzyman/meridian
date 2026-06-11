@@ -12,7 +12,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createGroq } from '@ai-sdk/groq';
-import { createOllama } from 'ollama-ai-provider-v2';
+import { createOllama } from 'ollama-ai-provider';
 import type { AgentEnv, ModelChain } from '../config/schema.js';
 
 export type ProviderName = 'openrouter' | 'anthropic' | 'openai' | 'groq' | 'ollama';
@@ -22,6 +22,25 @@ export interface ResolvedProvider {
   modelId: string;
   ref: string; // canonical "provider/model"
   model: LanguageModel;
+}
+
+/** Route ollama doStream calls by payload: tools → simulated streaming
+ *  (tool calls parse), no tools → true streaming (live tokens). See the
+ *  ollama case in ProviderRouter.build for the full rationale. */
+function hybridOllama(live: LanguageModel, sim: LanguageModel): LanguageModel {
+  return new Proxy(live, {
+    get(target, prop, receiver) {
+      if (prop === 'doStream') {
+        return (options: Parameters<LanguageModel['doStream']>[0]) => {
+          const mode = options.mode as { type?: string; tools?: unknown[] };
+          const hasTools =
+            mode?.type === 'regular' && Array.isArray(mode.tools) && mode.tools.length > 0;
+          return (hasTools ? sim : live).doStream(options);
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
 }
 
 function parseRef(ref: string): { provider: ProviderName; modelId: string } {
@@ -139,10 +158,21 @@ export class ProviderRouter {
         return g(modelId);
       }
       case 'ollama': {
+        // ollama-ai-provider@1.x speaks LanguageModelV1 (AI SDK 4). The
+        // previous -v2 package emitted V2 models that ai@4.x rejects at
+        // runtime with "Unsupported model version" — every default config
+        // advertising ollama fallbacks was silently broken (caught by the
+        // live eval).
+        //
+        // Hybrid streaming: the provider's TRUE streaming mode drops tool
+        // calls entirely (model consumes tokens, zero parts surface, the
+        // turn dies as "empty reply"), while simulateStreaming parses tool
+        // calls but delivers text as one end burst. So: tool-bearing calls
+        // go through the simulated model, text-only calls keep live
+        // token-by-token streaming. Both verified against a live ollama
+        // in the eval harness (scripts/eval/run-eval.mts).
         const o = createOllama({ baseURL: `${this.env.OLLAMA_BASE_URL}/api` });
-        // ollama-ai-provider-v2 returns LanguageModelV2; AI SDK 4 expects V1.
-        // The runtime tolerates the mismatch (duck-typed). Cast through unknown.
-        return o(modelId) as unknown as LanguageModel;
+        return hybridOllama(o(modelId), o(modelId, { simulateStreaming: true }));
       }
       default:
         throw new Error(`unknown provider: ${provider}`);

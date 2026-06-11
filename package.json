@@ -46,7 +46,7 @@
     "gpt-tokenizer": "^2.8.1",
     "grammy": "^1.39.0",
     "node-cron": "^4.1.0",
-    "ollama-ai-provider-v2": "^1.0.0",
+    "ollama-ai-provider": "^1.2.0",
     "ora": "^9.0.0",
     "pdfjs-dist": "^5.7.284",
     "pino": "^9.5.0",

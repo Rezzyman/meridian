@@ -2,6 +2,60 @@
 
 All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
+## [Unreleased] — feature/world-class-parity
+
+Parity build: test suite + CI, MCP both directions, SSE streaming, bounded
+sub-agents, schema-enforced output. Full writeup in the PR.
+
+### Added
+
+- **Test suite + CI.** 191 tests (`node:test` + tsx, DI-only — no module mocking)
+  across the turn loop, conversation/operator, skills loader, CortexBind HTTP
+  contract, memory provider factory, vault, provider router, verification
+  runtime, MCP client/server, gateway SSE, delegation, structured output.
+  GitHub Actions (`.github/workflows/ci.yml`): typecheck + lint + test + build
+  on Node 22/24.
+- **MCP client.** `CONNECTIONS/mcp.json` declares MCP servers (stdio /
+  streamable-http / sse). Discovered tools surface as `mcp_<server>_<tool>`
+  with a per-server channel gate — voice is excluded by default. Probe with
+  `meridian mcp list`.
+- **MCP server.** `meridian mcp serve` exposes the agent over MCP on stdio:
+  `memory_recall` (CORTEX recall as a protocol-native tool), `memory_stats`,
+  `memory_health`; `memory_encode` only behind `--allow-encode`. agentId is
+  pinned server-side and never accepted as a parameter.
+- **SSE streaming gateway.** `POST /chat/stream` with live token deltas
+  (`delta` / `reset` / `tool` / `done` / `error` events); `done` carries the
+  canonical post-processed reply. `/chat` unchanged. `skeleton/web/chat.html`
+  renders the stream and falls back to blocking `/chat` on older gateways.
+- **Bounded sub-agents.** `delegate` built-in runs a scoped sub-turn with
+  structural depth limits, per-sub-turn output-token + wall-clock caps,
+  explicit tool grants, and no memory encode by default
+  (`delegation` config block; CLI allowlist only).
+- **Provider circuit breaker.** Consecutive failures open a per-ref circuit
+  (cooldown + half-open probe); `chainFor` skips open refs with an all-open
+  failsafe. Fed from the turn loop.
+- **Schema-enforced output.** `defineTool` validates tool RESULTS against a
+  Zod schema (structured `output_validation` failures the model can
+  self-correct on); `generateStructured` returns schema-validated JSON from
+  the model chain with repair-retries that feed validation errors back.
+- **Live eval harness.** `scripts/eval/run-eval.mts`: tool-calling precision,
+  MCP path, delegate path, memory encode→recall, structured output, SSE
+  streaming — runs against a real model on a dedicated eval agent.
+
+### Fixed
+
+- **Provider fallback was dead code.** `streamText` (ai@4.x) routes provider
+  errors to an `onError` callback the turn loop never set, so a failing
+  primary surfaced as "All providers failed" without ever trying fallbacks.
+  Errors are now captured and rethrown to advance the chain.
+- **Ollama provider was broken.** `ollama-ai-provider-v2` emits AI SDK v5
+  models that ai@4.x rejects at runtime ("Unsupported model version") —
+  every default config advertising ollama fallbacks crashed. Swapped to the
+  v4-compatible `ollama-ai-provider` with hybrid streaming: tool-bearing
+  calls use simulated streaming (tool calls parse), text-only calls keep
+  live token-by-token streaming.
+- Recall-timeout race no longer strands a live 8s timer per turn.
+
 ## [1.1.0] - 2026-05-05
 
 Groq added as a first-class model provider.
