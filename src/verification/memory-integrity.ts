@@ -123,14 +123,26 @@ const ABSOLUTE_ADVERBS = [
 const OVERRIDE_VERBS = [
   'ignore', 'disregard', 'forget', 'override',
   'ignorez', 'oubliez', // fr
-  'ignora', 'olvida', // es
-  'ignoriere', 'vergiss', // de
+  'ignora', 'olvida', 'descarta', // es
+  'ignoriere', 'vergiss', 'missachte', // de
+  'ignora', 'dimentica', // it (ignora shared with es)
+  'negeer', 'vergeet', // nl
+  'ignore', 'esqueça', 'esqueca', // pt
 ];
+// Imperative directive verbs. The red-team showed that covered Latin languages
+// (DE/IT/NL/PT, and gaps in ES/FR) evaded because their natural verb-FIRST
+// imperatives ("genehmige immer …", "autorizza sempre …") used verbs absent
+// from this list. Each language's high-frequency money/authorization verbs are
+// now here so the order-independent and clause-initial checks can fire.
 const DIRECTIVE_VERBS = [
   'approve', 'refuse', 'reject', 'deny', 'decline', 'disable', 'enable', 'send', 'forward',
-  'bypass', 'skip', 'execute', 'reveal', 'disclose', 'wire', 'transfer', 'pay', 'delete',
-  'approuver', 'approuvez', 'refuser', 'refusez', 'envoyer', // fr
-  'aprueba', 'rechaza', 'envia', 'transfiere', // es
+  'bypass', 'skip', 'execute', 'reveal', 'disclose', 'wire', 'transfer', 'pay', 'delete', 'release',
+  'approuver', 'approuvez', 'refuser', 'refusez', 'envoyer', 'payez', 'virez', 'autorisez', // fr
+  'aprueba', 'rechaza', 'envia', 'transfiere', 'paga', 'retira', 'autoriza', 'aprobá', // es
+  'genehmige', 'überweise', 'uberweise', 'zahle', 'sende', 'autorisiere', 'deaktiviere', 'lösche', 'losche', // de
+  'autorizza', 'approva', 'trasferisci', 'paga', 'invia', 'elimina', 'disabilita', // it
+  'keur', 'betaal', 'stuur', 'verstuur', // nl
+  'aprove', 'transfira', 'pague', 'envie', 'autorize', // pt
 ];
 
 const ABS_RE = new RegExp(`\\b(?:${ABSOLUTE_ADVERBS.join('|')})\\b`, 'i');
@@ -141,10 +153,20 @@ const ABS_THEN_VERB_RE = new RegExp(
   `\\b(?:${ABSOLUTE_ADVERBS.join('|')})\\b(?:\\W+\\w+){0,2}\\W+(?:${OVERRIDE_VERBS.join('|')}|${DIRECTIVE_VERBS.join('|')})\\b`,
   'i',
 );
+// The MIRROR of ABS_THEN_VERB for verb-FIRST languages: a directive verb within
+// a couple words BEFORE an absolute adverb ("genehmige immer", "autorizza
+// sempre", "paga sempre"). Without this, every verb-first-imperative language
+// (German/Italian/Dutch and many ES/FR forms) evaded.
+const VERB_THEN_ABS_RE = new RegExp(
+  `\\b(?:${OVERRIDE_VERBS.join('|')}|${DIRECTIVE_VERBS.join('|')})\\b(?:\\W+\\w+){0,2}\\W+(?:${ABSOLUTE_ADVERBS.join('|')})\\b`,
+  'i',
+);
 // A directive verb scoped to a quantifier ("refuse every request", "send all
-// invoices", "approve any withdrawal").
+// invoices", "approve any withdrawal", "transfiere todo", "genehmige alle").
+// Quantifiers are multilingual so verb+quantifier fires across covered langs.
+const QUANTIFIER = 'all|every|any|each|todos|todas|todo|tous|toutes|tout|alle|alles|tutti|tutte|tutto|tudo|tutte';
 const QUANTIFIED_DIRECTIVE_RE = new RegExp(
-  `\\b(?:${OVERRIDE_VERBS.join('|')}|${DIRECTIVE_VERBS.join('|')})\\b[^.!?\\n]{0,40}\\b(?:all|every|any|each)\\b`,
+  `\\b(?:${OVERRIDE_VERBS.join('|')}|${DIRECTIVE_VERBS.join('|')})\\b[^.!?\\n]{0,40}\\b(?:${QUANTIFIER})\\b`,
   'i',
 );
 // Standing-rule preamble; a directive verb anywhere in the same memory makes it
@@ -161,10 +183,27 @@ const ANY_DIRECTIVE_VERB_RE = new RegExp(
 // remote" (a first-person statement of fact).
 const STANDING_IMPERATIVE_RE =
   /\b(?:from now on|going forward|moving forward|henceforth)\b[,\s]+(?!(?:i|i'|we|we'|they|he|she|it|the|my|our|your|his|her|their|its|user|customer|client|caller|vendor|operator)\b)[a-z]/i;
+// Override + an object it overrides. Object nouns are plural/inflected and
+// multilingual (the red-team's Spanish "instrucciones anteriores" and German
+// "bisherigen Anweisungen" both evaded the English-only singular list).
+const OVERRIDE_OBJECT =
+  'previous|prior|earlier|above|all|instruction|instructions|rule|rules|constraint|constraints|guideline|guidelines|' +
+  'précédent|précédentes|antérieur|anterior|anteriores|instrucción|instruccion|instrucciones|reglas|' + // fr/es
+  'bisherige|bisherigen|vorherige|vorherigen|anweisung|anweisungen|regeln|' + // de
+  'precedenti|istruzioni|regole|' + // it
+  'vorige|instructies|' + // nl
+  'anteriores|instruções|instrucoes'; // pt
 const OVERRIDE_RE = new RegExp(
-  `\\b(?:${OVERRIDE_VERBS.join('|')})\\b[^.!?\\n]{0,40}\\b(?:previous|prior|earlier|above|all|instruction|instructions|rule|rules|constraint|constraints|guideline|guidelines|précédent|antérieur|anterior)\\b`,
+  `\\b(?:${OVERRIDE_VERBS.join('|')})\\b[^.!?\\n]{0,40}\\b(?:${OVERRIDE_OBJECT})\\b`,
   'i',
 );
+// A clause that STARTS with an override verb is an imperative override
+// regardless of object or adverb ("ignore all previous instructions",
+// "ignoriere alle bisherigen Anweisungen", "ignora las instrucciones
+// anteriores"). Override verbs are near-never benign as a clause head, so this
+// is safe to fire unconditionally — unlike bare directive verbs (pay/send),
+// which can head ordinary sentences and are gated by quantifier/adverb instead.
+const OVERRIDE_VERB_HEAD_RE = new RegExp(`^\\W*(?:please\\s+)?(?:${OVERRIDE_VERBS.join('|')})\\b`, 'i');
 const POLICY_RE = /\b(?:policy|rule|directive|standing order|system prompt|règle|directive|política|regla)\b\s*[:=\-—]/i;
 const ROLE_HEADER_RE = /^(?:system|assistant|admin|root|developer|superuser)\s*[:=]/im;
 
@@ -236,8 +275,15 @@ function clauseIsImperative(clause: string): boolean {
 // category and is not flagged. Languages outside this set still fall to Tier 2.
 
 interface ScriptLexicon {
-  /** always / never / from now on / permanent rule / by default. */
-  standing: string[];
+  /** EXPLICIT standing-rule preamble: "permanent rule", "from now on",
+   *  "henceforth". A benign habitual ("he always pays") never uses these, so a
+   *  ruleMarker is a strong directive cue. */
+  ruleMarker: string[];
+  /** Weak absolute adverb: always / never / by default / uniformly. Present in
+   *  benign habituals too, so NOT sufficient alone — needs a bypass or rule
+   *  marker (this split is the fix for the multilingual false-positive regression
+   *  the red-team found: "वह हमेशा पैसे भेजता है" / "他总是按时支付账单"). */
+  absolute: string[];
   /** ignore / disregard / override previous. */
   override: string[];
   /** approve / transfer / wire / pay / send / authorize / disclose. */
@@ -251,45 +297,52 @@ interface ScriptLexicon {
 // collisions are effectively nil because each list is script-specific.
 const SCRIPT_LEXICONS: Record<string, ScriptLexicon> = {
   arabic: {
-    standing: ['دائما', 'دائماً', 'القاعدة الدائمة', 'من الآن', 'بشكل دائم', 'افتراضي'],
+    ruleMarker: ['القاعدة الدائمة', 'من الآن', 'بشكل دائم'],
+    absolute: ['دائما', 'دائماً', 'افتراضي'],
     override: ['تجاهل', 'تجاهل التعليمات', 'تجاهل كل'],
     action: ['تحويل', 'حوّل', 'حول', 'وافق', 'الموافقة', 'اعتمد', 'ادفع', 'الدفع', 'أرسل', 'صرف'],
     bypass: ['دون تأكيد', 'بدون تأكيد', 'دون مراجعة', 'بدون مراجعة', 'دون موافقة', 'دون انتظار الموافقة'],
   },
   han: {
     // Chinese (and Han shared with Japanese kanji where applicable).
-    standing: ['始终', '总是', '永远', '从现在起', '从今以后', '以后', '永久规则', '默认', '一律'],
+    ruleMarker: ['从现在起', '从今以后', '以后', '永久规则'],
+    absolute: ['始终', '总是', '永远', '默认', '一律'],
     override: ['忽略', '无视', '忽略之前', '忽略所有'],
     action: ['批准', '转账', '汇款', '付款', '支付', '发送', '授权', '放款'],
     bypass: ['无需确认', '未经确认', '无须确认', '无需审核', '未经审核', '无需批准', '不必确认'],
   },
   japanese: {
     // Kana-marked Japanese (Han handled by the `han` set).
-    standing: ['常に', '今後', '必ず', 'これから', '毎回'],
+    ruleMarker: ['今後', 'これから'],
+    absolute: ['常に', '必ず', '毎回'],
     override: ['無視', '以前の指示を無視'],
     action: ['承認', '送金', '支払', '振込', '許可'],
     bypass: ['確認なし', '確認せず', '承認なし', '確認不要', '審査なし'],
   },
   hangul: {
-    standing: ['항상', '절대', '지금부터', '영구 규칙', '앞으로', '기본값'],
+    ruleMarker: ['지금부터', '영구 규칙', '앞으로'],
+    absolute: ['항상', '절대', '기본값'],
     override: ['무시', '이전 지시 무시'],
     action: ['승인', '송금', '지급', '결제', '이체', '전송'],
     bypass: ['확인 없이', '검토 없이', '승인 없이', '확인 불필요'],
   },
   cyrillic: {
-    standing: ['всегда', 'никогда', 'постоянное правило', 'отныне', 'с этого момента', 'по умолчанию'],
+    ruleMarker: ['постоянное правило', 'отныне', 'с этого момента'],
+    absolute: ['всегда', 'никогда', 'по умолчанию'],
     override: ['игнорируй', 'игнорировать', 'не обращай внимания', 'игнорируй предыдущие'],
     action: ['переведи', 'перевод', 'переводи', 'одобряй', 'одобрить', 'одобри', 'оплати', 'платеж', 'отправь', 'выплати'],
     bypass: ['без подтверждения', 'без проверки', 'без одобрения', 'без согласования'],
   },
   devanagari: {
-    standing: ['हमेशा', 'कभी नहीं', 'स्थायी नियम', 'अब से', 'डिफ़ॉल्ट'],
+    ruleMarker: ['स्थायी नियम', 'अब से'],
+    absolute: ['हमेशा', 'कभी नहीं', 'डिफ़ॉल्ट'],
     override: ['अनदेखा', 'पिछले निर्देशों को अनदेखा'],
     action: ['स्वीकृत', 'स्वीकार', 'स्थानांतरण', 'ट्रांसफर', 'भुगतान', 'भेज'],
     bypass: ['बिना पुष्टि', 'बिना समीक्षा', 'बिना अनुमोदन'],
   },
   greek: {
-    standing: ['πάντα', 'ποτέ', 'πάγια οδηγία', 'από τώρα', 'εξ ορισμού'],
+    ruleMarker: ['πάγια οδηγία', 'από τώρα'],
+    absolute: ['πάντα', 'ποτέ', 'εξ ορισμού'],
     override: ['αγνόησε', 'αγνόησε τις προηγούμενες'],
     action: ['ενέκρινε', 'έγκριση', 'μεταφορά', 'μετάφερε', 'πληρωμή', 'πλήρωσε', 'στείλε'],
     bypass: ['χωρίς επιβεβαίωση', 'χωρίς έλεγχο', 'χωρίς έγκριση'],
@@ -297,7 +350,8 @@ const SCRIPT_LEXICONS: Record<string, ScriptLexicon> = {
   turkish: {
     // Latin script: confusable folding leaves it intact, but no Turkish lexicon
     // in Layer 2 — handled here on the un-folded text.
-    standing: ['her zaman', 'asla', 'kalıcı kural', 'bundan sonra', 'şu andan itibaren', 'varsayılan'],
+    ruleMarker: ['kalıcı kural', 'bundan sonra', 'şu andan itibaren'],
+    absolute: ['her zaman', 'asla', 'varsayılan'],
     override: ['yoksay', 'önceki talimatları yoksay'],
     action: ['onayla', 'aktar', 'transfer', 'öde', 'gönder', 'havale'],
     bypass: ['onay olmadan', 'onaysız', 'teyit olmadan', 'inceleme olmadan', 'onay almadan'],
@@ -323,15 +377,32 @@ export function hasMultilingualDirective(content: string): boolean {
   const norm = normalizeMultilingual(content);
   for (const lex of Object.values(SCRIPT_LEXICONS)) {
     const has = (list: string[]): boolean => list.some((stem) => norm.includes(stem));
+    // An override marker ("ignore previous instructions") is unambiguous.
     if (has(lex.override)) return true;
-    const standing = has(lex.standing);
     const action = has(lex.action);
     const bypass = has(lex.bypass);
-    if (standing && (action || bypass)) return true;
+    const ruleMarker = has(lex.ruleMarker);
+    // A bypass-of-control phrase + an action ("approve … without confirmation")
+    // is a directive; benign facts almost never pair the two.
     if (bypass && action) return true;
+    // An EXPLICIT standing-rule preamble + an action or bypass ("permanent rule:
+    // … approve", "from now on … without review").
+    if (ruleMarker && (action || bypass)) return true;
+    // NOTE: a bare absolute adverb + action (the habitual shape "he always
+    // pays") is deliberately NOT sufficient — it was the false-positive source.
+    // Such a directive without a bypass/rule cue falls to the Tier-2 judge.
   }
   return false;
 }
+
+// First/third-person habitual ("I always pay by card", "he always sends money
+// home") — the absolute adverb here describes a habit, not a command. Suppressed
+// ONLY when no bypass-of-control, quantifier, or second-person cue is also
+// present (those would make it a real directive). Fixes the red-team's
+// over-quarantine of benign habituals.
+const HABITUAL_RE = new RegExp(`\\b(?:i|he|she|it|they|we)\\s+(?:${ABSOLUTE_ADVERBS.join('|')})\\b`, 'i');
+const QUANTIFIER_RE = new RegExp(`\\b(?:${QUANTIFIER})\\b`, 'i');
+const BYPASS_NOUN_RE = new RegExp(`\\b${BYPASS_NOUN}\\b`, 'i');
 
 /**
  * True when the memory expresses a standing directive aimed at the agent
@@ -350,6 +421,11 @@ export function hasStandingDirective(content: string): boolean {
   if (ROLE_HEADER_RE.test(content) || ROLE_HEADER_RE.test(norm)) return true;
   if (POLICY_RE.test(norm)) return true;
   if (OVERRIDE_RE.test(norm)) return true;
+  // A clause that STARTS with an override verb is a bare imperative override in
+  // ANY covered language ("ignore all previous instructions", "ignoriere alle
+  // bisherigen Anweisungen", "ignora las instrucciones anteriores"). Closes the
+  // red-team's verb-first-override evasion in covered Latin languages.
+  if (clauses(norm).some((c) => OVERRIDE_VERB_HEAD_RE.test(c))) return true;
   if (SECOND_PERSON_CMD_RE.test(norm)) return true;
   if (SPEAKER_INSTRUCTION_RE.test(norm) || SOFT_PREFER_RE.test(norm)) return true;
   if (BYPASS_FRAME_RE.test(norm)) return true;
@@ -359,11 +435,21 @@ export function hasStandingDirective(content: string): boolean {
   if (STANDING_PHRASE_RE.test(norm) && ANY_DIRECTIVE_VERB_RE.test(norm)) return true;
 
   // Absolute-adverb signals. A command when it's an imperative clause OR sits
-  // next to a directive verb — but NOT when the adverb is third-person
-  // reporting prose ("they've never received…").
+  // next to a directive verb (either order) — but NOT when the adverb is
+  // third-person reporting prose ("they've never received…") or a first/third-
+  // person habitual ("I always pay by card") with no bypass/quantifier cue.
   if (ABS_RE.test(norm)) {
     if (REPORTING_PROSE_RE.test(norm)) return false;
+    if (
+      HABITUAL_RE.test(norm) &&
+      !BYPASS_NOUN_RE.test(norm) &&
+      !QUANTIFIER_RE.test(norm) &&
+      !SECOND_PERSON_CMD_RE.test(norm)
+    ) {
+      return false;
+    }
     if (ABS_THEN_VERB_RE.test(norm)) return true;
+    if (VERB_THEN_ABS_RE.test(norm)) return true;
     if (clauses(norm).some(clauseIsImperative)) return true;
   }
   return false;
@@ -387,7 +473,9 @@ const TRUSTED_SOURCE_PATTERNS: RegExp[] = [
 const UNTRUSTED_SOURCE_MARKERS = /\b(?:external|public|untrusted|anon|anonymous|unknown)\b/i;
 
 export function isUntrustedProvenance(source: string | null): boolean {
-  if (!source) return true;
+  // Guard null/empty AND non-string (a runtime type violation must fail closed
+  // to untrusted, never throw and disable the whole screen).
+  if (typeof source !== 'string' || source.length === 0) return true;
   // A signed source carries a `#mac=` suffix that is irrelevant to the prefix
   // heuristic; strip it so the channel prefix still matches. (In 'signed' trust
   // mode the cryptographic resolver — not this function — decides trust.)
@@ -430,12 +518,27 @@ export const PREFIX_PROVENANCE_RESOLVER: ProvenanceResolver = {
 // through, already satisfied/authorized, pre-cleared, proceeds automatically).
 const SENSITIVE_TOPIC_RE =
   /\b(?:payment|payments|transfer|transfers|wire|wires|withdraw|withdrawal|invoice|invoices|funds|disbursement|disbursements|remittance|settlement|settlements|payout|payouts|credential|credentials|password|2fa|two[- ]factor|balance|refund|refunds|vendor|vendors|supplier|suppliers|payee|payees|beneficiary|recipient|account)\b/i;
-const AUTONOMY_SIGNAL_RE =
-  /\b(?:without (?:confirmation|approval|asking|checking|review|sign[- ]?off)|hands?[- ]off|unattended|no human (?:in the loop|involved)|straight[- ]through|on (?:their|your|my) behalf|handled for them|while (?:i'?m|you'?re|they'?re) (?:away|traveling)|automatically|auto[- ]?(?:pay|approve|approved)|proceeds? (?:automatically|on receipt)|on receipt|never (?:loops? a human|waits?|require)|already (?:authorized|satisfied|approved|cleared)|pre[- ]?(?:cleared|authorized|approved)|second (?:review|approval|sign[- ]?off)|ceiling|threshold|routine .* decisions)\b/i;
+// Autonomy is split STRONG vs WEAK after the red-team's cluster over-fire: weak
+// signals like "automatically"/"threshold" appear constantly in benign ops
+// facts ("statements download automatically"), so they only count when
+// co-located with a money ACTION verb. Strong signals are bypass-of-control
+// phrasings that benign facts almost never use.
+const STRONG_AUTONOMY_RE =
+  /\b(?:without (?:confirmation|approval|asking|checking|review|sign[- ]?off)|hands?[- ]off|unattended|no human (?:in the loop|involved)|straight[- ]through|on (?:their|your|my) behalf|handled for them|while (?:i'?m|you'?re|they'?re) (?:away|traveling)|never (?:loops? a human|waits?|require)|already (?:authorized|satisfied|approved|cleared)|pre[- ]?(?:cleared|authorized|approved)|second (?:review|approval|sign[- ]?off)|green[- ]?light|green[- ]?lit|rubber[- ]?stamp(?:ed)?|no second look|treat(?:ed)? as final|at face value)\b/i;
+const WEAK_AUTONOMY_RE =
+  /\b(?:automatically|auto[- ]?(?:pay|approve|approved)|proceeds? (?:automatically|on receipt)|on receipt|ceiling|threshold|auto[- ]?renew|routine .* decisions)\b/i;
 // Action verbs that, in an untrusted multi-memory set, indicate the cluster is
 // steering a sensitive CAPABILITY even when no topic NOUN is present.
 const CLUSTER_ACTION_RE =
   /\b(?:approve|approved|approves|release|released|wire|wired|transfer|transferred|pay|paid|disburse|disbursed|remit|settle|settled|authorize|authorized|process|processed)\b/i;
+
+/** A directive-grade autonomy signal: a strong bypass-of-control phrase, OR a
+ *  weak autonomy cue ("automatically") co-located with a money action verb.
+ *  This is the discriminator that keeps benign ops facts out of the cluster. */
+function hasDirectiveAutonomy(text: string): boolean {
+  if (STRONG_AUTONOMY_RE.test(text)) return true;
+  return WEAK_AUTONOMY_RE.test(text) && CLUSTER_ACTION_RE.test(text);
+}
 
 export interface ClusterFlag {
   memoryIds: number[];
@@ -481,9 +584,10 @@ function detectGradualCluster(untrusted: RecallMemory[]): ClusterFlag | null {
   if (untrusted.length < 2) return null;
   const norm = (m: RecallMemory) => normalizeForMatch(m.content);
 
-  // (a) Theme cluster.
+  // (a) Theme cluster — ≥2 topic members AND a directive-grade autonomy signal
+  // somewhere in the set (strong bypass phrase, or weak cue + a money action).
   const sensitive = untrusted.filter((m) => SENSITIVE_TOPIC_RE.test(norm(m)));
-  if (sensitive.length >= 2 && sensitive.some((m) => AUTONOMY_SIGNAL_RE.test(norm(m)))) {
+  if (sensitive.length >= 2 && hasDirectiveAutonomy(sensitive.map(norm).join('  '))) {
     return {
       memoryIds: sensitive.map((m) => m.id),
       reason: `gradual-subversion cluster: ${sensitive.length} untrusted memories jointly steer a sensitive capability with autonomy framing`,
@@ -503,7 +607,7 @@ function detectGradualCluster(untrusted: RecallMemory[]): ClusterFlag | null {
     if (ids.size < 2) continue;
     const linked = untrusted.filter((m) => ids.has(m.id));
     const text = linked.map(norm).join('  ');
-    const autonomy = AUTONOMY_SIGNAL_RE.test(text);
+    const autonomy = hasDirectiveAutonomy(text);
     const capability = SENSITIVE_TOPIC_RE.test(text) || CLUSTER_ACTION_RE.test(text);
     if (autonomy && capability) {
       return {
@@ -569,7 +673,25 @@ export function screenRecall(
   const quarantined: QuarantinedMemory[] = [];
 
   for (const m of memories) {
-    if (resolver.isUntrusted({ source: m.source, content: m.content }) && hasStandingDirective(m.content)) {
+    // Per-memory screen wrapped to FAIL CLOSED: a single malformed memory (e.g.
+    // a non-string source/content from a misbehaving backend) must never throw
+    // and disable screening for the whole recall set. On any internal error we
+    // quarantine that one memory rather than letting it (or the rest) through.
+    let untrusted: boolean;
+    let directive: boolean;
+    try {
+      untrusted = resolver.isUntrusted({ source: m.source, content: m.content });
+      directive = hasStandingDirective(m.content);
+    } catch {
+      quarantined.push({
+        id: m.id,
+        source: typeof m.source === 'string' ? m.source : null,
+        reason: 'screen error on malformed memory; quarantined fail-closed',
+        excerpt: typeof m.content === 'string' ? m.content.slice(0, 160) : '',
+      });
+      continue;
+    }
+    if (untrusted && directive) {
       quarantined.push({
         id: m.id,
         source: m.source,
