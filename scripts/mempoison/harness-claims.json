@@ -1,0 +1,107 @@
+{
+  "about": "Cited, published-behavior evidence for comparing memory-poisoning posture across agent harnesses. Read docs/harness-comparison-methodology.md first. RULE: every non-MERIDIAN cell is either 'unpublished' (no public evidence either way — the honest default) or backed by a `source` the reader can open. 'unpublished' does NOT mean 'absent'. We never ran any competitor's code. Re-verify before launch use; OSS security posture moves weekly.",
+  "methodologyDoc": "docs/harness-comparison-methodology.md",
+  "asOf": "2026-06-11",
+  "values": {
+    "yes": "public, checkable evidence the capability exists",
+    "partial": "a weaker or related form exists",
+    "no": "public evidence it explicitly lacks the capability (cited)",
+    "unpublished": "no public evidence either way — NOT proof of absence"
+  },
+  "dimensions": [
+    { "key": "recall_screen", "label": "Recall-stage screen", "question": "Is recalled memory screened before it reaches the model?" },
+    { "key": "provenance_trust", "label": "Provenance-aware trust", "question": "Trusted vs untrusted memory origin at recall?" },
+    { "key": "signed_provenance", "label": "Signed provenance", "question": "Is trust cryptographic, not a spoofable label?" },
+    { "key": "multilingual", "label": "Multilingual directives", "question": "Non-English / non-Latin directives detected?" },
+    { "key": "cluster_detection", "label": "Gradual / cross-memory", "question": "Gradual cross-memory subversion detected?" },
+    { "key": "judge_tier", "label": "Semantic judge tier", "question": "Optional model-judged semantic tier?" },
+    { "key": "open_benchmark", "label": "Open poisoning benchmark", "question": "Open, reproducible memory-poisoning benchmark?" },
+    { "key": "published_number", "label": "Published resistance #", "question": "Published poisoning-resistance result with method?" }
+  ],
+  "harnesses": [
+    {
+      "name": "MERIDIAN",
+      "summary": "Recall-stage two-tier defense + signed provenance + open benchmark. All cells are in-repo and reader-checkable.",
+      "claims": {
+        "recall_screen": { "value": "yes", "evidence": "src/verification/memory-integrity.ts screenRecall, wired in src/agent/turn.ts before the model call", "sourceType": "in-repo", "confidence": "high" },
+        "provenance_trust": { "value": "yes", "evidence": "isUntrustedProvenance + ProvenanceResolver; per-memory trusted/untrusted decision", "sourceType": "in-repo", "confidence": "high" },
+        "signed_provenance": { "value": "yes", "evidence": "src/verification/provenance.ts HMAC-SHA256 per-agent signed source; config.cortex.provenanceTrust='signed'", "sourceType": "in-repo", "confidence": "high" },
+        "multilingual": { "value": "yes", "evidence": "hasMultilingualDirective Tier-1 signal (Arabic/Chinese/Russian/Japanese/Korean/Hindi/Greek/Turkish) + LLM-judge Tier-2", "sourceType": "in-repo", "confidence": "high" },
+        "cluster_detection": { "value": "yes", "evidence": "detectGradualCluster: theme + entity-linked clustering, members kept + caution injected", "sourceType": "in-repo", "confidence": "high" },
+        "judge_tier": { "value": "yes", "evidence": "src/verification/memory-judge.ts makeModelJudge; config.cortex.memoryLlmJudge", "sourceType": "in-repo", "confidence": "high" },
+        "open_benchmark": { "value": "yes", "evidence": "scripts/mempoison/mempoisonbench.mts + version-controlled catalog; CI regression guard", "sourceType": "in-repo", "confidence": "high" },
+        "published_number": { "value": "yes", "evidence": "MemPoisonBench v3: 28/28 must-quarantine 100%->0%, 0 false positives, signed mode closes 4/4 laundering; two-tier honest reporting of the encoding/semantic frontier", "sourceType": "in-repo", "confidence": "high" }
+      }
+    },
+    {
+      "name": "OpenClaw",
+      "summary": "Star/usage leader. Independent research documents the exact gradual-subversion and decision-stage gaps; no public memory-poisoning defense or benchmark found.",
+      "claims": {
+        "recall_screen": { "value": "unpublished", "evidence": "No published recall-stage memory-integrity screen found; the MEMORY.md poisoning demonstrated in arXiv 2603.11619 persisted across sessions, consistent with no such screen, but no maintainer statement asserts its absence.", "source": "https://arxiv.org/pdf/2603.11619", "confidence": "medium" },
+        "provenance_trust": { "value": "unpublished", "evidence": "No public provenance-trust mechanism for recalled memory documented.", "confidence": "low" },
+        "signed_provenance": { "value": "unpublished", "evidence": "No public cryptographic-provenance scheme documented.", "confidence": "low" },
+        "multilingual": { "value": "unpublished", "evidence": "No public multilingual directive-detection claim.", "confidence": "low" },
+        "cluster_detection": { "value": "no", "evidence": "Independent research (Tsinghua + Ant Group): OpenClaw 'does not implement persistent monitoring to detect when legitimate context accumulation is gradually subverted'.", "source": "https://arxiv.org/pdf/2603.11619", "confidence": "high" },
+        "judge_tier": { "value": "unpublished", "evidence": "No public model-judged memory-integrity tier documented.", "confidence": "low" },
+        "open_benchmark": { "value": "unpublished", "evidence": "No open memory-poisoning benchmark for OpenClaw found.", "confidence": "medium" },
+        "published_number": { "value": "unpublished", "evidence": "No published poisoning-resistance number found; conventional hardening shipped in May 2026 releases addressed sandbox escapes, not memory-integrity.", "source": "https://arxiv.org/pdf/2603.11619", "confidence": "medium" }
+      }
+    },
+    {
+      "name": "Hermes Agent",
+      "summary": "Usage leader (#1 OpenRouter tokens per mid-2026 snapshots). Feature set / governance largely unexamined in public security literature; no memory-poisoning defense or benchmark found.",
+      "claims": {
+        "recall_screen": { "value": "unpublished", "evidence": "No public recall-stage memory screen documented.", "confidence": "low" },
+        "provenance_trust": { "value": "unpublished", "evidence": "No public provenance-trust mechanism documented.", "confidence": "low" },
+        "signed_provenance": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "multilingual": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "cluster_detection": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "judge_tier": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "open_benchmark": { "value": "unpublished", "evidence": "No open memory-poisoning benchmark found.", "confidence": "low" },
+        "published_number": { "value": "unpublished", "evidence": "None found.", "confidence": "low" }
+      }
+    },
+    {
+      "name": "Mastra",
+      "summary": "Sets the OPEN-BENCHMARK bar for memory ACCURACY (LongMemEval, fully reproducible harness). That is a different axis from poisoning resistance; on poisoning specifically, nothing published was found.",
+      "claims": {
+        "recall_screen": { "value": "unpublished", "evidence": "No public recall-stage poisoning screen documented (its memory work targets retrieval accuracy, not adversarial integrity).", "source": "https://mastra.ai/research/observational-memory", "confidence": "medium" },
+        "provenance_trust": { "value": "unpublished", "evidence": "None found for adversarial provenance.", "confidence": "low" },
+        "signed_provenance": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "multilingual": { "value": "unpublished", "evidence": "None found for directive detection.", "confidence": "low" },
+        "cluster_detection": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "judge_tier": { "value": "unpublished", "evidence": "Uses LLM judges for accuracy eval, not for memory-integrity screening; none found for poisoning.", "confidence": "low" },
+        "open_benchmark": { "value": "partial", "evidence": "Publishes a fully open, reproducible LongMemEval ACCURACY harness — the credibility standard to emulate — but not a poisoning benchmark.", "source": "https://github.com/mastra-ai/mastra", "confidence": "high" },
+        "published_number": { "value": "no", "evidence": "Published numbers are LongMemEval accuracy (94.87% gpt-5-mini / 84.23% gpt-4o), not poisoning resistance.", "source": "https://mastra.ai/research/observational-memory", "confidence": "high" }
+      }
+    },
+    {
+      "name": "Mem0",
+      "summary": "Standalone agent-memory layer (funded). Public material centers on retrieval/accuracy and scale; no memory-poisoning defense or benchmark found.",
+      "claims": {
+        "recall_screen": { "value": "unpublished", "evidence": "None found for adversarial recall screening.", "confidence": "low" },
+        "provenance_trust": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "signed_provenance": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "multilingual": { "value": "unpublished", "evidence": "None found for directive detection.", "confidence": "low" },
+        "cluster_detection": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "judge_tier": { "value": "unpublished", "evidence": "None found for memory-integrity.", "confidence": "low" },
+        "open_benchmark": { "value": "unpublished", "evidence": "No open memory-poisoning benchmark found.", "confidence": "low" },
+        "published_number": { "value": "unpublished", "evidence": "None found for poisoning resistance.", "confidence": "low" }
+      }
+    },
+    {
+      "name": "Letta (MemGPT)",
+      "summary": "Memory-centric agent framework. Public material centers on memory architecture/tiering; no memory-poisoning defense or benchmark found.",
+      "claims": {
+        "recall_screen": { "value": "unpublished", "evidence": "None found for adversarial recall screening.", "confidence": "low" },
+        "provenance_trust": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "signed_provenance": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "multilingual": { "value": "unpublished", "evidence": "None found for directive detection.", "confidence": "low" },
+        "cluster_detection": { "value": "unpublished", "evidence": "None found.", "confidence": "low" },
+        "judge_tier": { "value": "unpublished", "evidence": "None found for memory-integrity.", "confidence": "low" },
+        "open_benchmark": { "value": "unpublished", "evidence": "No open memory-poisoning benchmark found.", "confidence": "low" },
+        "published_number": { "value": "unpublished", "evidence": "None found for poisoning resistance.", "confidence": "low" }
+      }
+    }
+  ]
+}
