@@ -1,0 +1,24 @@
+{
+  "name": "@aterna/agent-builder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meridian Agent Builder — build your own Meridian agent in a few clicks. A friendly face on the Meridian agent OS.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.7.0"
+  }
+}

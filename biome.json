@@ -6,7 +6,8 @@
       "!**/dist",
       "!**/node_modules",
       "!**/skeleton",
-      "!**/test/fixtures"
+      "!**/test/fixtures",
+      "!**/apps"
     ]
   },
   "formatter": {
