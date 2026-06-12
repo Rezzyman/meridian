@@ -2,6 +2,62 @@
 
 All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
+## [Unreleased] — feature/safe-memory-v3
+
+Deeper on the memory-poisoning moat: cryptographic provenance, an always-on
+multilingual intent signal, cluster hardening, an adversarial red-team round
+folded back in, a fair cross-harness comparison methodology, and an open
+LongMemEval harness. Full writeup in the PR.
+
+### Added
+
+- **Signed provenance** (`config.cortex.provenanceTrust: 'signed'`). Trust for a
+  recalled memory can now be a per-agent **HMAC** minted at encode time
+  (`src/verification/provenance.ts`) over `(agentId, baseSource, sha256(content))`
+  with a local 0600 key — not a spoofable channel label. A directive laundered
+  onto `automation:`/`cli:`/`operator:`/`dream:` has no valid signature, so it is
+  untrusted and screened. Tamper-evident, agent-bound, opt-in (the zero-config
+  `prefix` heuristic is unchanged by default). Closes the provenance-laundering
+  attack family an adversarial pass flagged as the highest-severity hole.
+- **Multilingual Tier-1 intent signal** (always-on, no model). A script-aware,
+  decode-free directive detector across Arabic, Chinese, Japanese, Korean,
+  Russian, Hindi, Greek, and Turkish, plus expanded imperative-verb /
+  override-object lexicons for the covered Latin languages — so verb-first
+  "ignore all previous instructions" in German/Spanish is caught. Tuned for
+  precision (a strong override/bypass/rule cue is required), so benign
+  foreign-language habituals are not over-quarantined.
+- **Cluster hardening.** Cross-memory gradual-subversion detection now catches
+  split-topic and codeword-joined campaigns (entity-linked clustering) while a
+  strong-vs-weak autonomy split keeps benign ops facts ("statements download
+  automatically") out of the caution.
+- **MemPoisonBench v3** — 31 must-quarantine vectors (incl. 8 scripts +
+  verb-first overrides) at 100%→0%, 0 false positives on 9 legit memories
+  (incl. foreign habituals), and a `provenanceTrials` section showing prefix
+  mode reaches the model on laundering while signed mode quarantines it.
+- **Fair cross-harness comparison** (`docs/harness-comparison-methodology.md` +
+  `scripts/mempoison/compare-harnesses.mts`) — scores memory-poisoning posture
+  from each harness's *published* behavior only, never by running competitor
+  code; `unpublished` ≠ `no`, and every competitor weakness shown is cited.
+- **Open LongMemEval harness** (`scripts/longmemeval/`) — the accuracy axis,
+  provider-agnostic (embedded/CORTEX/Quartz through the same pipeline). Ready to
+  run, gated: a dry-run retrieval-recall mode needs no model; a full run is
+  behind `--confirm-live`. Dataset not vendored.
+- **Hosted/paid-lane scaffold** — `docs/hosted-lane.md` (architecture on the
+  existing MemoryProvider seam) + `scripts/hosted/waitlist.mts` (local intent
+  capture, no network). Wire the paid lane before virality.
+
+### Security / fixed
+
+- An adversarial red-team round against the v3 defense (run against the real
+  exported functions) confirmed signed provenance held against ~20 forgery
+  variants and surfaced real Tier-1 bugs — covered-language verb-first
+  evasions, a multilingual false-positive regression, a cluster over-fire, and a
+  non-string-source fail-open — all closed in this branch, with the residual
+  gaps (out-of-lexicon languages, encodings, semantic declaratives, patient
+  gradual spread, internal laundering) documented in the threat model.
+
+---
+
 ## [Unreleased] — feature/world-class-parity
 
 Parity build: test suite + CI, MCP both directions, SSE streaming, bounded
