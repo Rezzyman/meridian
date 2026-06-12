@@ -29,7 +29,7 @@ import { generateStructured } from '../agent/structured.js';
 import type { ModelChain } from '../config/schema.js';
 import type { ProviderRouter } from '../providers/router.js';
 import {
-  isUntrustedProvenance,
+  PREFIX_PROVENANCE_RESOLVER,
   type QuarantinedMemory,
   type RecallScreenResult,
   screenRecall,
@@ -115,7 +115,13 @@ export async function screenRecallDeep(
   const base = screenRecall(memories, context, opts);
   if (!opts.judge || opts.enabled === false) return base;
 
-  const suspects = base.kept.filter((m) => isUntrustedProvenance(m.source));
+  // Judge only the UNTRUSTED survivors, per the SAME trust policy the regex
+  // screen used (prefix heuristic by default, cryptographic in signed mode) —
+  // so a validly-signed memory is never sent to the model judge either.
+  const resolver = opts.provenance ?? PREFIX_PROVENANCE_RESOLVER;
+  const suspects = base.kept.filter((m) =>
+    resolver.isUntrusted({ source: m.source, content: m.content }),
+  );
   if (suspects.length === 0) return base;
 
   const verdicts = await opts.judge(suspects);

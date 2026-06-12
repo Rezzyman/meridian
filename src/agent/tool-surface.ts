@@ -27,7 +27,9 @@ import { builtinTools } from '../skills/builtin/index.js';
 import { loadSkills, prescanManifestEnvKeys } from '../skills/loader.js';
 import { PassphraseGuard } from '../skills/runtime.js';
 import { loadChecks } from '../verification/runtime.js';
+import { createProvenanceSigner, type ProvenanceSigner } from '../verification/provenance.js';
 import type { VerificationCheck } from '../config/schema.js';
+import { join } from 'node:path';
 import { defineTool } from '../skills/toolkit.js';
 import type { SkillRegistry } from '../skills/types.js';
 import { listAccounts as gogListAccounts, runGog, runGogJson } from '../tools/gog.js';
@@ -59,6 +61,10 @@ export interface ToolSurface {
   mcpStatus: McpToolSurface['status'];
   /** Operator verification checks loaded from VERIFICATION/*.checks.md. */
   verificationChecks: VerificationCheck[];
+  /** Per-agent provenance signer, present only when config.cortex.provenanceTrust
+   *  === 'signed'. Passed into Conversation so recall trusts by signature and
+   *  encode signs its own source. */
+  provenanceSigner?: ProvenanceSigner;
   skills: SkillRegistry;
   vault: Vault;
   guard: PassphraseGuard;
@@ -148,10 +154,29 @@ export async function buildToolSurface(inputs: ToolSurfaceInputs): Promise<ToolS
     logger.warn({ msg: 'verification checks load failed', err: (err as Error).message });
   }
 
+  // Signed-provenance trust: mint (or load) the per-agent key only when the
+  // operator opted into 'signed' mode. The key is a LOCAL secret stored 0600
+  // next to the agent's memory — never an external credential.
+  let provenanceSigner: ProvenanceSigner | undefined;
+  if (config.cortex.provenanceTrust === 'signed') {
+    try {
+      provenanceSigner = createProvenanceSigner({
+        agentId: env.CORTEX_AGENT_ID,
+        keyPath: join(home.agentRoot, '.provenance-key'),
+      });
+    } catch (err) {
+      logger.warn({
+        msg: 'provenance signer init failed; falling back to prefix trust',
+        err: (err as Error).message,
+      });
+    }
+  }
+
   assembled = { ...builtin, ...skills.asTools(), ...mcp.tools };
   return {
     tools: assembled,
     verificationChecks,
+    provenanceSigner,
     skillToolNames,
     mcpGate: mcp.channelGate,
     mcpStatus: mcp.status,

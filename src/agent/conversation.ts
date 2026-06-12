@@ -13,6 +13,7 @@ import type { Logger } from 'pino';
 import type { MeridianTurn, MeridianSession } from './types.js';
 import { runTurn, type TurnStreamEvent } from './turn.js';
 import type { VerificationCheck } from '../config/schema.js';
+import type { ProvenanceSigner } from '../verification/provenance.js';
 import type { SessionStore, TurnTrace } from '../session/store.js';
 
 export interface ConversationOptions {
@@ -31,6 +32,8 @@ export interface ConversationOptions {
   mcpGate?: ReadonlyMap<string, ReadonlySet<string>>;
   /** Operator verification checks (VERIFICATION/*.checks.md), loaded at boot. */
   verificationChecks?: VerificationCheck[];
+  /** Per-agent provenance signer for signed-trust mode (provenance.ts). */
+  provenanceSigner?: ProvenanceSigner;
   resume?: MeridianSession;
   /** When set, every turn's reasoning trace is persisted to this store
    *  so /why and /trace can answer "what backed that claim?" later. */
@@ -94,6 +97,7 @@ export class Conversation {
         skillToolNames: this.opts.skillToolNames,
         mcpGate: this.opts.mcpGate,
         verificationChecks: this.opts.verificationChecks,
+        provenanceSigner: this.opts.provenanceSigner,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,
