@@ -4,9 +4,13 @@
  * nothing depends on MERIDIAN_CORTEX_URL captured at module load.
  */
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { CortexBind } from '../../src/cortex/bind.js';
 import { createMemoryProvider } from '../../src/memory/factory.js';
+import { EmbeddedMemoryProvider } from '../../src/memory/embedded-memory-provider.js';
 import { QuartzMemoryProvider } from '../../src/memory/quartz-memory-provider.js';
 import type { QuartzPipeline } from '../../src/memory/quartz-memory-provider.js';
 import { makeEnv, mockCortex, mockRouter, textModel } from '../helpers/fixtures.js';
@@ -93,6 +97,31 @@ test('provider=quartz with router falls back when @aterna/quartz cannot be impor
   assert.match(result.fallbackReason ?? '', /quartz unavailable/);
   assert.match(result.fallbackReason ?? '', /falling back to cortex/);
   assert.ok(entries.some((e) => e.level === 'warn' && /quartz unavailable/.test(e.msg)));
+});
+
+test('provider=embedded selects the zero-config embedded provider (no server/keys)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mp-factory-'));
+  try {
+    const { entries, log } = logCapture();
+    const result = await createMemoryProvider({
+      env: makeEnv({ MERIDIAN_MEMORY_PROVIDER: 'embedded', CORTEX_AGENT_ID: 'emb-agent' }),
+      embeddedDbPath: join(dir, 'memory.jsonl'),
+      log,
+    });
+    assert.equal(result.selected, 'embedded');
+    assert.ok(result.provider instanceof EmbeddedMemoryProvider);
+    assert.equal(result.provider.agentId, 'emb-agent');
+    assert.ok(entries.some((e) => e.level === 'info' && /embedded/.test(e.msg)));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('provider=embedded without embeddedDbPath throws a clear error', async () => {
+  await assert.rejects(
+    () => createMemoryProvider({ env: makeEnv({ MERIDIAN_MEMORY_PROVIDER: 'embedded' }) }),
+    /embeddedDbPath/,
+  );
 });
 
 // ─── QuartzMemoryProvider ────────────────────────────────────────────────────
