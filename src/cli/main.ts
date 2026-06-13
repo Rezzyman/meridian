@@ -42,6 +42,7 @@ import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
 import { runMcpList, runMcpServe } from './mcp-cmd.js';
 import { runDemo } from './demo-cmd.js';
+import { runImport } from './import-cmd.js';
 
 const program = new Command();
 program
@@ -170,6 +171,25 @@ program
   .action(async (path: string) => {
     await runIngest(path);
   });
+
+// `meridian import <openclaw|hermes>` — migrate a competitor agent home into a
+// Meridian seven-layer home (secrets surfaced, never imported).
+program
+  .command('import <source>')
+  .description('Migrate an OpenClaw or Hermes agent home into Meridian (source: openclaw | hermes)')
+  .option('--from <path>', 'source home directory (default ~/.openclaw or ~/.hermes)')
+  .option('--slug <name>', 'target Meridian agent slug (default <source>-import)')
+  .option('--cortex', 'use the full CORTEX backend instead of zero-config embedded memory')
+  .option('--overwrite', 'overwrite an existing agent home of the same slug')
+  .option('--dry-run', 'preview the import without writing anything')
+  .action(
+    async (
+      source: string,
+      opts: { from?: string; slug?: string; cortex?: boolean; overwrite?: boolean; dryRun?: boolean },
+    ) => {
+      await runImport(source, opts);
+    },
+  );
 
 // `meridian voice` — manage voice-channel configuration (passphrase unlock).
 const voiceCmd = program
