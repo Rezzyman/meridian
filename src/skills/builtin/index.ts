@@ -10,6 +10,7 @@ import { coreTools } from './core-tools.js';
 import { cortexTools } from './cortex-tools.js';
 import { dataTools } from './data-tools.js';
 import { fileTools } from './file-tools.js';
+import { execTools } from './exec-tools.js';
 import { type DelegateDeps, delegateTools } from './delegate-tools.js';
 import { voiceTools } from './vapi-tools.js';
 import { telegramTools } from './telegram-tools.js';
@@ -40,6 +41,9 @@ export function builtinTools(opts: BuiltinToolsOptions): ToolSet {
   // File navigation/editing — same trust tier as read/write, CLI-gated by the
   // allowlist (config/schema.ts). Bounded walks; never chat-default.
   for (const [k, v] of Object.entries(fileTools)) out[k] = v;
+  // Bounded code execution (secret-scrubbed env, timeout, output cap). Powerful
+  // like bash — CLI-gated by the allowlist, never chat-default.
+  for (const [k, v] of Object.entries(execTools)) out[k] = v;
   for (const [k, v] of Object.entries(cortexTools(opts.cortex))) out[k] = v;
   if (opts.allowVoice !== false && opts.env.VAPI_API_KEY) {
     for (const [k, v] of Object.entries(voiceTools(opts.env))) out[k] = v;

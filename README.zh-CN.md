@@ -13,7 +13,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-464%20passing-brightgreen?style=for-the-badge" alt="464 tests passing">
+  <img src="https://img.shields.io/badge/tests-472%20passing-brightgreen?style=for-the-badge" alt="472 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
 </p>
 
@@ -133,6 +133,7 @@ meridian                      # 和它聊天；它会在重启后依然记得你
 | **🗂️ 可移植的七层智能体 OS** | IDENTITY / CONTEXT / SKILLS / MEMORY / CONNECTIONS / VERIFICATION / AUTOMATIONS，就是任何工具都能读取的普通文件系统。 |
 | **🧩 受限子智能体** | `delegate` 工具带有硬性的结构深度、token 与时钟上限，并置于服务商熔断器之后——能扇出，不会失控。 |
 | **🧰 带防护的内置工具箱** | 真正的 HTTP（任意方法）、HTML→文本、哈希、base64、时间——而 `http_request` 的每次请求都经过 **SSRF 防护**，默认拦截云元数据端点、回环地址与 RFC-1918 私网段（含十进制/十六进制/八进制/IPv6 各种混淆写法）。唯一一个 fetch 工具开箱即拒「混淆代理」攻击的智能体框架。 |
+| **⚙️ 受限代码执行** | `run_code` 运行 python/node/bash/ruby，带时钟超时（连同整个进程组一并杀死）、输出上限、一次性工作目录，以及**经过脱敏的环境**——你的 API 密钥对被执行的代码不可见。（仅进程级隔离，非内核沙箱；默认只在 CLI 面暴露。） |
 | **🌊 流式输出** | SSE 网关（`/chat/stream`）实时推送 token 增量，并附带单文件浏览器聊天页。 |
 | **📐 模式约束输出** | Zod 校验的工具结果 + 带修复重试的“受校验 JSON”生成。 |
 | **🌙 进程内自治** | 梦境整合、主动简报、心跳都跑在你的 Node 进程里——无需外部 cron，不会出现“网关挂了 → 梦境跳过 → 记忆陈旧”。 |
