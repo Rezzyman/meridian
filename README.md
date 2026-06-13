@@ -106,7 +106,7 @@ An honest, cited comparison — including where we trail today.
 | Bounded sub-agent delegation | ✅ | ✅ | ✅ |
 | Messaging channels | ✅ ~23 | ✅ ~7 | ⚠️ **4** |
 | One-line install (npm / curl) | ✅ | ✅ | 🚧 clone for now |
-| Migrate from a competitor | — | ✅ from OpenClaw | 🚧 `meridian import` (shipping) |
+| Migrate from a competitor | — | ✅ from OpenClaw | ✅ `meridian import` |
 | Localized (i18n) docs | — | ✅ | 🚧 |
 | License | MIT | MIT | MIT (+ BSL Quartz) |
 
@@ -256,6 +256,29 @@ same number triggers cross-call recall:
 > quote — want to schedule the inspection now?"*
 
 Every voice line gets a real receptionist's memory.
+
+---
+
+## Migrating from OpenClaw or Hermes
+
+Coming from another harness? Bring your agent over in **one command**. Meridian
+reads your existing home and writes a seven-layer Meridian home — zero-config
+embedded memory by default, so it boots immediately:
+
+```bash
+meridian import openclaw            # reads ~/.openclaw  (or --from <path>)
+meridian import hermes --dry-run    # preview without writing anything
+meridian use openclaw-import && meridian
+```
+
+What comes over: your **persona** (`SOUL.md` → `IDENTITY/AGENT.md`), **operator
+profile** (`USER.md`), **long-term memory notes** (`MEMORY.md`), **workspace
+instructions** (`AGENTS.md`), and your **skills/** directory.
+
+**Secrets never come over.** Any API keys or tokens in the source are detected
+and surfaced **by name only** — you re-add them deliberately in the new `.env` or
+via `meridian skills setup`. Nothing secret is ever copied, and `--dry-run`
+writes nothing at all.
 
 ---
 
