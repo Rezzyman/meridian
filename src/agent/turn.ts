@@ -477,7 +477,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       break;
     }
   }
-  const TEXT_CHANNELS: Array<MeridianTurn['channel']> = ['cli', 'telegram', 'gateway'];
+  const TEXT_CHANNELS: Array<MeridianTurn['channel']> = ['cli', 'telegram', 'gateway', 'slack'];
   if (commitmentDetected && TEXT_CHANNELS.includes(ctx.channel)) {
     const trimQuote =
       commitmentQuote.length > 80 ? `${commitmentQuote.slice(0, 79)}…` : commitmentQuote;

@@ -13,6 +13,7 @@ import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import type { VapiChannel } from '../channels/vapi.js';
+import type { SlackChannel } from '../channels/slack.js';
 import type { Conversation } from '../agent/conversation.js';
 import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
@@ -24,12 +25,29 @@ export interface GatewayOptions {
   logger: Logger;
   conversation: Conversation;
   vapi?: VapiChannel;
+  slack?: SlackChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
 }
 
 export async function startGateway(opts: GatewayOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, bodyLimit: 8 * 1024 * 1024 });
+
+  // Keep the RAW JSON body alongside the parsed one. Slack's request signature
+  // is computed over the exact bytes, so we cannot rely on a re-serialized body.
+  // Other routes are unaffected — they still receive parsed JSON in req.body.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    (req as unknown as { rawBody?: string }).rawBody = body as string;
+    if (!body || (body as string).length === 0) {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(body as string));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
 
   app.get('/health', async () => ({
     ok: true,
@@ -129,6 +147,31 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     const event = req.body as Parameters<VapiChannel['dispatch']>[0];
     const result = await opts.vapi.dispatch(event);
     return result;
+  });
+
+  // Slack Events API. Verify the signature over the RAW body, then ack within
+  // Slack's 3s window; the turn + reply happen async via chat.postMessage.
+  app.post<{
+    Headers: { 'x-slack-signature'?: string; 'x-slack-request-timestamp'?: string };
+  }>('/slack/events', async (req, reply) => {
+    if (!opts.slack) {
+      reply.code(404);
+      return { error: 'slack channel not configured' };
+    }
+    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
+    const ok = opts.slack.verifySignature(
+      rawBody,
+      req.headers['x-slack-signature'],
+      req.headers['x-slack-request-timestamp'],
+    );
+    if (!ok) {
+      reply.code(401);
+      return { error: 'invalid slack signature' };
+    }
+    const result = opts.slack.handleRequest(rawBody);
+    void result.done; // fire-and-forget the async turn + reply
+    reply.code(result.status);
+    return result.body;
   });
 
   // Place an outbound voice call via VAPI. Token-gated. Used by the
