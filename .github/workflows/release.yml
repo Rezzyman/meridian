@@ -1,0 +1,57 @@
+name: Release
+
+# Publishes @aterna/meridian to npm when a v* tag is pushed. The full gate runs
+# first (typecheck + lint + test + build) so a broken release can never ship.
+# Requires an NPM_TOKEN repo secret (an npm automation token with publish rights
+# to the @aterna scope). See docs/releasing.md.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    name: build · test · publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck · lint · test
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify tag matches package version
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::tag v$TAG does not match package.json version $PKG"
+            exit 1
+          fi
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

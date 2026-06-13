@@ -3,10 +3,26 @@
   "version": "1.1.0",
   "description": "Meridian: the Agentic Operating System runtime. CORTEX-native cognitive memory, voice-native VAPI integration, 20-minute deployment.",
   "type": "module",
-  "private": true,
   "license": "MIT",
   "author": "ATERNA AI",
   "homepage": "https://aterna.ai/meridian",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rezzyman/meridian.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rezzyman/meridian/issues"
+  },
+  "keywords": [
+    "agent",
+    "agent-os",
+    "ai",
+    "cognitive-memory",
+    "memory-poisoning",
+    "mcp",
+    "voice",
+    "cortex"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },
@@ -18,6 +34,20 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "files": [
+    "bin",
+    "dist",
+    "skeleton",
+    "docs",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "ROADMAP.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsx watch src/cli/main.ts",
     "build": "tsup",
@@ -25,7 +55,8 @@
     "format": "biome format --write .",
     "lint": "biome lint .",
     "test": "node --test --import tsx 'test/**/*.test.ts'",
-    "start": "node dist/cli/main.js"
+    "start": "node dist/cli/main.js",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
@@ -63,8 +94,5 @@
     "tsup": "^8.5.0",
     "tsx": "^4.20.0",
     "typescript": "^5.7.0"
-  },
-  "optionalDependencies": {
-    "@aterna/quartz": "file:../quartz"
   }
 }
