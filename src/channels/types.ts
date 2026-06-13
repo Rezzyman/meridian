@@ -6,7 +6,7 @@
 import type { Conversation } from '../agent/conversation.js';
 
 export interface InboundMessage {
-  channel: 'cli' | 'telegram' | 'voice' | 'gateway' | 'system';
+  channel: 'cli' | 'telegram' | 'voice' | 'gateway' | 'system' | 'slack';
   from: string; // user id, phone, chat id, etc.
   text: string;
   meta?: Record<string, unknown>;

@@ -21,6 +21,7 @@ import { buildToolSurface } from '../agent/tool-surface.js';
 import { createLogger } from '../logger/pino.js';
 import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
+import { SlackChannel } from '../channels/slack.js';
 import { VoiceSessionGuard } from '../voice/session-guard.js';
 import { startGateway } from '../gateway/server.js';
 import { colors } from '../utils/truecolor.js';
@@ -346,6 +347,24 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     console.log(colors.ok('voice channel armed'));
   }
 
+  // ── Slack channel — Events API webhook (signed), trusted workspace ──
+  // Needs the bot token + the app signing secret. The bot only receives events
+  // for channels it's invited to; channels.slack.allowedChannels narrows that.
+  let slack: SlackChannel | undefined;
+  if (env.SLACK_BOT_TOKEN && env.SLACK_SIGNING_SECRET) {
+    slack = new SlackChannel({
+      botToken: env.SLACK_BOT_TOKEN,
+      signingSecret: env.SLACK_SIGNING_SECRET,
+      allowedChannels: config.channels.slack?.allowedChannels ?? [],
+      logger,
+    });
+    slack.start(undefined, {
+      onInbound: async (m) => turn('slack', m.from, m.text),
+    });
+    channelMap.set('slack', slack as unknown as ChannelAdapter);
+    console.log(colors.ok('slack channel started (POST /slack/events)'));
+  }
+
   // ── Proactive sentinel — morning brief + optional nudges ──
   // The thing that makes a Meridian agent a partner instead of a chatbot.
   // Scheduled CORTEX recalls compose a brief and push it to the operator's
@@ -426,6 +445,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     logger,
     conversation: httpConvoFacade,
     vapi,
+    slack,
     sentinel,
     automations,
   });

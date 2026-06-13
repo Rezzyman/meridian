@@ -32,6 +32,10 @@ export const AgentEnvSchema = z
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_DEFAULT_CHAT_ID: z.string().optional(),
 
+  // Slack (Events API): bot token (xoxb-…) + the app signing secret.
+  SLACK_BOT_TOKEN: z.string().optional(),
+  SLACK_SIGNING_SECRET: z.string().optional(),
+
   // Gateway
   MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
   MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
@@ -120,6 +124,13 @@ export const ChannelConfigSchema = z.object({
       defaultChatId: z.string().optional(),
     })
     .default({ enabled: false }),
+  slack: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Optional channel-id allowlist; empty = any channel the bot is in. */
+      allowedChannels: z.array(z.string()).default([]),
+    })
+    .default({ enabled: false, allowedChannels: [] }),
   vapi: z
     .object({
       enabled: z.boolean().default(false),
@@ -481,6 +492,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
   channels: {
     cli: { enabled: true },
     telegram: { enabled: false },
+    slack: { enabled: false, allowedChannels: [] },
     vapi: { enabled: false, voicePersona: 'warm_professional' },
     gateway: { enabled: false, port: 18889 },
   },
