@@ -20,12 +20,15 @@ LongMemEval harness. Full writeup in the PR.
   `prefix` heuristic is unchanged by default). Closes the provenance-laundering
   attack family an adversarial pass flagged as the highest-severity hole.
 - **Multilingual Tier-1 intent signal** (always-on, no model). A script-aware,
-  decode-free directive detector across Arabic, Chinese, Japanese, Korean,
-  Russian, Hindi, Greek, and Turkish, plus expanded imperative-verb /
-  override-object lexicons for the covered Latin languages — so verb-first
-  "ignore all previous instructions" in German/Spanish is caught. Tuned for
-  precision (a strong override/bypass/rule cue is required), so benign
-  foreign-language habituals are not over-quarantined.
+  decode-free directive detector across **15 languages / all major scripts** —
+  Arabic, Chinese, Japanese, Korean, Russian, Hindi, Greek, Turkish, Persian,
+  Urdu, Hebrew, Vietnamese, Indonesian, Polish, Thai — plus expanded
+  imperative-verb / override-object lexicons for the covered Latin languages, so
+  verb-first "ignore all previous instructions" in German/Spanish is caught.
+  Persian/Urdu get their own lexicons (they share the Arabic *script*, not its
+  *vocabulary* — the "perceived coverage" gap a red-team round named). Tuned for
+  precision (a strong override/bypass/rule cue is required, not a bare
+  always+verb), so benign foreign-language habituals are not over-quarantined.
 - **Cluster hardening.** Cross-memory gradual-subversion detection now catches
   split-topic and codeword-joined campaigns (entity-linked clustering) while a
   strong-vs-weak autonomy split keeps benign ops facts ("statements download

@@ -79,11 +79,14 @@ marked directives. Hardened against the obvious evasions:
 - A **multilingual Tier-1 intent signal** (always-on, no model): a script-aware,
   decode-free co-occurrence check (a standing-rule / override / bypass marker
   with a sensitive action) across Arabic, Chinese, Japanese, Korean, Russian,
-  Hindi, Greek, and Turkish — plus expanded imperative-verb and override-object
+  Hindi, Greek, Turkish, **Persian, Urdu, Hebrew, Vietnamese, Indonesian,
+  Polish, and Thai** — plus expanded imperative-verb and override-object
   lexicons for the covered Latin languages (so verb-first "ignore all previous
-  instructions" in German/Spanish is caught). It requires a *strong* cue
-  (override, bypass+action, or an explicit rule-marker), **not** a bare
-  always+verb, so benign foreign habituals are not over-quarantined.
+  instructions" in German/Spanish is caught). Persian and Urdu have their own
+  lexicons rather than riding the Arabic one — they share the *script*, not the
+  *vocabulary*. It requires a *strong* cue (override, bypass+action, or an
+  explicit rule-marker), **not** a bare always+verb, so benign foreign
+  habituals are not over-quarantined.
 - Cross-memory correlation: individually-benign untrusted memories that jointly
   steer a sensitive capability with autonomy framing are flagged as a
   coordinated **cluster** (members kept; a security caution injected so the
@@ -131,11 +134,12 @@ verb-first overrides are now caught; the multilingual false-positive regression
 on benign foreign habituals is fixed; the cluster over-fire on benign ops facts
 is fixed. What remains open:
 
-- **Out-of-lexicon languages.** The Tier-1 multilingual signal covers a fixed set
-  of scripts/languages. Languages outside it — Thai, Hebrew, Vietnamese,
-  Indonesian, Polish, Bengali, and notably **Persian/Urdu** (Arabic *script* but
-  not Arabic *vocabulary*) — still need Tier 2. The keyword approach cannot scale
-  to every language; the long-term fix is a small multilingual intent classifier.
+- **Out-of-lexicon languages.** The Tier-1 multilingual signal now covers 15
+  languages across all major scripts (incl. Persian/Urdu with their own
+  vocabulary). Languages still outside it — e.g. Bengali, Tamil, Tagalog,
+  Swahili, Ukrainian — need Tier 2. The keyword approach cannot scale to every
+  language one lexicon at a time; the long-term fix remains a small multilingual
+  intent classifier that folds Tier-2 coverage into the always-on path.
 - **Arbitrary encodings** (base64, ROT13, acrostics, novel ciphers) are out of
   scope for a surface-text screen; Tier 2 catches the ones the model decodes,
   not all.

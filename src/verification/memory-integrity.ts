@@ -356,6 +356,61 @@ const SCRIPT_LEXICONS: Record<string, ScriptLexicon> = {
     action: ['onayla', 'aktar', 'transfer', 'öde', 'gönder', 'havale'],
     bypass: ['onay olmadan', 'onaysız', 'teyit olmadan', 'inceleme olmadan', 'onay almadan'],
   },
+  // ── v3.1: high-population languages the red-team's coverage analysis named.
+  // Persian/Urdu share the Arabic SCRIPT but not Arabic VOCABULARY — the exact
+  // "perceived vs actual coverage" gap. Each requires the same strong cue
+  // (override, bypass+action, or ruleMarker+action), so a benign foreign fact
+  // with a bare absolute+action is not over-quarantined.
+  farsi: {
+    ruleMarker: ['قانون دائمی', 'از این پس', 'از این به بعد'],
+    absolute: ['همیشه', 'هرگز', 'پیش‌فرض'],
+    override: ['نادیده بگیر', 'دستورهای قبلی را نادیده'],
+    action: ['انتقال', 'واریز', 'پرداخت', 'بفرست', 'ارسال کن'],
+    bypass: ['بدون تأیید', 'بدون تایید', 'بدون بررسی', 'بدون تأییدیه'],
+  },
+  urdu: {
+    ruleMarker: ['مستقل اصول', 'اب سے', 'آئندہ سے'],
+    absolute: ['ہمیشہ', 'کبھی نہیں', 'پہلے سے طے شدہ'],
+    override: ['نظر انداز کریں', 'پچھلی ہدایات کو نظر انداز'],
+    action: ['منتقلی', 'منظور کریں', 'ادائیگی', 'بھیجیں', 'ٹرانسفر'],
+    bypass: ['بغیر تصدیق', 'توثیق کے بغیر', 'بغیر منظوری', 'بغیر جانچ'],
+  },
+  hebrew: {
+    ruleMarker: ['כלל קבוע', 'מעכשיו', 'מעתה'],
+    absolute: ['תמיד', 'לעולם לא', 'אף פעם'],
+    override: ['התעלם', 'התעלם מההוראות'],
+    action: ['העבר', 'אשר את', 'שלם', 'שלח'],
+    bypass: ['ללא אישור', 'בלי אישור', 'ללא בדיקה', 'ללא אימות'],
+  },
+  vietnamese: {
+    ruleMarker: ['quy tắc cố định', 'từ bây giờ', 'kể từ bây giờ'],
+    absolute: ['luôn luôn', 'không bao giờ', 'mặc định'],
+    override: ['bỏ qua', 'bỏ qua các hướng dẫn trước'],
+    action: ['chuyển khoản', 'phê duyệt', 'thanh toán', 'chuyển tiền', 'gửi tiền'],
+    bypass: ['không cần xác nhận', 'không xác nhận', 'không cần phê duyệt', 'không kiểm tra'],
+  },
+  indonesian: {
+    ruleMarker: ['aturan tetap', 'mulai sekarang', 'mulai saat ini'],
+    absolute: ['selalu', 'tidak pernah', 'jangan pernah'],
+    override: ['abaikan', 'abaikan instruksi sebelumnya'],
+    action: ['transfer', 'setujui', 'bayar', 'kirimkan', 'kirim uang'],
+    bypass: ['tanpa konfirmasi', 'tanpa persetujuan', 'tanpa verifikasi', 'tanpa pemeriksaan'],
+  },
+  polish: {
+    ruleMarker: ['stała zasada', 'od teraz', 'od tej pory'],
+    absolute: ['zawsze', 'nigdy', 'domyślnie'],
+    override: ['zignoruj', 'zignoruj poprzednie'],
+    action: ['przelej', 'zatwierdź', 'zapłać', 'wyślij', 'przelew'],
+    bypass: ['bez potwierdzenia', 'bez zatwierdzenia', 'bez weryfikacji', 'bez sprawdzania'],
+  },
+  thai: {
+    // No inter-word spaces (like CJK) — substring matching, not \b.
+    ruleMarker: ['กฎถาวร', 'จากนี้ไป', 'ต่อจากนี้'],
+    absolute: ['เสมอ', 'ไม่เคย', 'ค่าเริ่มต้น'],
+    override: ['เพิกเฉย', 'ละเว้นคำสั่งก่อนหน้า'],
+    action: ['โอนเงิน', 'อนุมัติ', 'ชำระเงิน', 'จ่ายเงิน', 'โอน'],
+    bypass: ['โดยไม่ต้องยืนยัน', 'ไม่ต้องยืนยัน', 'โดยไม่ต้องอนุมัติ', 'ไม่ต้องตรวจสอบ'],
+  },
 };
 
 /** NFKC + zero-width strip + lowercase + whitespace-collapse, WITHOUT confusable
