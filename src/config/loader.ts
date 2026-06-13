@@ -30,6 +30,22 @@ export function loadAgentEnv(home: MeridianHome): AgentEnv {
     VAPI_WEBHOOK_SECRET: process.env.VAPI_WEBHOOK_SECRET,
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
     TELEGRAM_DEFAULT_CHAT_ID: process.env.TELEGRAM_DEFAULT_CHAT_ID,
+    // Webhook + client channels. These were silently dropped before: the
+    // gateway gates each channel on env.<KEY>, but loadAgentEnv never copied
+    // them out of process.env, so Slack/Discord/WhatsApp never started even
+    // with keys set. Propagate them (Matrix included).
+    SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
+    SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
+    DISCORD_PUBLIC_KEY: process.env.DISCORD_PUBLIC_KEY,
+    DISCORD_APPLICATION_ID: process.env.DISCORD_APPLICATION_ID,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID,
+    WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN,
+    WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET,
+    WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
+    MATRIX_HOMESERVER_URL: process.env.MATRIX_HOMESERVER_URL,
+    MATRIX_ACCESS_TOKEN: process.env.MATRIX_ACCESS_TOKEN,
+    MATRIX_USER_ID: process.env.MATRIX_USER_ID,
     MERIDIAN_GATEWAY_TOKEN: process.env.MERIDIAN_GATEWAY_TOKEN,
     MERIDIAN_GATEWAY_PORT: process.env.MERIDIAN_GATEWAY_PORT,
     MERIDIAN_CORTEX_URL: process.env.MERIDIAN_CORTEX_URL,
