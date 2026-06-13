@@ -284,6 +284,18 @@ export const AgentConfigSchema = z.object({
      * call on recall turns that surface untrusted memories. Off by default.
      */
     memoryLlmJudge: z.boolean().default(false),
+    /**
+     * Provenance trust policy for the memory-poisoning screen.
+     *   'prefix' (default) — trust is decided by the channel-label heuristic
+     *     (isUntrustedProvenance). Zero-config, but a path that can write a
+     *     trusted-looking source string can launder a directive into trust.
+     *   'signed' — trust requires a valid per-agent HMAC signature minted at
+     *     encode time (provenance.ts). A spoofed channel label confers nothing,
+     *     which closes the provenance-laundering attack family. Requires the
+     *     runtime to sign its own encodes; memories written before enabling it
+     *     (or by external surfaces) are treated as untrusted.
+     */
+    provenanceTrust: z.enum(['prefix', 'signed']).default('prefix'),
   }),
 });
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
@@ -487,5 +499,6 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     encodeOnTurn: true,
     valenceInference: true,
     memoryLlmJudge: false,
+    provenanceTrust: 'prefix',
   },
 });

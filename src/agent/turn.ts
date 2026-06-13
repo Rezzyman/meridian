@@ -17,6 +17,7 @@ import {
 } from '../config/schema.js';
 import { screenRecall, type QuarantinedMemory } from '../verification/memory-integrity.js';
 import { makeModelJudge, screenRecallDeep } from '../verification/memory-judge.js';
+import { type ProvenanceSigner, signedProvenanceResolver } from '../verification/provenance.js';
 import { buildSacredGuard, sacredViolation } from '../verification/sacred.js';
 import { runChecks, blocking, type CheckResult } from '../verification/runtime.js';
 import type { Logger } from 'pino';
@@ -120,6 +121,14 @@ export interface TurnContext {
    *  boot and passed in (runTurn stays home/fs-free). Run after reply
    *  assembly; a `block`-severity failure replaces the reply with a refusal. */
   verificationChecks?: VerificationCheck[];
+  /**
+   * Per-agent provenance signer (provenance.ts). Supplied at boot when
+   * config.cortex.provenanceTrust === 'signed'. When present the recall screen
+   * trusts a memory only if it carries a valid signature (closing channel-name
+   * laundering), and the post-turn encode signs its own source so the agent's
+   * own memories stay trusted. Absent → the string-prefix heuristic is used.
+   */
+  provenanceSigner?: ProvenanceSigner;
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -196,15 +205,23 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     // On a clean recall this is a byte-for-byte pass-through. With the
     // optional LLM-judge enabled, a second pass also catches non-lexicon /
     // encoded / semantic directives the regex screen can't see.
+    // In 'signed' trust mode the screen trusts a memory only when it carries a
+    // valid per-agent signature; a spoofed `automation:`/`operator:` label is
+    // worthless. Falls back to the string-prefix heuristic otherwise.
+    const provenance =
+      ctx.config.cortex.provenanceTrust === 'signed' && ctx.provenanceSigner
+        ? signedProvenanceResolver(ctx.provenanceSigner)
+        : undefined;
     const screen = ctx.config.cortex.memoryLlmJudge
       ? await screenRecallDeep(r.memories, r.context, {
+          provenance,
           judge: makeModelJudge({
             router: ctx.router,
             models: ctx.config.models,
             logger: ctx.logger,
           }),
         })
-      : screenRecall(r.memories, r.context);
+      : screenRecall(r.memories, r.context, { provenance });
     recallSummary = screen.safeContext;
     quarantinedMemories = screen.quarantined;
     _recallCount = screen.kept.length;
@@ -477,12 +494,23 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     const valence = ctx.config.cortex.valenceInference
       ? inferValence(`${userInput}\n\nASSISTANT: ${reply}`, ctx.channel)
       : undefined;
+    const encodeContent = `USER: ${userInput}\nASSISTANT: ${reply}`;
+    const baseSource = commitmentDetected
+      ? `meridian:${ctx.channel}:${ctx.sessionId}:commitment`
+      : `meridian:${ctx.channel}:${ctx.sessionId}`;
+    // In signed mode, bind this first-party memory to the agent key so a later
+    // recall trusts it cryptographically (not by its label). Note: a PUBLIC
+    // voice memory is signed too — it is genuinely first-party — but its
+    // content is still screened on recall like any other; signing attests the
+    // WRITER, not that the content is safe to obey.
+    const source =
+      ctx.config.cortex.provenanceTrust === 'signed' && ctx.provenanceSigner
+        ? ctx.provenanceSigner.signSource(baseSource, encodeContent)
+        : baseSource;
     void ctx.cortex
-      .encode(`USER: ${userInput}\nASSISTANT: ${reply}`, {
+      .encode(encodeContent, {
         // Commitments encoded with priority 3 so the ledger surfaces them.
-        source: commitmentDetected
-          ? `meridian:${ctx.channel}:${ctx.sessionId}:commitment`
-          : `meridian:${ctx.channel}:${ctx.sessionId}`,
+        source,
         priority: commitmentDetected ? 3 : 2,
         valence,
         channel: ctx.channel,

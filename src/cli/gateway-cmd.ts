@@ -113,7 +113,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
   // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
   // place shared with the REPL (src/agent/tool-surface.ts).
   const surface = await buildToolSurface({ home, config, env, cortex, logger, router, memory: memorySelection.provider });
-  const { tools, skillToolNames, skills, vault, verificationChecks } = surface;
+  const { tools, skillToolNames, skills, vault, verificationChecks, provenanceSigner } = surface;
 
   // Voice session guard — passphrase-gated unlock for the public voice line.
   // Vault stores the phrase; transcript scanner strips it before the model sees it;
@@ -177,6 +177,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
       skillToolNames,
       mcpGate: surface.mcpGate,
       verificationChecks,
+      provenanceSigner,
       resume,
       store,
     });
