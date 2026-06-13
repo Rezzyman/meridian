@@ -41,6 +41,13 @@ export const AgentEnvSchema = z
   DISCORD_APPLICATION_ID: z.string().optional(),
   DISCORD_BOT_TOKEN: z.string().optional(),
 
+  // WhatsApp (Meta Cloud API): phone-number id + access token + app secret +
+  // the webhook verify token.
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+
   // Gateway
   MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
   MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
@@ -141,6 +148,13 @@ export const ChannelConfigSchema = z.object({
       enabled: z.boolean().default(false),
     })
     .default({ enabled: false }),
+  whatsapp: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Optional sender allowlist (wa_id / phone); empty = anyone. */
+      allowedNumbers: z.array(z.string()).default([]),
+    })
+    .default({ enabled: false, allowedNumbers: [] }),
   vapi: z
     .object({
       enabled: z.boolean().default(false),
@@ -504,6 +518,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     telegram: { enabled: false },
     slack: { enabled: false, allowedChannels: [] },
     discord: { enabled: false },
+    whatsapp: { enabled: false, allowedNumbers: [] },
     vapi: { enabled: false, voicePersona: 'warm_professional' },
     gateway: { enabled: false, port: 18889 },
   },

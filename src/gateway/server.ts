@@ -15,6 +15,7 @@ import type { Logger } from 'pino';
 import type { VapiChannel } from '../channels/vapi.js';
 import type { SlackChannel } from '../channels/slack.js';
 import type { DiscordChannel } from '../channels/discord.js';
+import type { WhatsappChannel } from '../channels/whatsapp.js';
 import type { Conversation } from '../agent/conversation.js';
 import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
@@ -28,6 +29,7 @@ export interface GatewayOptions {
   vapi?: VapiChannel;
   slack?: SlackChannel;
   discord?: DiscordChannel;
+  whatsapp?: WhatsappChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
 }
@@ -197,6 +199,41 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     }
     const result = opts.discord.handleRequest(rawBody);
     void result.done; // fire-and-forget the async turn + follow-up
+    reply.code(result.status);
+    return result.body;
+  });
+
+  // WhatsApp (Meta Cloud API). GET = webhook verification handshake; POST =
+  // signed inbound messages → ack, then reply via the Graph API.
+  app.get<{ Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string } }>(
+    '/whatsapp/webhook',
+    async (req, reply) => {
+      if (!opts.whatsapp) {
+        reply.code(404);
+        return { error: 'whatsapp channel not configured' };
+      }
+      const q = req.query;
+      const challenge = opts.whatsapp.handleVerification(q['hub.mode'], q['hub.verify_token'], q['hub.challenge']);
+      if (challenge === null) {
+        reply.code(403);
+        return { error: 'verification failed' };
+      }
+      reply.code(200).header('content-type', 'text/plain').send(challenge);
+      return reply;
+    },
+  );
+  app.post<{ Headers: { 'x-hub-signature-256'?: string } }>('/whatsapp/webhook', async (req, reply) => {
+    if (!opts.whatsapp) {
+      reply.code(404);
+      return { error: 'whatsapp channel not configured' };
+    }
+    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
+    if (!opts.whatsapp.verifySignature(rawBody, req.headers['x-hub-signature-256'])) {
+      reply.code(401);
+      return { error: 'invalid signature' };
+    }
+    const result = opts.whatsapp.handleRequest(rawBody);
+    void result.done; // fire-and-forget the async turn + reply
     reply.code(result.status);
     return result.body;
   });

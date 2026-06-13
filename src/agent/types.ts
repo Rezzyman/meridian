@@ -13,7 +13,7 @@ export interface MeridianTurn {
   content: string;
   toolCalls?: Array<{ name: string; args: unknown }>;
   toolResults?: Array<{ name: string; result: unknown }>;
-  channel: 'cli' | 'telegram' | 'voice' | 'gateway' | 'system' | 'slack' | 'discord';
+  channel: 'cli' | 'telegram' | 'voice' | 'gateway' | 'system' | 'slack' | 'discord' | 'whatsapp';
   ts: string; // ISO
   /** CORTEX memory id assigned post-encode */
   memoryId?: number;
