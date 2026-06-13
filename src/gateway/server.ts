@@ -14,6 +14,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import type { VapiChannel } from '../channels/vapi.js';
 import type { SlackChannel } from '../channels/slack.js';
+import type { DiscordChannel } from '../channels/discord.js';
 import type { Conversation } from '../agent/conversation.js';
 import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
@@ -26,6 +27,7 @@ export interface GatewayOptions {
   conversation: Conversation;
   vapi?: VapiChannel;
   slack?: SlackChannel;
+  discord?: DiscordChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
 }
@@ -170,6 +172,31 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     }
     const result = opts.slack.handleRequest(rawBody);
     void result.done; // fire-and-forget the async turn + reply
+    reply.code(result.status);
+    return result.body;
+  });
+
+  // Discord Interactions endpoint. Ed25519-verified; PING→PONG, slash command →
+  // deferred ack then a follow-up edit with the reply.
+  app.post<{
+    Headers: { 'x-signature-ed25519'?: string; 'x-signature-timestamp'?: string };
+  }>('/discord/interactions', async (req, reply) => {
+    if (!opts.discord) {
+      reply.code(404);
+      return { error: 'discord channel not configured' };
+    }
+    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
+    const ok = opts.discord.verifySignature(
+      rawBody,
+      req.headers['x-signature-ed25519'],
+      req.headers['x-signature-timestamp'],
+    );
+    if (!ok) {
+      reply.code(401);
+      return { error: 'invalid request signature' };
+    }
+    const result = opts.discord.handleRequest(rawBody);
+    void result.done; // fire-and-forget the async turn + follow-up
     reply.code(result.status);
     return result.body;
   });

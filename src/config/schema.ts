@@ -36,6 +36,11 @@ export const AgentEnvSchema = z
   SLACK_BOT_TOKEN: z.string().optional(),
   SLACK_SIGNING_SECRET: z.string().optional(),
 
+  // Discord (Interactions): the app public key (Ed25519) + application id.
+  DISCORD_PUBLIC_KEY: z.string().optional(),
+  DISCORD_APPLICATION_ID: z.string().optional(),
+  DISCORD_BOT_TOKEN: z.string().optional(),
+
   // Gateway
   MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
   MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
@@ -131,6 +136,11 @@ export const ChannelConfigSchema = z.object({
       allowedChannels: z.array(z.string()).default([]),
     })
     .default({ enabled: false, allowedChannels: [] }),
+  discord: z
+    .object({
+      enabled: z.boolean().default(false),
+    })
+    .default({ enabled: false }),
   vapi: z
     .object({
       enabled: z.boolean().default(false),
@@ -493,6 +503,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     cli: { enabled: true },
     telegram: { enabled: false },
     slack: { enabled: false, allowedChannels: [] },
+    discord: { enabled: false },
     vapi: { enabled: false, voicePersona: 'warm_professional' },
     gateway: { enabled: false, port: 18889 },
   },
