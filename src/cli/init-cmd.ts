@@ -125,7 +125,7 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
 
   console.log(colors.ok(`\nMeridian agent '${slug}' ready.`));
   console.log(colors.muted('Next steps:'));
-  console.log(colors.muted(`  1. Fill in ${home.envPath} with isolation triad keys (NEON, VOYAGE, OPENROUTER).`));
+  console.log(colors.muted(`  1. Fill in ${home.envPath} with isolation triad keys (NEON, VOYAGE, ROUTEXOR).`));
   console.log(colors.muted(`  2. Run \`meridian doctor\` to validate the wiring.`));
   console.log(colors.muted(`  3. Run \`meridian onboard\` for the extended interview (mission, stakeholders, principles).`));
   console.log(colors.muted(`  4. Run \`meridian\` to start chatting.`));

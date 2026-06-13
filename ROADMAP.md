@@ -17,7 +17,7 @@ This file lives at the repo root because the OSS framework and the upcoming mana
 - **Encrypted vault** (AES-256-GCM, scrypt KDF) for per-skill secrets
 - **Passphrase guards** for sensitive skills (configurable session window)
 - **Voice-channel sacred-topic gates** — regex-blocked patterns refused before the model sees them
-- **Per-agent isolation** — dedicated Neon DB, Voyage embedding key, OpenRouter key per agent
+- **Per-agent isolation** — dedicated Neon DB, Voyage embedding key, model key per agent
 - **Framework-enforced runtime rules** prepended to every system prompt (no tool-call theatre, no hallucinated results, no swallowed errors)
 - **DreamWeaver** in-process consolidation cycle
 - **AutomationManager** for cron-scheduled skill runs

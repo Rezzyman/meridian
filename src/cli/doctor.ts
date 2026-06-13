@@ -78,7 +78,7 @@ export async function runDoctor(): Promise<number> {
   // 3. Per-agent triad uniqueness across agents
   const seenNeon = new Map<string, string>();
   const seenVoyage = new Map<string, string>();
-  const seenOpenRouter = new Map<string, string>();
+  const seenRoutexor = new Map<string, string>();
   const seenGroq = new Map<string, string>();
   const triadIssues: string[] = [];
   for (const slug of agents) {
@@ -98,12 +98,12 @@ export async function runDoctor(): Promise<number> {
         triadIssues.push(`Voyage key shared between ${seenVoyage.get(env.VOYAGE_API_KEY)} and ${slug}`);
       else seenVoyage.set(env.VOYAGE_API_KEY, slug);
     }
-    if (env.OPENROUTER_API_KEY) {
-      if (seenOpenRouter.has(env.OPENROUTER_API_KEY))
+    if (env.ROUTEXOR_API_KEY) {
+      if (seenRoutexor.has(env.ROUTEXOR_API_KEY))
         triadIssues.push(
-          `OpenRouter key shared between ${seenOpenRouter.get(env.OPENROUTER_API_KEY)} and ${slug}`,
+          `ROUTEXOR key shared between ${seenRoutexor.get(env.ROUTEXOR_API_KEY)} and ${slug}`,
         );
-      else seenOpenRouter.set(env.OPENROUTER_API_KEY, slug);
+      else seenRoutexor.set(env.ROUTEXOR_API_KEY, slug);
     }
     if (env.GROQ_API_KEY) {
       if (seenGroq.has(env.GROQ_API_KEY))
@@ -117,7 +117,7 @@ export async function runDoctor(): Promise<number> {
     row(
       'Isolation triad uniqueness',
       triadIssues.length ? 'fail' : 'ok',
-      triadIssues.length ? triadIssues.join('; ') : 'each agent has unique Neon + Voyage + OpenRouter',
+      triadIssues.length ? triadIssues.join('; ') : 'each agent has unique Neon + Voyage + ROUTEXOR',
     ),
   );
 
@@ -210,9 +210,9 @@ export async function runDoctor(): Promise<number> {
   rows.push(
     row(
       'Provider keys',
-      env.OPENROUTER_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY ? 'ok' : 'warn',
-      env.OPENROUTER_API_KEY
-        ? 'OpenRouter present'
+      env.ROUTEXOR_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY ? 'ok' : 'warn',
+      env.ROUTEXOR_API_KEY
+        ? 'ROUTEXOR present'
         : env.ANTHROPIC_API_KEY
           ? 'Anthropic present'
           : env.OPENAI_API_KEY

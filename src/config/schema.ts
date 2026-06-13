@@ -16,11 +16,14 @@ export const AgentEnvSchema = z
   // the cortex/quartz providers.
   NEON_DATABASE_URL: z.string().url('Neon Postgres URL required').optional(),
   VOYAGE_API_KEY: z.string().min(20, 'Voyage AI key required for embeddings').optional(),
-  OPENROUTER_API_KEY: z.string().min(20).optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
   OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),
+  // ROUTEXOR — ATERNA's BYOK zero-markup model router (recommended default,
+  // never mandatory). OpenAI-compatible; BASE_URL overrides the endpoint.
+  ROUTEXOR_API_KEY: z.string().optional(),
+  ROUTEXOR_BASE_URL: z.string().url().optional(),
 
   // VAPI voice channel (optional but headline)
   VAPI_API_KEY: z.string().optional(),
@@ -88,27 +91,27 @@ export type AgentEnv = z.infer<typeof AgentEnvSchema>;
 
 // ─── Provider config (runtime) ─────────────────────────────────────────────────
 export const ProviderRefSchema = z.object({
-  provider: z.enum(['openrouter', 'anthropic', 'openai', 'groq', 'ollama']),
+  provider: z.enum(['anthropic', 'openai', 'groq', 'ollama', 'routexor']),
   model: z.string(),
   alias: z.string().optional(),
 });
 export type ProviderRef = z.infer<typeof ProviderRefSchema>;
 
 export const ModelChainSchema = z.object({
-  primary: z.string(), // e.g. "openrouter/anthropic/claude-haiku-4.5"
+  primary: z.string(), // e.g. "routexor/anthropic/claude-haiku-4.5"
   fallbacks: z.array(z.string()).default([]),
   smartRouting: z
     .object({
       enabled: z.boolean().default(true),
       maxSimpleChars: z.number().default(200),
       maxSimpleWords: z.number().default(35),
-      cheapModel: z.string().default('openrouter/anthropic/claude-haiku-4.5'),
+      cheapModel: z.string().default('routexor/anthropic/claude-haiku-4.5'),
     })
     .default({
       enabled: true,
       maxSimpleChars: 200,
       maxSimpleWords: 35,
-      cheapModel: 'openrouter/anthropic/claude-haiku-4.5',
+      cheapModel: 'routexor/anthropic/claude-haiku-4.5',
     }),
 });
 export type ModelChain = z.infer<typeof ModelChainSchema>;
@@ -121,7 +124,7 @@ export const HeartbeatSchema = z.object({
     start: z.string().default('06:00'),
     end: z.string().default('23:30'),
   }),
-  model: z.string().default('openrouter/anthropic/claude-haiku-4.5'),
+  model: z.string().default('routexor/anthropic/claude-haiku-4.5'),
   target: z.string().default('last'),
   ackMaxChars: z.number().default(500),
 });
@@ -523,9 +526,9 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     reasoningEffort: 'medium',
   },
   models: {
-    primary: 'openrouter/anthropic/claude-haiku-4.5',
+    primary: 'routexor/anthropic/claude-haiku-4.5',
     fallbacks: [
-      'openrouter/anthropic/claude-sonnet-4.6',
+      'routexor/anthropic/claude-sonnet-4.6',
       'ollama/qwen2.5:14b',
       'ollama/hermes3:8b',
     ],
@@ -533,7 +536,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
       enabled: true,
       maxSimpleChars: 200,
       maxSimpleWords: 35,
-      cheapModel: 'openrouter/anthropic/claude-haiku-4.5',
+      cheapModel: 'routexor/anthropic/claude-haiku-4.5',
     },
   },
   channels: {
@@ -549,7 +552,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     enabled: true,
     every: '2h',
     activeHours: { start: '06:00', end: '23:30' },
-    model: 'openrouter/anthropic/claude-haiku-4.5',
+    model: 'routexor/anthropic/claude-haiku-4.5',
     target: 'last',
     ackMaxChars: 500,
   },
