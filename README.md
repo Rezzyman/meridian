@@ -6,7 +6,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-472%20passing-brightgreen?style=for-the-badge" alt="472 tests passing">
+  <img src="https://img.shields.io/badge/tests-473%20passing-brightgreen?style=for-the-badge" alt="473 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
   <a href="#built-openly-with-an-ai-co-builder"><img src="https://img.shields.io/badge/built%20openly-with%20an%20AI-ff69b4?style=for-the-badge" alt="Built openly with an AI co-builder"></a>
 </p>
@@ -197,8 +197,11 @@ daily use.
   `http://127.0.0.1:3100`), plus a Neon DB + Voyage embeddings key per agent.
   Brings the hippocampal pipeline, dream consolidation, and semantic recall.
 
-Set one model key per agent (`OPENROUTER_API_KEY`, or `ANTHROPIC_API_KEY` /
-`OPENAI_API_KEY` / `GROQ_API_KEY`, or point `OLLAMA_BASE_URL` at a local model).
+Set one model key per agent. The default router is **[ROUTEXOR](https://routexor.com)**
+— ATERNA's BYOK, **zero-markup** model router (`ROUTEXOR_API_KEY`; `ROUTEXOR_BASE_URL`
+overrides the endpoint). Prefer to go direct? `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
+`GROQ_API_KEY` all work, or point `OLLAMA_BASE_URL` at a local model. Refs are
+`provider/model`, e.g. `routexor/anthropic/claude-haiku-4.5` or `groq/llama-3.3-70b`.
 
 ---
 

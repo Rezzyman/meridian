@@ -23,7 +23,7 @@ interface LlmCompleteOpts {
   maxTokens?: number;
   temperature?: number;
   system?: string;
-  provider?: 'anthropic' | 'openai' | 'openrouter';
+  provider?: 'anthropic' | 'openai' | 'routexor';
   model?: string;
   apiKey?: string;
 }
@@ -65,7 +65,7 @@ export interface CortexBackendAdapterOptions {
   voyageApiKey: string;
   /** Voyage model id; defaults to "voyage-3.5". */
   voyageModel?: string;
-  /** Default LLM model ref (e.g. "openrouter/anthropic/claude-haiku-4.5"). */
+  /** Default LLM model ref (e.g. "routexor/anthropic/claude-haiku-4.5"). */
   defaultModelRef?: string;
 }
 
@@ -81,7 +81,7 @@ export class CortexBackendAdapter implements CortexBackend {
     this.router = opts.router;
     this.voyage = new VoyageAIClient({ apiKey: opts.voyageApiKey });
     this.voyageModel = opts.voyageModel ?? 'voyage-3.5';
-    this.defaultModelRef = opts.defaultModelRef ?? 'openrouter/anthropic/claude-haiku-4.5';
+    this.defaultModelRef = opts.defaultModelRef ?? 'routexor/anthropic/claude-haiku-4.5';
   }
 
   async embedTexts(texts: string[]): Promise<number[][]> {

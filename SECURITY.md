@@ -42,7 +42,7 @@ We do not currently run a paid bug bounty program. Credit in the release notes i
 
 Until you upgrade to a patched release, Meridian's design provides several layers of defense:
 
-- **Per-agent isolation.** Every agent has its own Neon DB, Voyage key, and OpenRouter key. A compromise of one agent does not bleed into another.
+- **Per-agent isolation.** Every agent has its own Neon DB, Voyage key, and model key. A compromise of one agent does not bleed into another.
 - **Encrypted vault.** All persisted secrets (API keys, OAuth tokens, passphrase hashes) are AES-256-GCM encrypted at rest. The vault key (`MERIDIAN_VAULT_KEY`) lives only in the agent's `.env` (chmod 600).
 - **Passphrase guards.** Skills can mark sensitive operations as passphrase-required; the agent will refuse without a fresh authorization.
 - **Voice-channel sacred-topic refusal.** The voice channel auto-refuses on a configurable list of sensitive patterns before any tool can be called.

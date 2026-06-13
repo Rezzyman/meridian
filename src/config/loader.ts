@@ -1,6 +1,6 @@
 /**
  * Loads and validates the per-agent .env into a typed AgentEnv.
- * Enforces the per-agent isolation triad (Neon DB + Voyage + OpenRouter).
+ * Enforces the per-agent isolation triad (Neon DB + Voyage + a model key).
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -18,7 +18,8 @@ export function loadAgentEnv(home: MeridianHome): AgentEnv {
     CORTEX_AGENT_ID: process.env.CORTEX_AGENT_ID ?? home.agentSlug,
     NEON_DATABASE_URL: process.env.NEON_DATABASE_URL,
     VOYAGE_API_KEY: process.env.VOYAGE_API_KEY,
-    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    ROUTEXOR_API_KEY: process.env.ROUTEXOR_API_KEY,
+    ROUTEXOR_BASE_URL: process.env.ROUTEXOR_BASE_URL,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GROQ_API_KEY: process.env.GROQ_API_KEY,
@@ -75,7 +76,7 @@ MERIDIAN_MEMORY_PROVIDER=embedded
 # then \`ollama pull qwen2.5\`). Or paste a key for any provider below.
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 GROQ_API_KEY=
-OPENROUTER_API_KEY=
+ROUTEXOR_API_KEY=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 
@@ -101,7 +102,7 @@ VOYAGE_API_KEY=
 # Model providers (at least one required)
 # Groq: free tier, fastest inference. Get a key at https://console.groq.com
 GROQ_API_KEY=
-OPENROUTER_API_KEY=
+ROUTEXOR_API_KEY=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 OLLAMA_BASE_URL=http://127.0.0.1:11434

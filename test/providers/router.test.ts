@@ -8,12 +8,12 @@ import { ProviderRouter } from '../../src/providers/router.js';
 import type { ModelChain } from '../../src/config/schema.js';
 import { makeEnv } from '../helpers/fixtures.js';
 
-// Syntactically valid dummy keys — never live. OPENROUTER_API_KEY needs >= 20 chars.
+// Syntactically valid dummy keys — never live.
 const ALL_KEYS = {
   ANTHROPIC_API_KEY: 'sk-ant-test-key',
   OPENAI_API_KEY: 'sk-openai-test-key',
   GROQ_API_KEY: 'gsk-groq-test-key',
-  OPENROUTER_API_KEY: 'sk-or-test-00000000000000000000',
+  ROUTEXOR_API_KEY: 'rx-test-key',
 };
 
 function makeChain(overrides: Partial<ModelChain> = {}): ModelChain {
@@ -40,12 +40,20 @@ describe('ProviderRouter.resolve', () => {
     assert.ok(resolved.model, 'model object is constructed');
   });
 
-  it('keeps inner slashes in openrouter model ids', () => {
+  it('passes vendor/model through routexor (the default router) intact', () => {
     const router = new ProviderRouter(makeEnv(ALL_KEYS));
-    const resolved = router.resolve('openrouter/anthropic/claude-sonnet-4.6');
-    assert.equal(resolved.provider, 'openrouter');
+    const resolved = router.resolve('routexor/anthropic/claude-sonnet-4.6');
+    assert.equal(resolved.provider, 'routexor');
     assert.equal(resolved.modelId, 'anthropic/claude-sonnet-4.6');
-    assert.equal(resolved.ref, 'openrouter/anthropic/claude-sonnet-4.6');
+    assert.equal(resolved.ref, 'routexor/anthropic/claude-sonnet-4.6');
+    assert.ok(resolved.model, 'model object is constructed');
+  });
+
+  it('honors a custom ROUTEXOR_BASE_URL without throwing', () => {
+    const router = new ProviderRouter(
+      makeEnv({ ROUTEXOR_API_KEY: 'rx-test-key', ROUTEXOR_BASE_URL: 'https://rtx.internal/v1' }),
+    );
+    assert.ok(router.resolve('routexor/some-model').model);
   });
 
   it('throws naming the env var when the provider key is missing', () => {
@@ -54,7 +62,7 @@ describe('ProviderRouter.resolve', () => {
     assert.throws(() => router.resolve('anthropic/claude-x'), /ANTHROPIC_API_KEY/);
     assert.throws(() => router.resolve('openai/gpt-5'), /OPENAI_API_KEY/);
     assert.throws(() => router.resolve('groq/llama-3.3-70b'), /GROQ_API_KEY/);
-    assert.throws(() => router.resolve('openrouter/anthropic/claude-x'), /OPENROUTER_API_KEY/);
+    assert.throws(() => router.resolve('routexor/anthropic/claude-x'), /ROUTEXOR_API_KEY/);
   });
 
   it('resolves ollama refs with no API key at all', () => {

@@ -7,7 +7,7 @@
  *
  *   - SECRET-SCRUBBED ENV. The child gets a minimal, hand-built environment —
  *     PATH, a throwaway HOME/TMPDIR, locale. It does NOT inherit process.env,
- *     so the agent's OPENROUTER/ANTHROPIC/NEON/VOYAGE keys are invisible to
+ *     so the agent's ROUTEXOR/ANTHROPIC/NEON/VOYAGE keys are invisible to
  *     executed code. A naive `child_process` that forwards process.env hands
  *     every secret to whatever it runs; this is the property that makes a code
  *     tool safe to expose to a model steered by an untrusted memory.

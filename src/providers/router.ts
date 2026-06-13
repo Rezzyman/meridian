@@ -1,6 +1,6 @@
 /**
  * Provider router on Vercel AI SDK.
- * Resolves "openrouter/anthropic/claude-haiku-4.5" → LanguageModel.
+ * Resolves "routexor/anthropic/claude-haiku-4.5" → LanguageModel.
  * Implements primary + fallback chain and smart-routing for short turns.
  *
  * We do not rebuild streaming, tool-use loops, or message shapes.
@@ -10,12 +10,11 @@
 import type { LanguageModel } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createGroq } from '@ai-sdk/groq';
 import { createOllama } from 'ollama-ai-provider';
 import type { AgentEnv, ModelChain } from '../config/schema.js';
 
-export type ProviderName = 'openrouter' | 'anthropic' | 'openai' | 'groq' | 'ollama';
+export type ProviderName = 'anthropic' | 'openai' | 'groq' | 'ollama' | 'routexor';
 
 export interface ResolvedProvider {
   provider: ProviderName;
@@ -129,13 +128,6 @@ export class ProviderRouter {
 
   private build(provider: ProviderName, modelId: string): LanguageModel {
     switch (provider) {
-      case 'openrouter': {
-        if (!this.env.OPENROUTER_API_KEY) {
-          throw new Error('OPENROUTER_API_KEY missing for openrouter provider');
-        }
-        const or = createOpenRouter({ apiKey: this.env.OPENROUTER_API_KEY });
-        return or.chat(modelId);
-      }
       case 'anthropic': {
         if (!this.env.ANTHROPIC_API_KEY) {
           throw new Error('ANTHROPIC_API_KEY missing for anthropic provider');
@@ -149,6 +141,25 @@ export class ProviderRouter {
         }
         const o = createOpenAI({ apiKey: this.env.OPENAI_API_KEY });
         return o(modelId);
+      }
+      case 'routexor': {
+        // ROUTEXOR (routexor.com) — ATERNA's BYOK, zero-markup model router.
+        // Speaks the OpenAI chat API, so it's a base-URL'd OpenAI provider:
+        // refs like `routexor/anthropic/claude-haiku-4.5` pass the inner
+        // `vendor/model` straight through to the router. The default router for
+        // every Meridian agent; direct providers (anthropic/openai/groq) and a
+        // local ollama all keep working for operators who prefer them. BYOK: the
+        // operator supplies ROUTEXOR_API_KEY; ROUTEXOR_BASE_URL overrides the
+        // endpoint if it differs from the default.
+        if (!this.env.ROUTEXOR_API_KEY) {
+          throw new Error('ROUTEXOR_API_KEY missing for routexor provider');
+        }
+        const rx = createOpenAI({
+          apiKey: this.env.ROUTEXOR_API_KEY,
+          baseURL: this.env.ROUTEXOR_BASE_URL ?? 'https://api.routexor.com/v1',
+          name: 'routexor',
+        });
+        return rx(modelId);
       }
       case 'groq': {
         if (!this.env.GROQ_API_KEY) {
