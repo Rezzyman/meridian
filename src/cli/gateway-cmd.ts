@@ -23,6 +23,7 @@ import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
 import { SlackChannel } from '../channels/slack.js';
 import { DiscordChannel } from '../channels/discord.js';
+import { WhatsappChannel } from '../channels/whatsapp.js';
 import { VoiceSessionGuard } from '../voice/session-guard.js';
 import { startGateway } from '../gateway/server.js';
 import { colors } from '../utils/truecolor.js';
@@ -381,6 +382,24 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     console.log(colors.ok('discord channel started (POST /discord/interactions)'));
   }
 
+  // ── WhatsApp channel — Meta Cloud API webhook (signed), optional allowlist ──
+  let whatsapp: WhatsappChannel | undefined;
+  if (env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN) {
+    whatsapp = new WhatsappChannel({
+      phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
+      accessToken: env.WHATSAPP_ACCESS_TOKEN,
+      appSecret: env.WHATSAPP_APP_SECRET,
+      verifyToken: env.WHATSAPP_VERIFY_TOKEN,
+      allowedNumbers: config.channels.whatsapp?.allowedNumbers ?? [],
+      logger,
+    });
+    whatsapp.start(undefined, {
+      onInbound: async (m) => turn('whatsapp', m.from, m.text),
+    });
+    channelMap.set('whatsapp', whatsapp as unknown as ChannelAdapter);
+    console.log(colors.ok('whatsapp channel started (GET+POST /whatsapp/webhook)'));
+  }
+
   // ── Proactive sentinel — morning brief + optional nudges ──
   // The thing that makes a Meridian agent a partner instead of a chatbot.
   // Scheduled CORTEX recalls compose a brief and push it to the operator's
@@ -463,6 +482,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     vapi,
     slack,
     discord,
+    whatsapp,
     sentinel,
     automations,
   });

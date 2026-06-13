@@ -104,7 +104,7 @@ An honest, cited comparison — including where we trail today.
 | Voice channel | ✅ | ✅ | ✅ + **cross-call memory** |
 | Model Context Protocol (MCP) | ✅ client | ✅ client | ✅ **client + server** |
 | Bounded sub-agent delegation | ✅ | ✅ | ✅ |
-| Messaging channels | ✅ ~23 | ✅ ~7 | ⚠️ **6** (CLI, Telegram, Slack, Discord, voice, web) |
+| Messaging channels | ✅ ~23 | ✅ ~7 | **7** (CLI, Telegram, Slack, Discord, WhatsApp, voice, web) |
 | One-line install (npm / curl) | ✅ | ✅ | 🚧 clone for now |
 | Migrate from a competitor | — | ✅ from OpenClaw | ✅ `meridian import` |
 | Localized (i18n) docs | — | ✅ | 🚧 |
@@ -231,7 +231,7 @@ Talk to your agent in the terminal (`meridian`) or from a connected channel
 
 ## Channels
 
-Meridian wires **6 channels** today, with cross-channel memory through CORTEX:
+Meridian wires **7 channels** today, with cross-channel memory through CORTEX:
 
 - **CLI / REPL** — the default `meridian` command.
 - **Telegram** — inbound bot, bootstrap-locked to your first sender / pinned chat.
@@ -241,15 +241,20 @@ Meridian wires **6 channels** today, with cross-channel memory through CORTEX:
 - **Discord** — Interactions endpoint (`/discord/interactions`) with Ed25519
   signature verification; register a slash command and set `DISCORD_PUBLIC_KEY` +
   `DISCORD_APPLICATION_ID`.
+- **WhatsApp** — Meta Cloud API webhook (`/whatsapp/webhook`) with
+  `X-Hub-Signature-256` verification + the GET verification handshake; set
+  `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_APP_SECRET` /
+  `WHATSAPP_VERIFY_TOKEN`. Optional sender allowlist.
 - **Voice (VAPI)** — inbound phone calls with **cross-call memory** (the headline
   below).
 - **HTTP gateway + SSE streaming** — `/chat`, `/chat/stream`, `/vapi/webhook`, plus
   a single-file browser chat (`skeleton/web/chat.html`).
 
-Closing on OpenClaw (~23) and Hermes (~7) — **WhatsApp is next** (see
-[Roadmap](ROADMAP.md)). The two things that close the gap fast: MCP (any MCP
-server becomes channel-gated tools) and the portable seven-layer home (any
-markdown-reading harness can drive a Meridian agent).
+That's **parity with Hermes (~7)** on the channels that matter most, with
+OpenClaw's long tail (~23) still ahead on breadth. The two things that keep
+closing the gap: MCP (any MCP server becomes channel-gated tools) and the
+portable seven-layer home (any markdown-reading harness can drive a Meridian
+agent).
 
 ### Voice with cross-call memory
 
