@@ -13,7 +13,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-375%20passing-brightgreen?style=for-the-badge" alt="375 tests passing">
+  <img src="https://img.shields.io/badge/tests-390%20passing-brightgreen?style=for-the-badge" alt="390 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
   <a href="#built-openly-with-an-ai-co-builder"><img src="https://img.shields.io/badge/built%20openly-with%20an%20AI-ff69b4?style=for-the-badge" alt="Built openly with an AI co-builder"></a>
 </p>
@@ -108,6 +108,7 @@ An honest, cited comparison — including where we trail today.
 | Voice channel | ✅ | ✅ | ✅ + **cross-call memory** |
 | Model Context Protocol (MCP) | ✅ client | ✅ client | ✅ **client + server** |
 | Bounded sub-agent delegation | ✅ | ✅ | ✅ |
+| Self-improving skill creation | partial | ✅ | ✅ **+ screened by the poisoning defense** |
 | Messaging channels | ✅ ~23 | ✅ ~7 | **7** (CLI, Telegram, Slack, Discord, WhatsApp, voice, web) |
 | One-line install (npm / curl) | ✅ | ✅ | 🚧 release wired ([one tag away](docs/releasing.md)) |
 | Migrate from a competitor | — | ✅ from OpenClaw | ✅ `meridian import` |
@@ -154,6 +155,7 @@ meridian                      # talk to it; it remembers you across restarts
 | **🔌 MCP, both directions** | Consume any MCP server as channel-gated tools, **and** serve this agent's memory to any MCP client (`meridian mcp serve`). |
 | **🗂️ Portable seven-layer agent OS** | IDENTITY / CONTEXT / SKILLS / MEMORY / CONNECTIONS / VERIFICATION / AUTOMATIONS as a plain filesystem any tool can read. |
 | **🧩 Bounded sub-agents** | A `delegate` tool with hard structural depth, token, and wall-clock caps behind a provider circuit breaker — fan-out without runaway. |
+| **🧬 Memory-safe skill authoring** | The agent writes its own skills (`meridian skills new`) — and every draft is screened by the poisoning defense before install, so a poisoned source can't trick it into authoring a malicious one. Hermes's signature feature, with a safety property no one else has. |
 | **🌊 Streaming** | SSE gateway (`/chat/stream`) with live token deltas and a single-file browser chat. |
 | **📐 Schema-enforced output** | Zod-validated tool results + validated-JSON generation with repair retries. |
 | **🌙 In-process autonomy** | Dream consolidation, proactive briefs, and heartbeats run on your Node process — no external cron, no "gateway down → memory stale." |
@@ -225,7 +227,7 @@ meridian init outbound --inherits aria   # a specialist that inherits hub CONTEX
 
 **Full command surface:** `init` · `onboard` · `agents` · `use` · `demo` ·
 `doctor` · `deploy` · `audit` · `gateway` · `ingest` · `chat` · `mcp list|serve` ·
-`voice passphrase|status|call` · `skills list|install|remove|setup`.
+`voice passphrase|status|call` · `skills list|install|remove|setup|new`.
 
 ### CLI ⇄ messaging quick reference
 
