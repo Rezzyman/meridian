@@ -1,13 +1,6 @@
-# Meridian
-
-```
-███╗   ███╗███████╗██████╗ ██╗██████╗ ██╗ █████╗ ███╗   ██╗
-████╗ ████║██╔════╝██╔══██╗██║██╔══██╗██║██╔══██╗████╗  ██║
-██╔████╔██║█████╗  ██████╔╝██║██║  ██║██║███████║██╔██╗ ██║
-██║╚██╔╝██║██╔══╝  ██╔══██╗██║██║  ██║██║██╔══██║██║╚██╗██║
-██║ ╚═╝ ██║███████╗██║  ██║██║██████╔╝██║██║  ██║██║ ╚████║
-╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝
-```
+<p align="center">
+  <img src="assets/meridian-logo.svg" alt="MERIDIAN — 你敢把生活托付给它的智能体操作系统" width="760">
+</p>
 
 <p align="center">
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
