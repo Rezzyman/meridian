@@ -25,6 +25,7 @@ import { SlackChannel } from '../channels/slack.js';
 import { DiscordChannel } from '../channels/discord.js';
 import { WhatsappChannel } from '../channels/whatsapp.js';
 import { MatrixChannel } from '../channels/matrix.js';
+import { SmsChannel } from '../channels/sms.js';
 import { VoiceSessionGuard } from '../voice/session-guard.js';
 import { startGateway } from '../gateway/server.js';
 import { colors } from '../utils/truecolor.js';
@@ -419,6 +420,29 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     console.log(colors.ok('matrix channel started (polling /sync)'));
   }
 
+  // ── SMS channel — Twilio webhook (signed), async reply via the REST API. ──
+  let sms: SmsChannel | undefined;
+  if (
+    env.TWILIO_ACCOUNT_SID &&
+    env.TWILIO_AUTH_TOKEN &&
+    env.TWILIO_PHONE_NUMBER &&
+    env.TWILIO_WEBHOOK_URL
+  ) {
+    sms = new SmsChannel({
+      accountSid: env.TWILIO_ACCOUNT_SID,
+      authToken: env.TWILIO_AUTH_TOKEN,
+      fromNumber: env.TWILIO_PHONE_NUMBER,
+      webhookUrl: env.TWILIO_WEBHOOK_URL,
+      allowedNumbers: config.channels.sms?.allowedNumbers ?? [],
+      logger,
+    });
+    sms.start(undefined, {
+      onInbound: async (m) => turn('sms', m.from, m.text),
+    });
+    channelMap.set('sms', sms as unknown as ChannelAdapter);
+    console.log(colors.ok('sms channel started (POST /twilio/sms)'));
+  }
+
   // ── Proactive sentinel — morning brief + optional nudges ──
   // The thing that makes a Meridian agent a partner instead of a chatbot.
   // Scheduled CORTEX recalls compose a brief and push it to the operator's
@@ -502,6 +526,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     slack,
     discord,
     whatsapp,
+    sms,
     sentinel,
     automations,
   });
