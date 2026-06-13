@@ -109,7 +109,7 @@ An honest, cited comparison — including where we trail today.
 | Model Context Protocol (MCP) | ✅ client | ✅ client | ✅ **client + server** |
 | Bounded sub-agent delegation | ✅ | ✅ | ✅ |
 | Messaging channels | ✅ ~23 | ✅ ~7 | **7** (CLI, Telegram, Slack, Discord, WhatsApp, voice, web) |
-| One-line install (npm / curl) | ✅ | ✅ | 🚧 clone for now |
+| One-line install (npm / curl) | ✅ | ✅ | 🚧 release wired ([one tag away](docs/releasing.md)) |
 | Migrate from a competitor | — | ✅ from OpenClaw | ✅ `meridian import` |
 | Localized (i18n) docs | — | ✅ | ✅ ([中文](README.zh-CN.md)) |
 | License | MIT | MIT | MIT (+ BSL Quartz) |
@@ -165,8 +165,20 @@ meridian                      # talk to it; it remembers you across restarts
 
 ## Install
 
-Requires **Node ≥ 20** and [pnpm](https://pnpm.io). Not yet on npm
-([tracked](ROADMAP.md) — a one-line `npx` install is coming); clone for now:
+Requires **Node ≥ 20**.
+
+**npm (once the first release is cut):**
+
+```bash
+npm i -g @aterna/meridian      # or: npx @aterna/meridian demo
+```
+
+Publishing is fully wired — a `v*` tag-push runs the [release workflow](.github/workflows/release.yml)
+(typecheck · lint · test · build · `npm publish --provenance`). See
+[docs/releasing.md](docs/releasing.md). Until that first tag lands, install from
+source:
+
+**From source (works today):**
 
 ```bash
 git clone https://github.com/Rezzyman/meridian
