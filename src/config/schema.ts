@@ -222,6 +222,7 @@ const CLI_SAFE_DEFAULT = [
   'glob_files',
   'search_files',
   'edit_file',
+  'run_code',
   'delegate',
   'http_request',
   ...SAFE_UTILITIES,
