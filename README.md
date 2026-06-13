@@ -13,7 +13,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-434%20passing-brightgreen?style=for-the-badge" alt="434 tests passing">
+  <img src="https://img.shields.io/badge/tests-449%20passing-brightgreen?style=for-the-badge" alt="449 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
   <a href="#built-openly-with-an-ai-co-builder"><img src="https://img.shields.io/badge/built%20openly-with%20an%20AI-ff69b4?style=for-the-badge" alt="Built openly with an AI co-builder"></a>
 </p>
@@ -155,7 +155,7 @@ meridian                      # talk to it; it remembers you across restarts
 | **🔌 MCP, both directions** | Consume any MCP server as channel-gated tools, **and** serve this agent's memory to any MCP client (`meridian mcp serve`). |
 | **🗂️ Portable seven-layer agent OS** | IDENTITY / CONTEXT / SKILLS / MEMORY / CONNECTIONS / VERIFICATION / AUTOMATIONS as a plain filesystem any tool can read. |
 | **🧩 Bounded sub-agents** | A `delegate` tool with hard structural depth, token, and wall-clock caps behind a provider circuit breaker — fan-out without runaway. |
-| **🧰 Guarded built-in toolbelt** | Real HTTP (any method), HTML→text, hashing, base64, time — and the `http_request` tool routes every call through an **SSRF guard** that blocks the cloud-metadata endpoint, loopback, and RFC-1918 ranges *by default* (incl. the decimal/hex/octal/IPv6 obfuscations). The only harness whose fetch tool refuses the confused-deputy attack out of the box. |
+| **🧰 Guarded built-in toolbelt** | Real HTTP (any method), HTML→text, hashing, base64, time, plus file navigation & scoped editing (`list_dir` / `glob_files` / `search_files` / `edit_file`, with bounded walks) — and the `http_request` tool routes every call through an **SSRF guard** that blocks the cloud-metadata endpoint, loopback, and RFC-1918 ranges *by default* (incl. the decimal/hex/octal/IPv6 obfuscations). The only harness whose fetch tool refuses the confused-deputy attack out of the box. |
 | **🌊 Streaming** | SSE gateway (`/chat/stream`) with live token deltas and a single-file browser chat. |
 | **📐 Schema-enforced output** | Zod-validated tool results + validated-JSON generation with repair retries. |
 | **🌙 In-process autonomy** | Dream consolidation, proactive briefs, and heartbeats run on your Node process — no external cron, no "gateway down → memory stale." |
