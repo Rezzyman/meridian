@@ -193,7 +193,23 @@ export type DreamConfig = z.infer<typeof DreamConfigSchema>;
 // should never have shell. A DevOps agent on REPL might want it. This
 // schema makes that an explicit per-agent decision instead of a hardcoded
 // default.
-const CHAT_SAFE_DEFAULT = ['web_fetch', 'voice_status', 'cortex_dream', 'telegram_dm'] as const;
+// Pure, side-effect-free helpers (hash/base64/time/HTML-extract) are safe on
+// every surface. `http_request` makes real network egress (SSRF-guarded but
+// still POST-capable), so it stays a CLI power-user default — operators opt
+// chat agents in explicitly.
+const SAFE_UTILITIES = [
+  'extract_text',
+  'hash_text',
+  'base64_transform',
+  'current_time',
+] as const;
+const CHAT_SAFE_DEFAULT = [
+  'web_fetch',
+  'voice_status',
+  'cortex_dream',
+  'telegram_dm',
+  ...SAFE_UTILITIES,
+] as const;
 const CLI_SAFE_DEFAULT = [
   'web_fetch',
   'voice_status',
@@ -203,6 +219,8 @@ const CLI_SAFE_DEFAULT = [
   'read',
   'write',
   'delegate',
+  'http_request',
+  ...SAFE_UTILITIES,
 ] as const;
 export const ToolsConfigSchema = z.object({
   chat: z.array(z.string()).default([...CHAT_SAFE_DEFAULT]),
