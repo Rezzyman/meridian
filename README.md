@@ -104,7 +104,7 @@ An honest, cited comparison — including where we trail today.
 | Voice channel | ✅ | ✅ | ✅ + **cross-call memory** |
 | Model Context Protocol (MCP) | ✅ client | ✅ client | ✅ **client + server** |
 | Bounded sub-agent delegation | ✅ | ✅ | ✅ |
-| Messaging channels | ✅ ~23 | ✅ ~7 | ⚠️ **5** (CLI, Telegram, Slack, voice, web) |
+| Messaging channels | ✅ ~23 | ✅ ~7 | ⚠️ **6** (CLI, Telegram, Slack, Discord, voice, web) |
 | One-line install (npm / curl) | ✅ | ✅ | 🚧 clone for now |
 | Migrate from a competitor | — | ✅ from OpenClaw | ✅ `meridian import` |
 | Localized (i18n) docs | — | ✅ | 🚧 |
@@ -231,22 +231,25 @@ Talk to your agent in the terminal (`meridian`) or from a connected channel
 
 ## Channels
 
-Meridian wires **5 channels** today, with cross-channel memory through CORTEX:
+Meridian wires **6 channels** today, with cross-channel memory through CORTEX:
 
 - **CLI / REPL** — the default `meridian` command.
 - **Telegram** — inbound bot, bootstrap-locked to your first sender / pinned chat.
 - **Slack** — Events API webhook (`/slack/events`) with HMAC signature
   verification; set `SLACK_BOT_TOKEN` + `SLACK_SIGNING_SECRET` and point the app's
   Event Subscriptions at your gateway. Optional channel allowlist.
+- **Discord** — Interactions endpoint (`/discord/interactions`) with Ed25519
+  signature verification; register a slash command and set `DISCORD_PUBLIC_KEY` +
+  `DISCORD_APPLICATION_ID`.
 - **Voice (VAPI)** — inbound phone calls with **cross-call memory** (the headline
   below).
 - **HTTP gateway + SSE streaming** — `/chat`, `/chat/stream`, `/vapi/webhook`, plus
   a single-file browser chat (`skeleton/web/chat.html`).
 
-Still behind OpenClaw (~23) and Hermes (~7) on count — **Discord and WhatsApp are
-next** (see [Roadmap](ROADMAP.md)). The two things that close the gap fast: MCP
-(any MCP server becomes channel-gated tools) and the portable seven-layer home
-(any markdown-reading harness can drive a Meridian agent).
+Closing on OpenClaw (~23) and Hermes (~7) — **WhatsApp is next** (see
+[Roadmap](ROADMAP.md)). The two things that close the gap fast: MCP (any MCP
+server becomes channel-gated tools) and the portable seven-layer home (any
+markdown-reading harness can drive a Meridian agent).
 
 ### Voice with cross-call memory
 

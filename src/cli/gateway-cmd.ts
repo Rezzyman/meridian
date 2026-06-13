@@ -22,6 +22,7 @@ import { createLogger } from '../logger/pino.js';
 import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
 import { SlackChannel } from '../channels/slack.js';
+import { DiscordChannel } from '../channels/discord.js';
 import { VoiceSessionGuard } from '../voice/session-guard.js';
 import { startGateway } from '../gateway/server.js';
 import { colors } from '../utils/truecolor.js';
@@ -365,6 +366,21 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     console.log(colors.ok('slack channel started (POST /slack/events)'));
   }
 
+  // ── Discord channel — Interactions endpoint (slash commands), Ed25519 ──
+  let discord: DiscordChannel | undefined;
+  if (env.DISCORD_PUBLIC_KEY) {
+    discord = new DiscordChannel({
+      publicKey: env.DISCORD_PUBLIC_KEY,
+      applicationId: env.DISCORD_APPLICATION_ID,
+      logger,
+    });
+    discord.start(undefined, {
+      onInbound: async (m) => turn('discord', m.from, m.text),
+    });
+    channelMap.set('discord', discord as unknown as ChannelAdapter);
+    console.log(colors.ok('discord channel started (POST /discord/interactions)'));
+  }
+
   // ── Proactive sentinel — morning brief + optional nudges ──
   // The thing that makes a Meridian agent a partner instead of a chatbot.
   // Scheduled CORTEX recalls compose a brief and push it to the operator's
@@ -446,6 +462,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     conversation: httpConvoFacade,
     vapi,
     slack,
+    discord,
     sentinel,
     automations,
   });
