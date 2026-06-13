@@ -51,6 +51,12 @@ export const AgentEnvSchema = z
   WHATSAPP_APP_SECRET: z.string().optional(),
   WHATSAPP_VERIFY_TOKEN: z.string().optional(),
 
+  // Matrix (client-server API): the homeserver, a bot access token, and the
+  // bot's own MXID (to ignore its own messages). Polls /sync — no webhook.
+  MATRIX_HOMESERVER_URL: z.string().url().optional(),
+  MATRIX_ACCESS_TOKEN: z.string().optional(),
+  MATRIX_USER_ID: z.string().optional(),
+
   // Gateway
   MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
   MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
@@ -158,6 +164,13 @@ export const ChannelConfigSchema = z.object({
       allowedNumbers: z.array(z.string()).default([]),
     })
     .default({ enabled: false, allowedNumbers: [] }),
+  matrix: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Optional room-id allowlist; empty = any room the bot has joined. */
+      allowedRooms: z.array(z.string()).default([]),
+    })
+    .default({ enabled: false, allowedRooms: [] }),
   vapi: z
     .object({
       enabled: z.boolean().default(false),
@@ -545,6 +558,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     slack: { enabled: false, allowedChannels: [] },
     discord: { enabled: false },
     whatsapp: { enabled: false, allowedNumbers: [] },
+    matrix: { enabled: false, allowedRooms: [] },
     vapi: { enabled: false, voicePersona: 'warm_professional' },
     gateway: { enabled: false, port: 18889 },
   },

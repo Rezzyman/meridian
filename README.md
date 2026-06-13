@@ -6,7 +6,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-473%20passing-brightgreen?style=for-the-badge" alt="473 tests passing">
+  <img src="https://img.shields.io/badge/tests-482%20passing-brightgreen?style=for-the-badge" alt="482 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
   <a href="#built-openly-with-an-ai-co-builder"><img src="https://img.shields.io/badge/built%20openly-with%20an%20AI-ff69b4?style=for-the-badge" alt="Built openly with an AI co-builder"></a>
 </p>
@@ -103,7 +103,7 @@ An honest, cited comparison — including where we trail today.
 | Model Context Protocol (MCP) | ✅ client | ✅ client | ✅ **client + server** |
 | Bounded sub-agent delegation | ✅ | ✅ | ✅ |
 | Self-improving skill creation | partial | ✅ | ✅ **+ screened by the poisoning defense** |
-| Messaging channels | ✅ ~23 | ✅ ~7 | **7** (CLI, Telegram, Slack, Discord, WhatsApp, voice, web) |
+| Messaging channels | ✅ ~23 | ✅ ~7 | **8** (CLI, Telegram, Slack, Discord, WhatsApp, **Matrix**, voice, web) |
 | One-line install (npm / curl) | ✅ | ✅ | 🚧 release wired ([one tag away](docs/releasing.md)) |
 | Migrate from a competitor | — | ✅ from OpenClaw | ✅ `meridian import` |
 | Localized (i18n) docs | — | ✅ | ✅ ([中文](README.zh-CN.md)) |
@@ -248,7 +248,7 @@ Talk to your agent in the terminal (`meridian`) or from a connected channel
 
 ## Channels
 
-Meridian wires **7 channels** today, with cross-channel memory through CORTEX:
+Meridian wires **8 channels** today, with cross-channel memory through CORTEX:
 
 - **CLI / REPL** — the default `meridian` command.
 - **Telegram** — inbound bot, bootstrap-locked to your first sender / pinned chat.
@@ -262,16 +262,21 @@ Meridian wires **7 channels** today, with cross-channel memory through CORTEX:
   `X-Hub-Signature-256` verification + the GET verification handshake; set
   `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_APP_SECRET` /
   `WHATSAPP_VERIFY_TOKEN`. Optional sender allowlist.
+- **Matrix** — the open, federated messenger. Unlike the webhook channels, the
+  agent is a *client*: it long-polls `/sync` and replies via the client-server
+  API, so there's **no public webhook and no inbound port** — it runs behind NAT
+  and self-hosts on your own homeserver. Set `MATRIX_HOMESERVER_URL` /
+  `MATRIX_ACCESS_TOKEN` / `MATRIX_USER_ID`. Optional room allowlist.
 - **Voice (VAPI)** — inbound phone calls with **cross-call memory** (the headline
   below).
 - **HTTP gateway + SSE streaming** — `/chat`, `/chat/stream`, `/vapi/webhook`, plus
   a single-file browser chat (`skeleton/web/chat.html`).
 
-That's **parity with Hermes (~7)** on the channels that matter most, with
-OpenClaw's long tail (~23) still ahead on breadth. The two things that keep
-closing the gap: MCP (any MCP server becomes channel-gated tools) and the
-portable seven-layer home (any markdown-reading harness can drive a Meridian
-agent).
+That **edges past Hermes (~7)** on the channels that matter most — including a
+self-hostable, behind-NAT one neither competitor lists — with OpenClaw's long
+tail (~23) still ahead on raw breadth. The two things that keep closing that
+gap: MCP (any MCP server becomes channel-gated tools) and the portable
+seven-layer home (any markdown-reading harness can drive a Meridian agent).
 
 ### Voice with cross-call memory
 

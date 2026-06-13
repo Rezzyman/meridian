@@ -24,6 +24,7 @@ import { VapiChannel } from '../channels/vapi.js';
 import { SlackChannel } from '../channels/slack.js';
 import { DiscordChannel } from '../channels/discord.js';
 import { WhatsappChannel } from '../channels/whatsapp.js';
+import { MatrixChannel } from '../channels/matrix.js';
 import { VoiceSessionGuard } from '../voice/session-guard.js';
 import { startGateway } from '../gateway/server.js';
 import { colors } from '../utils/truecolor.js';
@@ -398,6 +399,24 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     });
     channelMap.set('whatsapp', whatsapp as unknown as ChannelAdapter);
     console.log(colors.ok('whatsapp channel started (GET+POST /whatsapp/webhook)'));
+  }
+
+  // ── Matrix channel — client-server /sync poller. No webhook, no inbound port:
+  // works behind NAT, self-hostable on your own homeserver. ──
+  let matrix: MatrixChannel | undefined;
+  if (env.MATRIX_HOMESERVER_URL && env.MATRIX_ACCESS_TOKEN && env.MATRIX_USER_ID) {
+    matrix = new MatrixChannel({
+      homeserverUrl: env.MATRIX_HOMESERVER_URL,
+      accessToken: env.MATRIX_ACCESS_TOKEN,
+      userId: env.MATRIX_USER_ID,
+      allowedRooms: config.channels.matrix?.allowedRooms ?? [],
+      logger,
+    });
+    matrix.start(undefined, {
+      onInbound: async (m) => turn('matrix', m.from, m.text),
+    });
+    channelMap.set('matrix', matrix as unknown as ChannelAdapter);
+    console.log(colors.ok('matrix channel started (polling /sync)'));
   }
 
   // ── Proactive sentinel — morning brief + optional nudges ──
