@@ -14,7 +14,10 @@ import { existsSync, mkdirSync, copyFileSync, rmSync, readdirSync, statSync, rea
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline/promises';
-import { activeAgentSlug, ensureAgentHome } from '../config/home.js';
+import { activeAgentSlug, ensureAgentHome, loadAgentConfig } from '../config/home.js';
+import { loadAgentEnv } from '../config/loader.js';
+import { ProviderRouter } from '../providers/router.js';
+import { generateSkillDraft, installSkillDraft, screenSkillDraft } from '../skills/authoring.js';
 import { colors } from '../utils/truecolor.js';
 import type { Vault } from '../secrets/vault.js';
 import type { GogRunOptions, GogRunResult } from '../tools/gog.js';
@@ -374,4 +377,52 @@ export async function runSkillsSetup(name: string): Promise<void> {
   console.log('');
   console.log(colors.ok(`${manifest.name} configured.`));
   console.log(colors.muted(`  restart the gateway (or REPL) for the skill's tools to load.`));
+}
+
+/**
+ * `meridian skills new --description "..."` — author a new MARKDOWN skill from a
+ * description (and optional context), SCREEN it through the memory-poisoning
+ * defense, and install it. A poisoned description that tries to smuggle a
+ * malicious instruction (override / sensitive-bypass / exfiltration / secret
+ * disclosure) is BLOCKED before anything is written.
+ */
+export async function runSkillNew(
+  description: string,
+  opts: { context?: string; overwrite?: boolean } = {},
+): Promise<void> {
+  const slug = activeAgentSlug();
+  const home = ensureAgentHome(slug);
+  const config = loadAgentConfig(home);
+  const env = loadAgentEnv(home);
+  const router = new ProviderRouter(env);
+
+  console.log(colors.cyan('Authoring a skill from your description…'));
+  let draft: Awaited<ReturnType<typeof generateSkillDraft>>;
+  try {
+    draft = await generateSkillDraft(description, opts.context, { router, models: config.models });
+  } catch (err) {
+    console.error(colors.err(`could not author the skill: ${(err as Error).message}`));
+    process.exit(1);
+  }
+
+  // The moat: screen the generated skill BEFORE writing it.
+  const screen = screenSkillDraft(draft);
+  if (!screen.ok) {
+    console.error(colors.err('\n🛡️  BLOCKED by the memory-poisoning defense.'));
+    console.error(colors.err(`   ${screen.reason}`));
+    console.error(colors.muted(`   signals: ${screen.flags.join(', ')}`));
+    console.error(colors.muted('   Nothing was written. A safe skill is never installed without passing this screen.'));
+    process.exit(2);
+  }
+
+  try {
+    const { slug: skillSlug, dir } = installSkillDraft(draft, home, { overwrite: opts.overwrite });
+    console.log(colors.ok(`\n✓ authored + screened + installed: ${skillSlug}`));
+    console.log(colors.muted(`  ${dir}`));
+    console.log(colors.muted(`  description: ${draft.description}`));
+    console.log(colors.muted('  restart the gateway (or REPL) for the agent to load it.'));
+  } catch (err) {
+    console.error(colors.err((err as Error).message));
+    process.exit(1);
+  }
 }

@@ -37,7 +37,7 @@ import { runGateway } from './gateway-cmd.js';
 import { initAgent } from './init-cmd.js';
 import { runOnboard } from './onboard-cmd.js';
 import { pickAgentInteractive } from './agent-picker.js';
-import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup } from './skills-cmd.js';
+import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup, runSkillNew } from './skills-cmd.js';
 import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
 import { runMcpList, runMcpServe } from './mcp-cmd.js';
@@ -236,6 +236,15 @@ skillsCmd
   .description('Run a skill\'s interactive setup walkthrough (env keys, passphrase, OAuth, etc.)')
   .action(async (name: string) => {
     await runSkillsSetup(name);
+  });
+skillsCmd
+  .command('new')
+  .description('Author a NEW markdown skill from a description — screened by the memory-poisoning defense before install')
+  .requiredOption('--description <text>', 'what the skill should do')
+  .option('--context <text>', 'optional experience/context to encode into the skill')
+  .option('--overwrite', 'overwrite an existing skill of the same name')
+  .action(async (opts: { description: string; context?: string; overwrite?: boolean }) => {
+    await runSkillNew(opts.description, { context: opts.context, overwrite: opts.overwrite });
   });
 
 program

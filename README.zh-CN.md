@@ -13,7 +13,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-375%20passing-brightgreen?style=for-the-badge" alt="375 tests passing">
+  <img src="https://img.shields.io/badge/tests-390%20passing-brightgreen?style=for-the-badge" alt="390 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
 </p>
 
@@ -87,6 +87,7 @@ npx tsx scripts/mempoison/mempoisonbench.mts
 | 语音通道 | ✅ | ✅ | ✅ + **跨通话记忆** |
 | 模型上下文协议（MCP） | ✅ 客户端 | ✅ 客户端 | ✅ **客户端 + 服务端** |
 | 受限的子智能体委派 | ✅ | ✅ | ✅ |
+| 自我改进的技能创建 | 部分 | ✅ | ✅ **+ 经投毒防御筛查** |
 | 消息通道 | ✅ ~23 | ✅ ~7 | **7**（CLI、Telegram、Slack、Discord、WhatsApp、语音、网页） |
 | 一行安装（npm / curl） | ✅ | ✅ | 🚧 暂用 clone |
 | 从竞品迁移 | — | ✅ 从 OpenClaw | ✅ `meridian import` |
