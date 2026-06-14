@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@aterna/meridian"><img src="https://img.shields.io/npm/v/@aterna/meridian?style=for-the-badge&color=cb3837&logo=npm" alt="npm"></a>
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
@@ -83,23 +84,22 @@ npx tsx scripts/mempoison/mempoisonbench.mts
 | 受限的子智能体委派 | ✅ | ✅ | ✅ |
 | 自我改进的技能创建 | 部分 | ✅ | ✅ **+ 经投毒防御筛查** |
 | 消息通道 | ✅ ~23 | ✅ ~7 | **9**（CLI、Telegram、Slack、Discord、WhatsApp、**Matrix**、**短信(SMS)**、语音、网页） |
-| 一行安装（npm / curl） | ✅ | ✅ | 🚧 暂用 clone |
+| 一行安装（npm） | ✅ | ✅ | ✅ `npm i -g @aterna/meridian` |
 | 从竞品迁移 | — | ✅ 从 OpenClaw | ✅ `meridian import` |
 | 多语言（i18n）文档 | — | ✅ | ✅（本页！） |
 | 许可证 | MIT | MIT | MIT（+ BSL Quartz） |
 
 > **—** 表示截至 2026 年 6 月没有公开的该项能力——这*并非*断言其不存在
 > （见我们的[对比方法论](docs/harness-comparison-methodology.md)，它只就公开行为打分，
-> 从不运行竞品代码）。**🚧** 表示一个我们正在积极填补的真实缺口。我们在**可信任的记忆**上
-> 决定性地领先；在**通道广度与打包分发**上确实落后，并正在补齐。
+> 从不运行竞品代码）。我们在**可信任的记忆**上决定性地领先；唯一仍在原始广度上领先我们的，
+> 是 OpenClaw 约 23 个通道的长尾——其余皆已交付。
 
 ---
 
 ## 90 秒看效果 —— 零配置
 
 ```bash
-git clone https://github.com/Rezzyman/meridian && cd meridian && pnpm install
-npx tsx src/cli/main.ts demo      # 或：meridian demo （在 `pnpm link --global` 之后）
+npx @aterna/meridian demo      # 零安装 —— 直接从 npm 跑这套验证
 ```
 
 无需模型、无需密钥、无需服务器。这个 demo 会展示智能体**在重启后仍然记得你**、
@@ -138,17 +138,22 @@ meridian                      # 和它聊天；它会在重启后依然记得你
 
 ## 安装
 
-需要 **Node ≥ 20** 与 [pnpm](https://pnpm.io)。暂未发布到 npm
-（[已列入计划](ROADMAP.md)——一行 `npx` 安装即将到来）；现在请先 clone：
+需要 **Node ≥ 20**。
+
+```bash
+npm i -g @aterna/meridian      # 或零安装：npx @aterna/meridian demo
+```
+
+已发布到 npm，并带[构建来源证明（provenance）](https://docs.npmjs.com/generating-provenance-statements)，
+经由标签触发的[发布工作流](.github/workflows/release.yml)推送。想改源码？从源码运行：
 
 ```bash
 git clone https://github.com/Rezzyman/meridian
-cd meridian
-pnpm install
+cd meridian && pnpm install
 pnpm link --global   # 把 `meridian` 和 `mer` 暴露到 $PATH
 ```
 
-CLI 直接通过 `tsx` 从 `src/` 运行，因此日常使用**无需构建步骤**。
+从源码运行时，CLI 直接通过 `tsx` 从 `src/` 运行，因此**无需构建步骤**。
 
 **两条记忆路径：**
 
