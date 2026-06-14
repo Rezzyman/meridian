@@ -6,7 +6,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-487%20passing-brightgreen?style=for-the-badge" alt="487 tests passing">
+  <img src="https://img.shields.io/badge/tests-518%20passing-brightgreen?style=for-the-badge" alt="518 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
   <a href="#built-openly-with-an-ai-co-builder"><img src="https://img.shields.io/badge/built%20openly-with%20an%20AI-ff69b4?style=for-the-badge" alt="Built openly with an AI co-builder"></a>
 </p>
@@ -150,7 +150,7 @@ meridian                      # talk to it; it remembers you across restarts
 | **🗂️ Portable seven-layer agent OS** | IDENTITY / CONTEXT / SKILLS / MEMORY / CONNECTIONS / VERIFICATION / AUTOMATIONS as a plain filesystem any tool can read. |
 | **🧩 Bounded sub-agents** | A `delegate` tool with hard structural depth, token, and wall-clock caps behind a provider circuit breaker — fan-out without runaway. |
 | **🧬 Memory-safe skill authoring** | The agent writes its own skills (`meridian skills new`) — and every draft is screened by the poisoning defense before install, so a poisoned source can't trick it into authoring a malicious one. Hermes's signature feature, with a safety property no one else has. |
-| **🧰 Guarded built-in toolbelt** | Real HTTP (any method), HTML→text, hashing, base64, time, plus file navigation & scoped editing (`list_dir` / `glob_files` / `search_files` / `edit_file`, with bounded walks) — and the `http_request` tool routes every call through an **SSRF guard** that blocks the cloud-metadata endpoint, loopback, and RFC-1918 ranges *by default* (incl. the decimal/hex/octal/IPv6 obfuscations). The only harness whose fetch tool refuses the confused-deputy attack out of the box. |
+| **🧰 Guarded built-in toolbelt** | Real HTTP (any method), HTML→text, hashing, base64, time, safe arithmetic (`calculate`, no `eval`) + JSON extraction (`json_query`), and file navigation & scoped editing (`list_dir` / `glob_files` / `search_files` / `edit_file`, bounded walks) — and the `http_request` tool routes every call through an **SSRF guard** that blocks the cloud-metadata endpoint, loopback, and RFC-1918 ranges *by default* (incl. the decimal/hex/octal/IPv6 obfuscations). The only harness whose fetch tool refuses the confused-deputy attack out of the box. |
 | **⚙️ Bounded code execution** | `run_code` runs python/node/bash/ruby with a wall-clock timeout (whole process group killed), capped output, a throwaway workspace, and a **secret-scrubbed environment** — your API keys are invisible to executed code. (Process isolation, not a kernel sandbox; CLI-surface default only.) |
 | **🌊 Streaming** | SSE gateway (`/chat/stream`) with live token deltas and a single-file browser chat. |
 | **📐 Schema-enforced output** | Zod-validated tool results + validated-JSON generation with repair retries. |

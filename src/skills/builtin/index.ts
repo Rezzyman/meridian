@@ -7,6 +7,7 @@ import type { ToolSet } from 'ai';
 import type { CortexBind } from '../../cortex/bind.js';
 import type { AgentEnv } from '../../config/schema.js';
 import { coreTools } from './core-tools.js';
+import { computeTools } from './compute-tools.js';
 import { cortexTools } from './cortex-tools.js';
 import { dataTools } from './data-tools.js';
 import { fileTools } from './file-tools.js';
@@ -33,6 +34,7 @@ export function builtinTools(opts: BuiltinToolsOptions): ToolSet {
   // Pure, side-effect-free utilities + the HTML extractor: always registered,
   // gated per channel by the allowlist (defaults in config/schema.ts).
   for (const [k, v] of Object.entries(dataTools)) out[k] = v;
+  for (const [k, v] of Object.entries(computeTools)) out[k] = v;
   out.extract_text = webTools.extract_text;
   // SSRF-guarded HTTP client: registered, but defaults to CLI-only.
   out.http_request = webTools.http_request;
