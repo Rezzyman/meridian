@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@aterna/meridian"><img src="https://img.shields.io/npm/v/@aterna/meridian?style=for-the-badge&color=cb3837&logo=npm" alt="npm"></a>
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
@@ -104,25 +105,23 @@ An honest, cited comparison — including where we trail today.
 | Bounded sub-agent delegation | ✅ | ✅ | ✅ |
 | Self-improving skill creation | partial | ✅ | ✅ **+ screened by the poisoning defense** |
 | Messaging channels | ✅ ~23 | ✅ ~7 | **9** (CLI, Telegram, Slack, Discord, WhatsApp, **Matrix**, **SMS**, voice, web) |
-| One-line install (npm / curl) | ✅ | ✅ | 🚧 release wired ([one tag away](docs/releasing.md)) |
+| One-line install (npm) | ✅ | ✅ | ✅ `npm i -g @aterna/meridian` |
 | Migrate from a competitor | — | ✅ from OpenClaw | ✅ `meridian import` |
 | Localized (i18n) docs | — | ✅ | ✅ ([中文](README.zh-CN.md)) |
 | License | MIT | MIT | MIT (+ BSL Quartz) |
 
 > **—** = no such capability published as of June 2026 — *not* a claim of absence
 > (see our [comparison methodology](docs/harness-comparison-methodology.md), which
-> scores only published behavior and never runs competitor code). **🚧** = a real
-> Meridian gap we're actively closing. We win decisively on **memory you can
-> trust**; we're honestly behind on **channel breadth and packaging**, and
-> shipping fixes.
+> scores only published behavior and never runs competitor code). We win
+> decisively on **memory you can trust**; OpenClaw's ~23-channel long tail is the
+> one axis still ahead of us on raw breadth — everything else is shipped.
 
 ---
 
 ## See it in 90 seconds — zero setup
 
 ```bash
-git clone https://github.com/Rezzyman/meridian && cd meridian && pnpm install
-npx tsx src/cli/main.ts demo      # or: meridian demo  (after `pnpm link --global`)
+npx @aterna/meridian demo      # zero install — runs the proof straight from npm
 ```
 
 No model, no keys, no server. The demo shows the agent **remember you across a
@@ -165,28 +164,22 @@ meridian                      # talk to it; it remembers you across restarts
 
 Requires **Node ≥ 20**.
 
-**npm (once the first release is cut):**
-
 ```bash
-npm i -g @aterna/meridian      # or: npx @aterna/meridian demo
+npm i -g @aterna/meridian      # or zero-install: npx @aterna/meridian demo
 ```
 
-Publishing is fully wired — a `v*` tag-push runs the [release workflow](.github/workflows/release.yml)
-(typecheck · lint · test · build · `npm publish --provenance`). See
-[docs/releasing.md](docs/releasing.md). Until that first tag lands, install from
-source:
-
-**From source (works today):**
+Published to npm with [build provenance](https://docs.npmjs.com/generating-provenance-statements)
+via the tag-triggered [release workflow](.github/workflows/release.yml). Prefer
+to hack on it? Run from source:
 
 ```bash
 git clone https://github.com/Rezzyman/meridian
-cd meridian
-pnpm install
+cd meridian && pnpm install
 pnpm link --global   # exposes `meridian` and `mer` on $PATH
 ```
 
-The CLI runs straight from `src/` via `tsx`, so **no build step** is needed for
-daily use.
+The CLI runs straight from `src/` via `tsx`, so **no build step** is needed when
+working from source.
 
 **Two memory paths:**
 
