@@ -2,15 +2,52 @@
 
 All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
-## [Unreleased] — feature/safe-memory-v3
+## [1.2.0] — 2026-06-13
 
-Deeper on the memory-poisoning moat: cryptographic provenance, an always-on
-multilingual intent signal, cluster hardening, an adversarial red-team round
-folded back in, a fair cross-harness comparison methodology, and an open
-LongMemEval harness. Full writeup in the PR.
+The "lead the field" release. Two thrusts: **(1)** the memory-poisoning moat goes
+deeper — cryptographic provenance, an always-on multilingual intent signal,
+cluster hardening, a fair cross-harness comparison methodology, and an open
+LongMemEval harness; **(2)** the capability surface expands to match and beat the
+field — self-authored (screened) skills, a guarded tool surface, bounded code
+execution, four more channels, and ROUTEXOR as the default model router.
+
+### Removed
+
+- **OpenRouter** — removed entirely; it competes directly with ROUTEXOR. The
+  `@openrouter/ai-sdk-provider` dependency, the provider, and `OPENROUTER_API_KEY`
+  are gone. Configs pinning `openrouter/...` refs should re-point to
+  `routexor/...` (an `openrouter` ref now resolves to an unknown provider and is
+  skipped in the fallback chain).
 
 ### Added
 
+- **ROUTEXOR — the default model router.** ATERNA's BYOK, **zero-markup** router
+  (OpenAI-compatible; `ROUTEXOR_API_KEY`, `ROUTEXOR_BASE_URL` to override the
+  endpoint). Refs are `routexor/<vendor/model>`. The direct providers
+  (anthropic/openai/groq) and a local ollama all keep working — ROUTEXOR is the
+  default, never mandatory.
+- **Four more channels → 9 total.** **Matrix** (self-hostable client-server
+  `/sync` poller — no public webhook, runs behind NAT) and **SMS** (Twilio,
+  signed webhook + async reply via the Messages API). Also fixed a silent loader
+  bug that meant **Slack / Discord / WhatsApp never received their env** even when
+  set (the keys weren't propagated out of `process.env`).
+- **Memory-safe skill authoring** (`meridian skills new`). The agent writes its
+  own skills, and **every draft is screened by the poisoning defense before
+  install** — a poisoned source can't trick it into authoring a malicious one.
+- **Guarded built-in toolbelt.** `http_request` routed through an **SSRF guard**
+  (blocks the cloud-metadata endpoint, loopback, and RFC-1918 by default, incl.
+  decimal/hex/octal/IPv6 obfuscations), plus `extract_text`, `hash_text`,
+  `base64_transform`, `current_time`, `calculate` (a no-`eval` evaluator),
+  `json_query`, and file tools (`list_dir` / `glob_files` / `search_files` /
+  `edit_file`, bounded walks).
+- **Bounded code execution** (`run_code`) — python/node/bash/ruby with a
+  wall-clock timeout (whole process group killed), capped output, a throwaway
+  workspace, and a **secret-scrubbed environment** so executed code can't read
+  the agent's API keys. CLI-surface default only.
+- **`meridian import <openclaw|hermes>`** — migrate a competitor's home to the
+  portable seven-layer home; secrets surfaced by name, never copied.
+- **Colored brand logo** — the CLI boot-banner wordmark (blue gradient +
+  starburst) now opens both READMEs (`assets/meridian-logo.svg`).
 - **Signed provenance** (`config.cortex.provenanceTrust: 'signed'`). Trust for a
   recalled memory can now be a per-agent **HMAC** minted at encode time
   (`src/verification/provenance.ts`) over `(agentId, baseSource, sha256(content))`
