@@ -232,6 +232,8 @@ const SAFE_UTILITIES = [
   'hash_text',
   'base64_transform',
   'current_time',
+  'calculate',
+  'json_query',
 ] as const;
 const CHAT_SAFE_DEFAULT = [
   'web_fetch',
