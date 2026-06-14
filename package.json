@@ -1,6 +1,6 @@
 {
   "name": "@aterna/meridian",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Meridian: the Agentic Operating System runtime. CORTEX-native cognitive memory, voice-native VAPI integration, 20-minute deployment.",
   "type": "module",
   "license": "MIT",
@@ -66,7 +66,6 @@
     "@inquirer/prompts": "^7.8.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "ai": "^4.3.0",
-    "better-sqlite3": "^12.5.0",
     "boxen": "^8.0.0",
     "chalk": "^5.6.0",
     "cli-table3": "^0.6.5",
@@ -88,7 +87,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.12.0",
     "tsup": "^8.5.0",
     "tsx": "^4.20.0",

@@ -2,6 +2,19 @@
 
 All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
+## [1.2.1] — 2026-06-14
+
+### Fixed
+
+- **`npm i -g @aterna/meridian` now installs cleanly on every platform.** The
+  1.2.0 publish carried a hard native dependency (`better-sqlite3`) for the
+  session store — fine in CI, but `npm install` broke for anyone without a
+  prebuilt binary for their exact Node version/arch and no C toolchain (e.g.
+  Node 23 → `node-gyp` compile → failure). Rewrote `SessionStore` as a pure-JS
+  **JSONL append-log** (same public API, full persistence across restarts, O(1)
+  writes, in-memory reads) and removed `better-sqlite3` entirely. **Zero native
+  dependencies** now — verified by a clean tarball install + a working CLI run.
+
 ## [1.2.0] — 2026-06-13
 
 The "lead the field" release. Two thrusts: **(1)** the memory-poisoning moat goes
