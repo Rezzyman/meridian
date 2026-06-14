@@ -57,6 +57,13 @@ export const AgentEnvSchema = z
   MATRIX_ACCESS_TOKEN: z.string().optional(),
   MATRIX_USER_ID: z.string().optional(),
 
+  // SMS (Twilio): account SID + auth token + the agent's Twilio number, plus
+  // the exact public webhook URL Twilio POSTs to (needed for signature checks).
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_PHONE_NUMBER: z.string().optional(),
+  TWILIO_WEBHOOK_URL: z.string().url().optional(),
+
   // Gateway
   MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
   MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
@@ -171,6 +178,13 @@ export const ChannelConfigSchema = z.object({
       allowedRooms: z.array(z.string()).default([]),
     })
     .default({ enabled: false, allowedRooms: [] }),
+  sms: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Optional sender allowlist (E.164); empty = anyone. */
+      allowedNumbers: z.array(z.string()).default([]),
+    })
+    .default({ enabled: false, allowedNumbers: [] }),
   vapi: z
     .object({
       enabled: z.boolean().default(false),
@@ -559,6 +573,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     discord: { enabled: false },
     whatsapp: { enabled: false, allowedNumbers: [] },
     matrix: { enabled: false, allowedRooms: [] },
+    sms: { enabled: false, allowedNumbers: [] },
     vapi: { enabled: false, voicePersona: 'warm_professional' },
     gateway: { enabled: false, port: 18889 },
   },

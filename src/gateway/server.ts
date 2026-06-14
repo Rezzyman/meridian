@@ -16,6 +16,7 @@ import type { VapiChannel } from '../channels/vapi.js';
 import type { SlackChannel } from '../channels/slack.js';
 import type { DiscordChannel } from '../channels/discord.js';
 import type { WhatsappChannel } from '../channels/whatsapp.js';
+import type { SmsChannel } from '../channels/sms.js';
 import type { Conversation } from '../agent/conversation.js';
 import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
@@ -30,6 +31,7 @@ export interface GatewayOptions {
   slack?: SlackChannel;
   discord?: DiscordChannel;
   whatsapp?: WhatsappChannel;
+  sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
 }
@@ -52,6 +54,17 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       done(err as Error, undefined);
     }
   });
+
+  // Twilio posts application/x-www-form-urlencoded; its signature is computed
+  // over the URL + the raw params, so keep the raw body here too.
+  app.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (req, body, done) => {
+      (req as unknown as { rawBody?: string }).rawBody = body as string;
+      done(null, Object.fromEntries(new URLSearchParams((body as string) ?? '')));
+    },
+  );
 
   app.get('/health', async () => ({
     ok: true,
@@ -235,6 +248,24 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     const result = opts.whatsapp.handleRequest(rawBody);
     void result.done; // fire-and-forget the async turn + reply
     reply.code(result.status);
+    return result.body;
+  });
+
+  // Twilio inbound SMS (application/x-www-form-urlencoded). Verify the
+  // X-Twilio-Signature over the raw body, ack with TwiML, run the turn async.
+  app.post<{ Headers: { 'x-twilio-signature'?: string } }>('/twilio/sms', async (req, reply) => {
+    if (!opts.sms) {
+      reply.code(404);
+      return { error: 'sms channel not configured' };
+    }
+    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
+    if (!opts.sms.verifySignature(rawBody, req.headers['x-twilio-signature'])) {
+      reply.code(401);
+      return { error: 'invalid twilio signature' };
+    }
+    const result = opts.sms.handleRequest(rawBody);
+    void result.done; // fire-and-forget the async turn + reply
+    reply.code(result.status).header('content-type', result.contentType);
     return result.body;
   });
 
