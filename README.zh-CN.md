@@ -164,10 +164,12 @@ pnpm link --global   # 把 `meridian` 和 `mer` 暴露到 $PATH
   `http://127.0.0.1:3100`）访问，外加每个智能体一份 Neon 数据库 + Voyage 向量密钥。
   它带来海马体式管线、梦境整合与语义召回。
 
-为每个智能体设置一个模型密钥。默认路由器是 **[ROUTEXOR](https://routexor.com)**——ATERNA 的
-BYOK、**零加价**模型路由（`ROUTEXOR_API_KEY`；`ROUTEXOR_BASE_URL` 可覆盖端点）。想直连？
-`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GROQ_API_KEY` 均可，或把 `OLLAMA_BASE_URL`
-指向本地模型。模型引用格式为 `provider/model`，例如 `routexor/anthropic/claude-haiku-4.5`。
+**模型路由。** 为每个智能体设置一个模型密钥。默认路由器是 **[ROUTEXOR](https://routexor.com)**
+——ATERNA 的 **BYOK、零加价**模型路由：把你自己的服务商密钥带到
+[routexor.com](https://routexor.com)，拿到一把密钥，设为 `ROUTEXOR_API_KEY`（`ROUTEXOR_BASE_URL`
+可覆盖端点）。想直连或完全本地？`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GROQ_API_KEY`
+均可，或把 `OLLAMA_BASE_URL` 指向本地模型——无需注册、无需密钥。模型引用格式为
+`provider/model`，例如 `routexor/anthropic/claude-haiku-4.5`、`groq/llama-3.3-70b` 或 `ollama/qwen2.5`。
 
 ---
 

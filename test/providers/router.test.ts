@@ -65,6 +65,13 @@ describe('ProviderRouter.resolve', () => {
     assert.throws(() => router.resolve('routexor/anthropic/claude-x'), /ROUTEXOR_API_KEY/);
   });
 
+  it('the routexor missing-key error is actionable (points to routexor.com)', () => {
+    // The default-router error is a new user's most likely first failure, so it
+    // must tell them where to get a key rather than dead-end. Locks the onboarding UX.
+    const router = new ProviderRouter(makeEnv());
+    assert.throws(() => router.resolve('routexor/anthropic/claude-x'), /routexor\.com/);
+  });
+
   it('resolves ollama refs with no API key at all', () => {
     const router = new ProviderRouter(makeEnv());
     const resolved = router.resolve('ollama/llama3.2');

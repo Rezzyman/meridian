@@ -92,11 +92,14 @@ MERIDIAN_AGENT=${slug}
 CORTEX_AGENT_ID=${slug}
 MERIDIAN_MEMORY_PROVIDER=embedded
 
-# Model provider — local ollama needs no key (install: https://ollama.com,
-# then \`ollama pull qwen2.5\`). Or paste a key for any provider below.
+# ── Model routing ──
+# Meridian's default router is ROUTEXOR (BYOK, zero markup): bring your own
+# provider keys to https://routexor.com, get ONE key, and paste it below.
+# Prefer to go direct or fully local? A direct provider key, OR a local ollama
+# (no key — install https://ollama.com then \`ollama pull qwen2.5\`), also works.
+ROUTEXOR_API_KEY=
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 GROQ_API_KEY=
-ROUTEXOR_API_KEY=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 
@@ -119,10 +122,11 @@ NEON_DATABASE_URL=
 # Voyage AI embeddings (dedicated key per agent)
 VOYAGE_API_KEY=
 
-# Model providers (at least one required)
-# Groq: free tier, fastest inference. Get a key at https://console.groq.com
-GROQ_API_KEY=
+# ── Model routing (at least one required) ──
+# Default router: ROUTEXOR — BYOK, zero markup. Get a key at https://routexor.com
 ROUTEXOR_API_KEY=
+# Or go direct / local instead of (or alongside) ROUTEXOR:
+GROQ_API_KEY=          # free tier, fastest inference — https://console.groq.com
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 OLLAMA_BASE_URL=http://127.0.0.1:11434

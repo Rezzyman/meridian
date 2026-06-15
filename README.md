@@ -190,11 +190,14 @@ working from source.
   `http://127.0.0.1:3100`), plus a Neon DB + Voyage embeddings key per agent.
   Brings the hippocampal pipeline, dream consolidation, and semantic recall.
 
-Set one model key per agent. The default router is **[ROUTEXOR](https://routexor.com)**
-— ATERNA's BYOK, **zero-markup** model router (`ROUTEXOR_API_KEY`; `ROUTEXOR_BASE_URL`
-overrides the endpoint). Prefer to go direct? `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
-`GROQ_API_KEY` all work, or point `OLLAMA_BASE_URL` at a local model. Refs are
-`provider/model`, e.g. `routexor/anthropic/claude-haiku-4.5` or `groq/llama-3.3-70b`.
+**Model routing.** Set one model key per agent. The default router is
+**[ROUTEXOR](https://routexor.com)** — ATERNA's **BYOK, zero-markup** model router:
+bring your own provider keys to [routexor.com](https://routexor.com), get one key,
+and set it as `ROUTEXOR_API_KEY` (`ROUTEXOR_BASE_URL` overrides the endpoint). Prefer
+to go direct or fully local? `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GROQ_API_KEY`
+all work, or point `OLLAMA_BASE_URL` at a local model — no signup, no key. Model refs
+are `provider/model`, e.g. `routexor/anthropic/claude-haiku-4.5`, `groq/llama-3.3-70b`,
+or `ollama/qwen2.5`.
 
 ---
 
