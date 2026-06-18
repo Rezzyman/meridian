@@ -196,7 +196,7 @@ bring your own provider keys to [routexor.com](https://routexor.com), get one ke
 and set it as `ROUTEXOR_API_KEY` (`ROUTEXOR_BASE_URL` overrides the endpoint). Prefer
 to go direct or fully local? `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GROQ_API_KEY`
 all work, or point `OLLAMA_BASE_URL` at a local model — no signup, no key. Model refs
-are `provider/model`, e.g. `routexor/anthropic/claude-haiku-4.5`, `groq/llama-3.3-70b`,
+are `provider/model`, e.g. `routexor/claude-4-haiku`, `groq/llama-3.3-70b`,
 or `ollama/qwen2.5`.
 
 ---

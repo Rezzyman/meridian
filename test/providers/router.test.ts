@@ -40,12 +40,12 @@ describe('ProviderRouter.resolve', () => {
     assert.ok(resolved.model, 'model object is constructed');
   });
 
-  it('passes vendor/model through routexor (the default router) intact', () => {
+  it('passes the ROUTEXOR catalog model id through (the default router) intact', () => {
     const router = new ProviderRouter(makeEnv(ALL_KEYS));
-    const resolved = router.resolve('routexor/anthropic/claude-sonnet-4.6');
+    const resolved = router.resolve('routexor/claude-sonnet-4.6');
     assert.equal(resolved.provider, 'routexor');
-    assert.equal(resolved.modelId, 'anthropic/claude-sonnet-4.6');
-    assert.equal(resolved.ref, 'routexor/anthropic/claude-sonnet-4.6');
+    assert.equal(resolved.modelId, 'claude-sonnet-4.6');
+    assert.equal(resolved.ref, 'routexor/claude-sonnet-4.6');
     assert.ok(resolved.model, 'model object is constructed');
   });
 
@@ -62,14 +62,14 @@ describe('ProviderRouter.resolve', () => {
     assert.throws(() => router.resolve('anthropic/claude-x'), /ANTHROPIC_API_KEY/);
     assert.throws(() => router.resolve('openai/gpt-5'), /OPENAI_API_KEY/);
     assert.throws(() => router.resolve('groq/llama-3.3-70b'), /GROQ_API_KEY/);
-    assert.throws(() => router.resolve('routexor/anthropic/claude-x'), /ROUTEXOR_API_KEY/);
+    assert.throws(() => router.resolve('routexor/claude-4-haiku'), /ROUTEXOR_API_KEY/);
   });
 
   it('the routexor missing-key error is actionable (points to routexor.com)', () => {
     // The default-router error is a new user's most likely first failure, so it
     // must tell them where to get a key rather than dead-end. Locks the onboarding UX.
     const router = new ProviderRouter(makeEnv());
-    assert.throws(() => router.resolve('routexor/anthropic/claude-x'), /routexor\.com/);
+    assert.throws(() => router.resolve('routexor/claude-4-haiku'), /routexor\.com/);
   });
 
   it('resolves ollama refs with no API key at all', () => {

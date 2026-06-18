@@ -111,20 +111,20 @@ export const ProviderRefSchema = z.object({
 export type ProviderRef = z.infer<typeof ProviderRefSchema>;
 
 export const ModelChainSchema = z.object({
-  primary: z.string(), // e.g. "routexor/anthropic/claude-haiku-4.5"
+  primary: z.string(), // e.g. "routexor/claude-4-haiku"
   fallbacks: z.array(z.string()).default([]),
   smartRouting: z
     .object({
       enabled: z.boolean().default(true),
       maxSimpleChars: z.number().default(200),
       maxSimpleWords: z.number().default(35),
-      cheapModel: z.string().default('routexor/anthropic/claude-haiku-4.5'),
+      cheapModel: z.string().default('routexor/claude-4-haiku'),
     })
     .default({
       enabled: true,
       maxSimpleChars: 200,
       maxSimpleWords: 35,
-      cheapModel: 'routexor/anthropic/claude-haiku-4.5',
+      cheapModel: 'routexor/claude-4-haiku',
     }),
 });
 export type ModelChain = z.infer<typeof ModelChainSchema>;
@@ -137,7 +137,7 @@ export const HeartbeatSchema = z.object({
     start: z.string().default('06:00'),
     end: z.string().default('23:30'),
   }),
-  model: z.string().default('routexor/anthropic/claude-haiku-4.5'),
+  model: z.string().default('routexor/claude-4-haiku'),
   target: z.string().default('last'),
   ackMaxChars: z.number().default(500),
 });
@@ -555,9 +555,9 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     reasoningEffort: 'medium',
   },
   models: {
-    primary: 'routexor/anthropic/claude-haiku-4.5',
+    primary: 'routexor/claude-4-haiku',
     fallbacks: [
-      'routexor/anthropic/claude-sonnet-4.6',
+      'routexor/claude-sonnet-4.6',
       'ollama/qwen2.5:14b',
       'ollama/hermes3:8b',
     ],
@@ -565,7 +565,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
       enabled: true,
       maxSimpleChars: 200,
       maxSimpleWords: 35,
-      cheapModel: 'routexor/anthropic/claude-haiku-4.5',
+      cheapModel: 'routexor/claude-4-haiku',
     },
   },
   channels: {
@@ -583,7 +583,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     enabled: true,
     every: '2h',
     activeHours: { start: '06:00', end: '23:30' },
-    model: 'routexor/anthropic/claude-haiku-4.5',
+    model: 'routexor/claude-4-haiku',
     target: 'last',
     ackMaxChars: 500,
   },
