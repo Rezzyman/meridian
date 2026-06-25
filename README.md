@@ -425,7 +425,7 @@ gaps remain open.
 ## Community
 
 - 🐛 [Issues](https://github.com/Rezzyman/meridian/issues) · 💬 [Discussions](https://github.com/Rezzyman/meridian/discussions)
-- 𝕏 [@aterna_ai](https://x.com/aterna_ai) · 🌐 [aterna.ai](https://aterna.ai)
+- 𝕏 [@rezzyman](https://x.com/rezzyman) · 🌐 [aterna.ai](https://aterna.ai)
 - Found a hole in the threat model? Open an issue — we turn every one into a public commit.
 
 ## License

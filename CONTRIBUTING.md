@@ -60,6 +60,6 @@ We probably won't merge:
 
 ## Questions
 
-Open a [GitHub Discussion](https://github.com/Rezzyman/meridian/discussions) or DM [@aterna_ai](https://x.com/aterna_ai) on X.
+Open a [GitHub Discussion](https://github.com/Rezzyman/meridian/discussions) or DM [@rezzyman](https://x.com/rezzyman) on X.
 
 By contributing, you agree your contributions are licensed under MIT (the project license).
