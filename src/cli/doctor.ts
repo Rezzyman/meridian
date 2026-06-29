@@ -212,12 +212,12 @@ export async function runDoctor(): Promise<number> {
       'Provider keys',
       env.ROUTEXOR_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY ? 'ok' : 'warn',
       env.ROUTEXOR_API_KEY
-        ? 'ROUTEXOR present'
+        ? 'ROUTEXOR present (default router)'
         : env.ANTHROPIC_API_KEY
           ? 'Anthropic present'
           : env.OPENAI_API_KEY
             ? 'OpenAI present'
-            : 'no provider keys; Ollama-only mode',
+            : 'no model key — get a free ROUTEXOR key at https://routexor.com, or run a local ollama model',
     ),
   );
 

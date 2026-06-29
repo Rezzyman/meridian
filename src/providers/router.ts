@@ -1,6 +1,6 @@
 /**
  * Provider router on Vercel AI SDK.
- * Resolves "routexor/anthropic/claude-haiku-4.5" → LanguageModel.
+ * Resolves "routexor/claude-4-haiku" → LanguageModel.
  * Implements primary + fallback chain and smart-routing for short turns.
  *
  * We do not rebuild streaming, tool-use loops, or message shapes.
@@ -145,14 +145,20 @@ export class ProviderRouter {
       case 'routexor': {
         // ROUTEXOR (routexor.com) — ATERNA's BYOK, zero-markup model router.
         // Speaks the OpenAI chat API, so it's a base-URL'd OpenAI provider:
-        // refs like `routexor/anthropic/claude-haiku-4.5` pass the inner
-        // `vendor/model` straight through to the router. The default router for
-        // every Meridian agent; direct providers (anthropic/openai/groq) and a
-        // local ollama all keep working for operators who prefer them. BYOK: the
-        // operator supplies ROUTEXOR_API_KEY; ROUTEXOR_BASE_URL overrides the
+        // a ref `routexor/<model>` sends `<model>` straight to ROUTEXOR, where
+        // `<model>` is a ROUTEXOR catalog id (e.g. claude-4-haiku,
+        // claude-sonnet-4.6, gpt-4o-mini — see /v1/models). The default router
+        // for every Meridian agent; direct providers (anthropic/openai/groq) and
+        // a local ollama all keep working for operators who prefer them. BYOK:
+        // the operator supplies ROUTEXOR_API_KEY; ROUTEXOR_BASE_URL overrides the
         // endpoint if it differs from the default.
         if (!this.env.ROUTEXOR_API_KEY) {
-          throw new Error('ROUTEXOR_API_KEY missing for routexor provider');
+          throw new Error(
+            'ROUTEXOR_API_KEY missing — Meridian routes models through ROUTEXOR by default ' +
+              '(BYOK, zero markup). Get a key at https://routexor.com, set ROUTEXOR_API_KEY in ' +
+              "your agent's .env, or switch your model ref to a direct provider " +
+              '(anthropic/openai/groq) or a local `ollama/...` model.',
+          );
         }
         const rx = createOpenAI({
           apiKey: this.env.ROUTEXOR_API_KEY,
