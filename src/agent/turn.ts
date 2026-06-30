@@ -22,6 +22,7 @@ import { buildSacredGuard, sacredViolation } from '../verification/sacred.js';
 import { runChecks, blocking, type CheckResult } from '../verification/runtime.js';
 import type { Logger } from 'pino';
 import type { MeridianTurn } from './types.js';
+import { sanitizeOutbound, ProviderChainError } from '../safety/error-firewall.js';
 
 /**
  * Framework-enforced behavioral rules prepended to every system prompt.
@@ -516,8 +517,12 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     }
   }
   if (!reply) {
+    // RULE ZERO: never surface raw provider error text to a client. Log the
+    // full detail server-side; throw a ProviderChainError whose `message` is the
+    // generic client-safe string, so even channels that print err.message stay safe.
     const detail = providerErrors.map((e) => `${e.ref}: ${e.message}`).join(' | ');
-    throw new Error(`All providers failed. ${detail || '(no error captured)'}`);
+    ctx.logger.error({ msg: 'all providers failed', detail: detail || '(no error captured)' });
+    throw new ProviderChainError(detail || '(no error captured)');
   }
 
   // ─── Sacred-topic guardrail ──
@@ -591,6 +596,13 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       commitmentQuote.length > 80 ? `${commitmentQuote.slice(0, 79)}…` : commitmentQuote;
     reply = `${reply.trimEnd()}\n\n✓ logged: ${trimQuote}`;
   }
+
+  // ── RULE ZERO client firewall (chokepoint for ALL channels) ──
+  // Strip any internal provider/runtime/teammate names the model may have
+  // surfaced ("our system" for VAPI/OpenRouter/Anthropic/…, "our team" for
+  // AJ/Rez/…), and replace wholesale if the draft leaked raw error/billing
+  // text. Model-independent — does not depend on the model remembering the rule.
+  reply = sanitizeOutbound(reply);
 
   // 4) CORTEX encode (post-turn) — fire-and-forget so the reply lands fast.
   // Voyage embed + synapse formation can take 3-10s; users shouldn't wait.

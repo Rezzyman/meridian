@@ -13,6 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { Bot } from 'grammy';
 import type { ChannelAdapter, ChannelStartOptions } from './types.js';
 import type { Logger } from 'pino';
+import { sanitizeOutbound } from '../safety/error-firewall.js';
 
 export class TelegramChannel implements ChannelAdapter {
   readonly name = 'telegram';
@@ -87,7 +88,9 @@ export class TelegramChannel implements ChannelAdapter {
         });
         stillThinking = false;
         clearInterval(typingHeartbeat);
-        for (const chunk of splitForTelegram(reply)) {
+        // Last-mile RULE ZERO net (defense-in-depth; turn.ts already sanitizes,
+        // but a non-turn onInbound or future caller is covered here too).
+        for (const chunk of splitForTelegram(sanitizeOutbound(reply))) {
           await ctx.reply(chunk);
         }
       } catch (err) {
@@ -115,7 +118,8 @@ export class TelegramChannel implements ChannelAdapter {
 
   async send(msg: { to: string; text: string }): Promise<void> {
     if (!this.bot) throw new Error('telegram bot not started');
-    for (const chunk of splitForTelegram(msg.text)) {
+    // Proactive/outbound (sentinel briefs etc.) bypass turn.ts — sanitize here.
+    for (const chunk of splitForTelegram(sanitizeOutbound(msg.text))) {
       await this.bot.api.sendMessage(msg.to, chunk);
     }
   }
