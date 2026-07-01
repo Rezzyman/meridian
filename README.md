@@ -205,11 +205,15 @@ or `ollama/qwen2.5`.
 
 ```bash
 meridian init aria                 # scaffold ~/.meridian/aria/ (seven layers)
-#  → edit ~/.meridian/aria/.env  (model key; + Neon/Voyage for the CORTEX path)
+#  → zero-config by default: local embedded memory, no server. Add just a
+#    model key to ~/.meridian/aria/.env (free ROUTEXOR key, or a local ollama
+#    model with no key). Want the full CORTEX server path? `meridian init aria
+#    --cortex` (needs NEON_DATABASE_URL + VOYAGE_API_KEY).
 meridian doctor                    # validate the foundation end-to-end
 
 meridian skills install web-search # bundled plugins, one command each
 meridian skills setup web-search   # paste API key (masked, validated, vaulted)
+#  → write your own: docs/skill-authoring.md (add a real tool in ten minutes)
 
 meridian gateway                   # HTTP gateway on :18889 + Telegram + voice
 meridian                           # interactive REPL (default command)
@@ -403,6 +407,7 @@ crashed → dream skipped → memory stale" failure mode.
 
 | Doc | What's inside |
 |---|---|
+| [Skill authoring](docs/skill-authoring.md) | Add a real tool in ten minutes: manifest, `createTools(ctx)`, credentials, build, install, verify |
 | [Threat model & memory-poisoning defense](docs/memory-poisoning.md) | The attack, the two-tier defense, signed provenance, and the honest residual gaps |
 | [Harness comparison methodology](docs/harness-comparison-methodology.md) | How we compare to other harnesses fairly — published behavior only, no competitor code run |
 | [Hosted / paid lane](docs/hosted-lane.md) | The MemoryProvider seam, Quartz, and the hosted-tier architecture |
