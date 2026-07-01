@@ -314,11 +314,28 @@ export const OperatorConfigSchema = z.object({
   email: z.string().email().optional(),
   channels: z
     .object({
+      // ID-matched channels: exact identifier compare (chat id, user id, MXID).
       telegram: z.array(z.string()).default([]),
+      slack: z.array(z.string()).default([]),
+      discord: z.array(z.string()).default([]),
+      matrix: z.array(z.string()).default([]),
+      // Phone-matched channels: normalized to E.164-ish before comparing.
       voice: z.array(z.string()).default([]),
+      whatsapp: z.array(z.string()).default([]),
+      sms: z.array(z.string()).default([]),
+      // OS-username-matched.
       cli: z.array(z.string()).default([]),
     })
-    .default({ telegram: [], voice: [], cli: [] }),
+    .default({
+      telegram: [],
+      slack: [],
+      discord: [],
+      matrix: [],
+      voice: [],
+      whatsapp: [],
+      sms: [],
+      cli: [],
+    }),
   /**
    * Sacred-topic policy: content the agent must never surface on an
    * untrusted channel (the public voice line, external callers). The

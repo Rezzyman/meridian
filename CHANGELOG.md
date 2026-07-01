@@ -28,6 +28,14 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
 
 ### Fixed
 
+- **Cross-channel continuity now covers all 9 channels.** `resolveOperator` only
+  had branches for telegram, voice, and cli, so a message the operator sent from
+  Slack, Discord, WhatsApp, Matrix, or SMS fell through to an isolated
+  `unknown:<channel>` session and did not share the operator's running
+  conversation. The operator config now registers ids for every channel (exact
+  match for slack/discord/matrix, phone normalization for whatsapp/sms), so the
+  "one continuous conversation across every channel" promise holds on all of
+  them. A stranger on any channel still stays isolated.
 - **Executable skills load under the shipped runtime.** The loader imported raw
   `tools.ts`, which throws `ERR_UNKNOWN_FILE_EXTENSION` under `node dist/` on
   Node 20 (the documented floor); the error was swallowed, so github, google,

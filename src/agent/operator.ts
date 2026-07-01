@@ -13,8 +13,9 @@
  * match is found.
  *
  * Session keys derived from operator id mean the gateway looks up ONE
- * conversation per operator — voice + telegram + cli land on the same
- * Conversation instance and share history.
+ * conversation per operator — a message from the operator over ANY of the
+ * configured channels (voice, Telegram, Slack, Discord, WhatsApp, Matrix,
+ * SMS, CLI) lands on the same Conversation instance and shares history.
  */
 
 import type { AgentConfig } from '../config/schema.js';
@@ -47,6 +48,51 @@ function isCliMatch(operatorCli: readonly string[], from: string): boolean {
   return false;
 }
 
+/** Phone-matched channels normalize both sides to E.164-ish before comparing. */
+const PHONE_CHANNELS = new Set<ChannelKind>(['voice', 'whatsapp', 'sms']);
+
+/**
+ * The operator's registered identifiers for a channel, or undefined for
+ * channels that carry no per-operator identity (gateway/system are internal).
+ */
+function operatorChannelList(
+  channels: NonNullable<AgentConfig['operator']>['channels'],
+  channel: ChannelKind,
+): readonly string[] | undefined {
+  switch (channel) {
+    case 'telegram':
+      return channels.telegram;
+    case 'slack':
+      return channels.slack;
+    case 'discord':
+      return channels.discord;
+    case 'matrix':
+      return channels.matrix;
+    case 'voice':
+      return channels.voice;
+    case 'whatsapp':
+      return channels.whatsapp;
+    case 'sms':
+      return channels.sms;
+    case 'cli':
+      return channels.cli;
+    default:
+      return undefined; // gateway, system: no operator identity
+  }
+}
+
+/** Does `from` match one of the operator's registered ids for this channel? */
+function channelMatches(channel: ChannelKind, registered: readonly string[], from: string): boolean {
+  if (channel === 'cli') return isCliMatch(registered, from);
+  if (PHONE_CHANNELS.has(channel)) {
+    const fromNorm = normPhone(from);
+    return registered.some((num) => normPhone(num) === fromNorm);
+  }
+  // ID-matched channels (telegram/slack/discord/matrix): exact identifier
+  // compare, no normalization — a chat id / user id / MXID is opaque.
+  return registered.includes(from);
+}
+
 export function resolveOperator(
   config: AgentConfig,
   channel: ChannelKind,
@@ -54,18 +100,8 @@ export function resolveOperator(
 ): ResolvedOperator {
   const op = config.operator;
   if (op) {
-    if (channel === 'telegram' && op.channels.telegram.includes(from)) {
-      return { id: op.id, source: 'config', channel, from };
-    }
-    if (channel === 'voice') {
-      const fromNorm = normPhone(from);
-      for (const num of op.channels.voice) {
-        if (normPhone(num) === fromNorm) {
-          return { id: op.id, source: 'config', channel, from };
-        }
-      }
-    }
-    if (channel === 'cli' && isCliMatch(op.channels.cli, from)) {
+    const registered = operatorChannelList(op.channels, channel);
+    if (registered && channelMatches(channel, registered, from)) {
       return { id: op.id, source: 'config', channel, from };
     }
   }

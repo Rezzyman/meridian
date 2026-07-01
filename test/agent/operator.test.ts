@@ -14,7 +14,12 @@ const cfg = makeConfig({
     id: 'rez',
     channels: {
       telegram: ['123456789'],
+      slack: ['U0A1B2C3D'],
+      discord: ['198765432109876543'],
+      matrix: ['@rez:example.org'],
       voice: ['+1 (303) 997-1189'],
+      whatsapp: ['+1 (303) 997-1189'],
+      sms: ['+13039971189'],
       cli: ['Rez', 'root'],
     },
   },
@@ -116,6 +121,57 @@ const cases: Case[] = [
     wantId: 'unknown:cli:mallory',
     wantSource: 'unknown',
   },
+  // slack/discord/matrix: exact identifier match, like telegram
+  {
+    name: 'slack user id matches',
+    channel: 'slack',
+    from: 'U0A1B2C3D',
+    wantId: 'rez',
+    wantSource: 'config',
+  },
+  {
+    name: 'slack unrecognised id falls back to unknown',
+    channel: 'slack',
+    from: 'U9999',
+    wantId: 'unknown:slack:U9999',
+    wantSource: 'unknown',
+  },
+  {
+    name: 'discord user id matches',
+    channel: 'discord',
+    from: '198765432109876543',
+    wantId: 'rez',
+    wantSource: 'config',
+  },
+  {
+    name: 'matrix MXID matches exactly',
+    channel: 'matrix',
+    from: '@rez:example.org',
+    wantId: 'rez',
+    wantSource: 'config',
+  },
+  // whatsapp/sms: phone normalization, like voice
+  {
+    name: 'whatsapp bare digits match formatted config number',
+    channel: 'whatsapp',
+    from: '13039971189',
+    wantId: 'rez',
+    wantSource: 'config',
+  },
+  {
+    name: 'sms formatted number matches bare-digit config number',
+    channel: 'sms',
+    from: '+1 (303) 997-1189',
+    wantId: 'rez',
+    wantSource: 'config',
+  },
+  {
+    name: 'sms unrecognised number falls back to unknown',
+    channel: 'sms',
+    from: '+15550000000',
+    wantId: 'unknown:sms:+15550000000',
+    wantSource: 'unknown',
+  },
   // channels with no operator mapping never match config
   {
     name: 'gateway channel has no operator mapping — always unknown',
@@ -153,4 +209,41 @@ test('resolveOperator: empty from falls back to anon in the id, raw from stays e
 test('operatorSessionId prefixes with op:', () => {
   assert.equal(operatorSessionId('rez'), 'op:rez');
   assert.equal(operatorSessionId('unknown:cli:anon'), 'op:unknown:cli:anon');
+});
+
+test('cross-channel continuity: the operator on every configured channel lands on ONE session', () => {
+  // The "one continuous conversation across every channel" claim: a message
+  // from the operator over any registered channel must resolve to the same
+  // session id, so voice + Telegram + Slack + Discord + WhatsApp + Matrix + SMS
+  // + CLI share history instead of forking into parallel disjoint threads.
+  const arrivals: Array<[ChannelKind, string]> = [
+    ['telegram', '123456789'],
+    ['slack', 'U0A1B2C3D'],
+    ['discord', '198765432109876543'],
+    ['matrix', '@rez:example.org'],
+    ['voice', '13039971189'],
+    ['whatsapp', '+1-303-997-1189'],
+    ['sms', '+13039971189'],
+    ['cli', 'root'],
+  ];
+  const sessionIds = new Set(
+    arrivals.map(([channel, from]) => {
+      const op = resolveOperator(cfg, channel, from);
+      assert.equal(op.source, 'config', `${channel} resolved to the operator`);
+      return operatorSessionId(op.id);
+    }),
+  );
+  assert.deepEqual([...sessionIds], ['op:rez'], 'all channels collapse to one operator session');
+});
+
+test('a stranger on any channel stays isolated from the operator session', () => {
+  for (const [channel, from] of [
+    ['slack', 'Uxxxxx'],
+    ['discord', '000'],
+    ['sms', '+15551234567'],
+  ] as Array<[ChannelKind, string]>) {
+    const op = resolveOperator(cfg, channel, from);
+    assert.equal(op.source, 'unknown');
+    assert.notEqual(operatorSessionId(op.id), 'op:rez');
+  }
 });
