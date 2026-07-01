@@ -177,23 +177,28 @@ pnpm link --global   # 把 `meridian` 和 `mer` 暴露到 $PATH
 
 ```bash
 meridian init aria                 # 在 ~/.meridian/aria/ 搭好七层骨架
-#  → 编辑 ~/.meridian/aria/.env （模型密钥；CORTEX 路径还需 Neon/Voyage）
+#  → 默认零配置：本地 embedded 记忆，无需服务器。只需在 ~/.meridian/aria/.env
+#    里加一个模型密钥（免费的 ROUTEXOR 密钥，或本地 ollama 模型、无需密钥）。
+#    想要完整 CORTEX 服务端路径？用 meridian init aria --cortex
+#    （需要 NEON_DATABASE_URL + VOYAGE_API_KEY）。
 meridian doctor                    # 端到端校验地基
 
 meridian skills install web-search # 内置插件，每个一条命令
 meridian skills setup web-search   # 粘贴 API 密钥（掩码输入、校验、入库）
+#  → 写你自己的技能：docs/skill-authoring.md（十分钟加一个真正的工具）
 
 meridian gateway                   # :18889 上的 HTTP 网关 + Telegram + 语音
 meridian                           # 交互式 REPL（默认命令）
 open skeleton/web/chat.html        # 浏览器聊天——通过 SSE 实时流式输出 token
 
+meridian mcp add github --command npx --arg -y --arg @modelcontextprotocol/server-github
 meridian mcp list                  # 探测 CONNECTIONS/mcp.json 里的 MCP 服务器
 meridian mcp serve                 # 把本智能体的记忆服务给任意 MCP 客户端
 meridian init outbound --inherits aria   # 继承中枢 CONTEXT + MEMORY 的专才智能体
 ```
 
 **完整命令面：** `init` · `onboard` · `agents` · `use` · `demo` ·
-`doctor` · `deploy` · `audit` · `gateway` · `ingest` · `chat` · `mcp list|serve` ·
+`doctor` · `deploy` · `audit` · `gateway` · `ingest` · `chat` · `mcp add|list|remove|serve` ·
 `voice passphrase|status|call` · `skills list|install|remove|setup`。
 
 ---
