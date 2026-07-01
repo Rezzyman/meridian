@@ -117,3 +117,42 @@ describe('SmsChannel.handleRequest', () => {
     assert.equal(sends.length, 0);
   });
 });
+
+describe('splitForSms — paginate instead of truncating', async () => {
+  const { splitForSms } = await import('../../src/channels/sms.js');
+
+  it('returns a single segment unchanged when under the limit', () => {
+    assert.deepEqual(splitForSms('hello there'), ['hello there']);
+  });
+
+  it('never returns an empty body', () => {
+    assert.deepEqual(splitForSms('   '), ['(empty reply)']);
+    assert.deepEqual(splitForSms(''), ['(empty reply)']);
+  });
+
+  it('splits a long reply into ordered (i/n)-prefixed segments with no data loss', () => {
+    const sentence = 'This is a sentence that carries real content. ';
+    const long = sentence.repeat(120); // ~5600 chars, well over one SMS
+    const parts = splitForSms(long);
+    assert.ok(parts.length >= 3, `expected multiple segments, got ${parts.length}`);
+    // Every segment is prefixed and within the size budget.
+    parts.forEach((p, i) => {
+      assert.match(p, new RegExp(`^\\(${i + 1}/${parts.length}\\) `));
+      assert.ok(p.length <= 1500, `segment ${i} within SMS_MAX`);
+    });
+    // No content is dropped: stripping the prefixes reconstitutes every word.
+    const reassembled = parts.map((p) => p.replace(/^\(\d+\/\d+\) /, '')).join(' ');
+    for (const word of ['sentence', 'carries', 'real', 'content']) {
+      assert.ok(reassembled.includes(word));
+    }
+    const originalWords = long.trim().split(/\s+/).length;
+    const keptWords = reassembled.split(/\s+/).length;
+    assert.ok(keptWords >= originalWords, 'no words were truncated away');
+  });
+
+  it('splits on a boundary, not mid-word, when possible', () => {
+    const parts = splitForSms(`${'word '.repeat(400)}FINALWORD`);
+    // No segment should end mid-"word" fragment from a hard cut.
+    assert.ok(parts.every((p) => !/\bwor$/.test(p.replace(/^\(\d+\/\d+\) /, ''))));
+  });
+});

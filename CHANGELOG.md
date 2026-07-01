@@ -37,6 +37,11 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
 
 ### Fixed
 
+- **SMS replies paginate instead of truncating.** A reply over 1500 chars was
+  hard-sliced and the tail dropped silently, unlike every other channel which
+  splits on boundaries. Long SMS answers now go out as multiple messages split on
+  natural boundaries, each carrying an `(i/n)` prefix so out-of-order segments
+  can be reordered. No content is lost.
 - **The empty-tool loop breaker is now real enforcement, not just a log line.**
   A tool that returned no results twice in a turn only produced a warning while
   the model could keep calling it (to the 3-step cap) and narrate fabricated

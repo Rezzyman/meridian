@@ -143,7 +143,14 @@ export class SmsChannel implements ChannelAdapter {
   }
 
   private async sendSms(to: string, text: string): Promise<void> {
-    const body = (text ?? '').trim().slice(0, SMS_MAX) || '(empty reply)';
+    // Paginate instead of truncating — a long answer used to lose everything
+    // past 1500 chars silently. Each segment is a separate Twilio message.
+    for (const segment of splitForSms(text)) {
+      await this.postSegment(to, segment);
+    }
+  }
+
+  private async postSegment(to: string, body: string): Promise<void> {
     const auth = Buffer.from(`${this.opts.accountSid}:${this.opts.authToken}`).toString('base64');
     const form = new URLSearchParams({ From: this.opts.fromNumber, To: to, Body: body });
     const res = await this.fetchImpl(
@@ -161,4 +168,31 @@ export class SmsChannel implements ChannelAdapter {
       this.opts.logger.warn({ msg: 'twilio send failed', status: res.status, to });
     }
   }
+}
+
+/**
+ * Split a reply into SMS-sized segments on natural boundaries — no silent
+ * truncation. Twilio caps a single API message near 1600 chars, so a long reply
+ * goes out as several texts; when there is more than one, each carries an
+ * "(i/n)" prefix so the recipient can order segments that arrive out of order.
+ */
+export function splitForSms(text: string, max: number = SMS_MAX): string[] {
+  const trimmed = (text ?? '').trim();
+  if (!trimmed) return ['(empty reply)'];
+  if (trimmed.length <= max) return [trimmed];
+  const chunks: string[] = [];
+  let rest = trimmed;
+  // Reserve room so a chunk plus its "(nn/nn) " prefix still fits under max.
+  const room = max - 10;
+  while (rest.length > room) {
+    let cut = rest.lastIndexOf('\n', room);
+    if (cut < room * 0.5) cut = rest.lastIndexOf('. ', room);
+    if (cut < room * 0.5) cut = rest.lastIndexOf(' ', room);
+    if (cut <= 0) cut = room;
+    chunks.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) chunks.push(rest);
+  if (chunks.length === 1) return chunks;
+  return chunks.map((c, i) => `(${i + 1}/${chunks.length}) ${c}`);
 }
