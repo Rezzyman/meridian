@@ -12,7 +12,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        # Include 20 (the documented engines floor): plain Node <22 cannot import
+        # a raw .ts, which is exactly where executable skills used to silently
+        # fail, so the build + test must be green here or that class of bug ships.
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
 
