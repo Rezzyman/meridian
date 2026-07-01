@@ -171,6 +171,45 @@ export async function runMcpAdd(opts: McpAddOptions): Promise<number> {
   return 0;
 }
 
+/**
+ * Remove a server from a list by name. Returns `{ servers, removed }` where
+ * `removed` is false if no server matched (the caller decides that is an error).
+ * Pure + exported for testing.
+ */
+export function removeMcpServer(
+  servers: McpServerConfig[],
+  name: string,
+): { servers: McpServerConfig[]; removed: boolean } {
+  const next = servers.filter((s) => s.name !== name);
+  return { servers: next, removed: next.length !== servers.length };
+}
+
+/** `meridian mcp remove <name>` — drop a server from CONNECTIONS/mcp.json. */
+export async function runMcpRemove(name: string): Promise<number> {
+  const slug = await pickAgentInteractive(process.env.MERIDIAN_AGENT);
+  const home = ensureAgentHome(slug);
+  const path = mcpConfigPath(home);
+  if (!existsSync(path)) {
+    console.log(colors.muted('No CONNECTIONS/mcp.json yet — nothing to remove.'));
+    return 1;
+  }
+  let servers: McpServerConfig[];
+  try {
+    servers = McpConnectionsFileSchema.parse(JSON.parse(readFileSync(path, 'utf8'))).servers;
+  } catch (err) {
+    console.log(colors.err(`CONNECTIONS/mcp.json: ${(err as Error).message}`));
+    return 1;
+  }
+  const { servers: next, removed } = removeMcpServer(servers, name);
+  if (!removed) {
+    console.log(colors.err(`no MCP server named "${name}" (have: ${servers.map((s) => s.name).join(', ') || 'none'})`));
+    return 1;
+  }
+  writeFileSync(path, `${JSON.stringify({ servers: next }, null, 2)}\n`);
+  console.log(colors.ok(`Removed MCP server "${name}".`));
+  return 0;
+}
+
 export async function runMcpServe(opts: { allowEncode?: boolean }): Promise<void> {
   // stdio transport: stdout IS the protocol channel. Nothing below may
   // console.log — the file logger is the only narrator.

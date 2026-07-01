@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildMcpServerEntry, upsertMcpServer } from '../../src/cli/mcp-cmd.js';
+import { buildMcpServerEntry, removeMcpServer, upsertMcpServer } from '../../src/cli/mcp-cmd.js';
 import type { McpServerConfig } from '../../src/mcp/index.js';
 
 describe('buildMcpServerEntry', () => {
@@ -83,5 +83,28 @@ describe('upsertMcpServer', () => {
     const servers = [a as McpServerConfig];
     upsertMcpServer(servers, buildMcpServerEntry({ name: 'z', command: 'x' }), false);
     assert.equal(servers.length, 1, 'input untouched');
+  });
+});
+
+describe('removeMcpServer', () => {
+  const a = buildMcpServerEntry({ name: 'a', command: 'x' });
+  const b = buildMcpServerEntry({ name: 'b', command: 'y' });
+
+  it('removes a matching server and reports removed=true', () => {
+    const { servers, removed } = removeMcpServer([a, b] as McpServerConfig[], 'a');
+    assert.equal(removed, true);
+    assert.deepEqual(servers.map((s) => s.name), ['b']);
+  });
+
+  it('reports removed=false when nothing matched (caller treats as error)', () => {
+    const { servers, removed } = removeMcpServer([a] as McpServerConfig[], 'nope');
+    assert.equal(removed, false);
+    assert.deepEqual(servers.map((s) => s.name), ['a']);
+  });
+
+  it('does not mutate the input', () => {
+    const input = [a, b] as McpServerConfig[];
+    removeMcpServer(input, 'a');
+    assert.equal(input.length, 2);
   });
 });

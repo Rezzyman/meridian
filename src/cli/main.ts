@@ -40,7 +40,7 @@ import { pickAgentInteractive } from './agent-picker.js';
 import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup, runSkillNew } from './skills-cmd.js';
 import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
-import { runMcpAdd, runMcpList, runMcpServe } from './mcp-cmd.js';
+import { runMcpAdd, runMcpList, runMcpRemove, runMcpServe } from './mcp-cmd.js';
 import { runDemo } from './demo-cmd.js';
 import { runImport } from './import-cmd.js';
 
@@ -181,6 +181,12 @@ mcp
       );
     },
   );
+mcp
+  .command('remove <name>')
+  .description('Remove an MCP server from CONNECTIONS/mcp.json')
+  .action(async (name: string) => {
+    process.exit(await runMcpRemove(name));
+  });
 mcp
   .command('serve')
   .description('Expose this agent over MCP on stdio (CORTEX recall as a tool)')

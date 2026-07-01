@@ -16,7 +16,9 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
   `--channels` gates which channels see the tools, `--force` overwrites. It reads
   the raw config (so a disabled server is never dropped on write-back), validates
   the entry with a clean error message, and refuses to clobber an existing name
-  without `--force`. The validation + upsert logic is pure and unit-tested.
+  without `--force`. **`meridian mcp remove <name>`** completes the CRUD (errors
+  clearly if the name is not found, preserves the other servers). The
+  validation / upsert / remove logic is pure and unit-tested.
 
 ### Security
 
