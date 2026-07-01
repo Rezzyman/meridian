@@ -348,7 +348,21 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
       onInbound: async (m) => turn('voice', m.from || 'anon', m.text),
     });
     channelMap.set('voice', vapi as unknown as ChannelAdapter);
-    console.log(colors.ok('voice channel armed'));
+    if (vapi.webhookUnauthenticated) {
+      // The webhook now fails closed (rejects every request) without a secret.
+      // Say so loudly — otherwise the operator sees "armed" and wonders why
+      // every call 401s. Set VAPI_WEBHOOK_SECRET here and in the VAPI dashboard.
+      logger.warn({
+        msg: 'VAPI webhook is UNAUTHENTICATED — set VAPI_WEBHOOK_SECRET; until then /vapi/webhook rejects all requests',
+      });
+      console.log(
+        colors.warn(
+          'voice channel armed — but VAPI_WEBHOOK_SECRET is unset, so /vapi/webhook will reject every call. Set it in .env and in the VAPI dashboard (x-vapi-secret).',
+        ),
+      );
+    } else {
+      console.log(colors.ok('voice channel armed'));
+    }
   }
 
   // ── Slack channel — Events API webhook (signed), trusted workspace ──

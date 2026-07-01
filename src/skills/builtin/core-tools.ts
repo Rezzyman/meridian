@@ -7,6 +7,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tool } from 'ai';
 import { z } from 'zod';
+import { screenUrl } from '../../tools/ssrf.js';
 
 export const coreTools = {
   bash: tool({
@@ -50,7 +51,22 @@ export const coreTools = {
     description: 'Fetch a URL and return its text body.',
     parameters: z.object({ url: z.string().url(), timeoutMs: z.number().int().default(15000) }),
     execute: async ({ url, timeoutMs }) => {
-      const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      // web_fetch is the URL tool an LLM reaches for first, so it MUST honor the
+      // same SSRF floor as http_request — otherwise a poisoned memory could make
+      // the agent GET the cloud metadata endpoint or an internal service. Screen
+      // the URL and refuse to follow redirects into a blocked host.
+      const screen = screenUrl(url);
+      if (!screen.ok) {
+        return {
+          ok: false as const,
+          error: 'blocked' as const,
+          reason: `SSRF guard: ${screen.reason}${screen.ip ? ` (${screen.ip})` : ''}`,
+        };
+      }
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+        redirect: 'manual',
+      });
       const body = await res.text();
       return { ok: res.ok, status: res.status, body: body.slice(0, 200_000) };
     },

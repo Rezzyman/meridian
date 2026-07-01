@@ -135,6 +135,9 @@ OLLAMA_BASE_URL=http://127.0.0.1:11434
 VAPI_API_KEY=
 VAPI_PHONE_NUMBER_ID=
 VAPI_ASSISTANT_ID=
+# REQUIRED to accept voice webhooks: /vapi/webhook fails closed without it
+# (it writes call transcripts to memory, so it must be authenticated). Set the
+# same value here and as the assistant's server secret in the VAPI dashboard.
 VAPI_WEBHOOK_SECRET=
 
 # Telegram (optional)

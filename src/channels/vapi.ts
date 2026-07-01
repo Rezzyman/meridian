@@ -16,9 +16,19 @@
  */
 
 import type { ChannelAdapter, InboundMessage } from './types.js';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Logger } from 'pino';
 import type { MemoryProvider } from '../memory/provider.js';
 import type { VoiceSessionGuard } from '../voice/session-guard.js';
+
+/** Constant-time string compare that tolerates unequal lengths by comparing
+ *  fixed-width SHA-256 digests, so neither a match nor the secret's length
+ *  leaks through timing. */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a).digest();
+  const hb = createHash('sha256').update(b).digest();
+  return timingSafeEqual(ha, hb);
+}
 
 export interface VapiToolCall {
   id?: string;
@@ -389,8 +399,22 @@ export class VapiChannel implements ChannelAdapter {
       .join('\n');
   }
 
+  /**
+   * Fail CLOSED. The /vapi/webhook handler writes end-of-call transcripts into
+   * CORTEX (encodeCallSummary), so an unauthenticated webhook is a memory-
+   * injection vector — the exact attack Meridian's positioning is built to
+   * prevent. If no shared secret is configured we therefore reject every
+   * request rather than trusting the caller. `meridian gateway` logs a loud
+   * warning at arm time so the operator knows to set VAPI_WEBHOOK_SECRET.
+   */
   verifyWebhook(headerSecret?: string): boolean {
-    if (!this.opts.webhookSecret) return true;
-    return headerSecret === this.opts.webhookSecret;
+    if (!this.opts.webhookSecret) return false;
+    // Constant-time compare so a timing side-channel can't leak the secret.
+    return timingSafeEqualStr(headerSecret ?? '', this.opts.webhookSecret);
+  }
+
+  /** True when the channel is armed but has no shared secret to verify against. */
+  get webhookUnauthenticated(): boolean {
+    return !this.opts.webhookSecret;
   }
 }
