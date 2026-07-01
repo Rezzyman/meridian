@@ -570,7 +570,7 @@ export function renderBootPanel(data: BootPanelData): string {
   if (libraryTotal > 0) {
     right.push(
       c.cyan('Skill Catalog') +
-        c.muted(`  ·  ${libraryTotal} available  ·  not yet installable in v0.1`),
+        c.muted(`  ·  ${libraryTotal} planned  ·  roadmap, not yet bundled`),
     );
     for (const [cat, items] of Object.entries(data.skillLibrary)) {
       const head = items.slice(0, 3).join(', ');

@@ -1,9 +1,11 @@
 /**
- * Bundled skill library shipping with Meridian. All names follow the
- * agentskills.io standard so they interop with the broader open ecosystem.
+ * Skill ROADMAP catalog — planned skills, not yet bundled or installable.
  *
- * Listed in the boot panel as available-but-disabled. Operator runs
- * `/skills enable <name>` to activate any of them.
+ * These names signal direction (and follow the agentskills.io standard so they
+ * interop with the broader ecosystem when they land), but they are NOT the
+ * shipped set. The installable skills live in skeleton/SKILLS/ and are surfaced
+ * by `meridian skills list`. The boot panel renders this list explicitly as
+ * "roadmap, not yet bundled" so `enable`-ing one of these is never implied.
  *
  * Categories mirror common operator workflows. Names are deliberately
  * portable, not vendor-bound.
