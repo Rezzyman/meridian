@@ -7,7 +7,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-574%20passing-brightgreen?style=for-the-badge" alt="574 tests passing">
+  <img src="https://img.shields.io/badge/tests-587%20passing-brightgreen?style=for-the-badge" alt="587 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
 </p>
 
