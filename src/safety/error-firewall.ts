@@ -67,6 +67,21 @@ const LEAK_SIGNALS: readonly string[] = [
   // Internal/runtime plumbing leakage
   'all providers failed',
   'no providers resolvable',
+  // Internal-plumbing narration — server paths, MCP jargon, tool-error dumps.
+  // (2026-06-30: Crystal told a client to "get AJ to fix the M365 MCP server
+  // at /root/aterna-fleet/mcp-servers/m365/".) Any hit → replace wholesale.
+  '/root/',
+  '/home/',
+  'aterna-fleet',
+  'hermes-gateway',
+  'mcp server',
+  'mcp error',
+  '-32602',
+  'invalid arguments for tool',
+  'invalid_type',
+  'validation error',
+  'tool definition',
+  'server configuration',
 ];
 
 export function isLeaky(text: string): boolean {
@@ -104,6 +119,11 @@ const DISCLOSURE_REDACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
   // Internal runtime / infra (note: "Meridian" is the product brand — left intact)
   [/\b(?:hermes|openclaw|cortex)\b/gi, 'our system'],
   [/\bvapi\b/gi, 'our system'],
+  // Server filesystem paths — a client must never see one
+  [/\/(?:root|home|etc|var|opt|usr)\/[^\s'"),]+/g, 'our system'],
+  // MCP plumbing + internal snake_case tool identifiers (m365_send_email, cortex_recall…)
+  [/\bMCP(?:\s+server)?\b/gi, 'our system'],
+  [/\b(?:m365|cortex|mcp|graph|hermes|vapi|send)_[a-z0-9_]+\b/gi, 'our tools'],
   // Internal team — never named to a client
   [/@rezzyman\b/gi, 'our team'],
   [/\b(?:rezzyman|rezzy|atanasio)\b/gi, 'our team'],

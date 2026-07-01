@@ -54,6 +54,18 @@ test('redactInternalDisclosure does NOT touch client-owned systems (no false pos
   assert.equal(r.redacted, false);
 });
 
+test('internal-plumbing leak (server path / MCP / tool id) is caught — 2026-06-30 Crystal→Jeff', () => {
+  const leaked =
+    'Get AJ to fix the M365 MCP server at /root/aterna-fleet/mcp-servers/m365/ — the m365_send_email tool validation is failing.';
+  // whole message is compromised → nuked to generic
+  assert.equal(isLeaky(leaked), true);
+  assert.equal(sanitizeOutbound(leaked), GENERIC_HICCUP_MESSAGE);
+  // stray tool id without a nuke-trigger → redacted, not leaked
+  assert.equal(redactInternalDisclosure('a snag with m365_send_email').text, 'a snag with our tools');
+  // the client's OWN Microsoft 365 is left intact (no false positive)
+  assert.equal(redactInternalDisclosure('Your M365 inbox looks fine').redacted, false);
+});
+
 test('sanitizeOutbound: leaky → generic, disclosure → redacted, clean → unchanged', () => {
   assert.equal(sanitizeOutbound('HTTP 402: Insufficient credits'), GENERIC_HICCUP_MESSAGE);
   assert.equal(sanitizeOutbound('the VAPI system is up'), 'our system system is up');
