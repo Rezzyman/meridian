@@ -162,6 +162,21 @@ export function resolveEncodeSource(
   return baseSource;
 }
 
+/**
+ * Should the sacred-topic guardrail run on this reply? Fire for the public voice
+ * line (always, preserving the original guarantee) and for any sender the
+ * gateway did not resolve to the operator (`senderTrusted === false`). The
+ * trusted operator (REPL/CLI/delegate, where senderTrusted is undefined, or a
+ * resolved operator identity) sees their own sacred topics. Strictly additive:
+ * it can only ADD refusals versus the old voice-only gate, never remove them.
+ */
+export function shouldGuardSacred(
+  channel: MeridianTurn['channel'],
+  senderTrusted: boolean | undefined,
+): boolean {
+  return channel === 'voice' || senderTrusted === false;
+}
+
 /** A tool result that carries no information — the model must not narrate it as data. */
 export function isEmptyToolResult(result: unknown): boolean {
   return (
@@ -505,18 +520,23 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     throw new Error(`All providers failed. ${detail || '(no error captured)'}`);
   }
 
-  // ─── Sacred-topic guardrail (voice channel only) ──
-  // The operator's private entities never appear on the public voice line.
+  // ─── Sacred-topic guardrail ──
+  // The operator's private entities never appear in a reply going to an
+  // UNTRUSTED counterpart, on ANY channel. This used to fire on voice only,
+  // which left an external sender on SMS/WhatsApp/Slack/Discord/Matrix able to
+  // extract the same sacred topics. We now guard the public voice line AND any
+  // sender the gateway did not resolve to the operator. The trusted operator
+  // (REPL/CLI, or their own resolved phone/handle) still sees their own info.
   // WHICH entities are sacred is operator-owned config (operator.sensitivity),
   // not hardcoded framework source — the runtime ships only identity-free
-  // universal defaults. If the model drafts a reply matching the guard,
-  // replace it with a refusal.
-  if (ctx.channel === 'voice') {
+  // universal defaults.
+  if (shouldGuardSacred(ctx.channel, ctx.senderTrusted)) {
     const guard = buildSacredGuard(ctx.config.operator);
     const hit = sacredViolation(reply, guard);
     if (hit) {
       ctx.logger.warn({
-        msg: 'sacred-topic guardrail fired on voice reply; replacing with refusal',
+        msg: 'sacred-topic guardrail fired on an untrusted-recipient reply; replacing with refusal',
+        channel: ctx.channel,
         pattern: hit.source,
       });
       reply = guard.refusal;

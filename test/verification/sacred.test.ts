@@ -139,3 +139,27 @@ test('sacredViolation returns the first matching pattern, null when clean', () =
   assert.ok(hit.test('$1,200'));
   assert.equal(sacredViolation('all good here', guard), null);
 });
+
+// ─── Sacred guard gating (which turns get the guard) ─────────────────────────
+// The guard used to fire on voice only, leaking sacred topics to untrusted
+// senders on every text channel. It now fires for the public voice line AND any
+// sender the gateway did not resolve to the operator, on any channel.
+import { shouldGuardSacred } from '../../src/agent/turn.js';
+
+test('shouldGuardSacred: voice is always guarded (no regression)', () => {
+  assert.equal(shouldGuardSacred('voice', undefined), true);
+  assert.equal(shouldGuardSacred('voice', false), true);
+  assert.equal(shouldGuardSacred('voice', true), true);
+});
+
+test('shouldGuardSacred: untrusted senders on text channels are now guarded', () => {
+  for (const ch of ['sms', 'whatsapp', 'slack', 'discord', 'matrix', 'telegram'] as const) {
+    assert.equal(shouldGuardSacred(ch, false), true, `${ch} untrusted → guarded`);
+  }
+});
+
+test('shouldGuardSacred: the trusted operator sees their own topics', () => {
+  assert.equal(shouldGuardSacred('cli', undefined), false); // REPL is the operator
+  assert.equal(shouldGuardSacred('telegram', true), false); // resolved operator
+  assert.equal(shouldGuardSacred('gateway', undefined), false);
+});

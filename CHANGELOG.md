@@ -37,6 +37,14 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
 
 ### Fixed
 
+- **Sacred-topic guard covers every channel, not just voice.** The guard that
+  refuses to surface the operator's private topics fired only on voice, so an
+  unrecognized sender on SMS, WhatsApp, Slack, Discord, Matrix, or Telegram could
+  extract the same sacred information and SECURITY.md overclaimed the protection.
+  It now fires for the public voice line AND any sender the gateway did not
+  resolve to the operator, on any channel (reusing the `senderTrusted` signal).
+  Strictly additive: it can only add refusals, never remove the voice guarantee.
+  The trusted operator still sees their own topics. SECURITY.md updated to match.
 - **`meridian doctor` is embedded-aware.** Now that `init` defaults to embedded
   memory, a stranger's very next command reported two false failures: the memory
   provider probe threw "embedded requires embeddedDbPath" (doctor did not pass

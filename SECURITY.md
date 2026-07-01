@@ -45,7 +45,7 @@ Until you upgrade to a patched release, Meridian's design provides several layer
 - **Per-agent isolation.** Every agent has its own Neon DB, Voyage key, and model key. A compromise of one agent does not bleed into another.
 - **Encrypted vault.** All persisted secrets (API keys, OAuth tokens, passphrase hashes) are AES-256-GCM encrypted at rest. The vault key (`MERIDIAN_VAULT_KEY`) lives only in the agent's `.env` (chmod 600).
 - **Passphrase guards.** Skills can mark sensitive operations as passphrase-required; the agent will refuse without a fresh authorization.
-- **Voice-channel sacred-topic refusal.** The voice channel auto-refuses on a configurable list of sensitive patterns before any tool can be called.
+- **Sacred-topic refusal for untrusted recipients.** On a configurable list of sensitive patterns, the agent refuses rather than surface the operator's private topics to any counterpart the runtime did not resolve as the operator. This covers the public voice line and any unrecognized sender on every text channel (SMS, WhatsApp, Slack, Discord, Matrix, Telegram). The trusted operator still sees their own information.
 - **Loopback gateway by default.** The HTTP gateway listens on `127.0.0.1` only. Public access is gated behind a reverse proxy with auth.
 
 These do not replace patching. They reduce the blast radius while you upgrade.
