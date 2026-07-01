@@ -162,6 +162,61 @@ export function resolveEncodeSource(
   return baseSource;
 }
 
+/** A tool result that carries no information — the model must not narrate it as data. */
+export function isEmptyToolResult(result: unknown): boolean {
+  return (
+    result == null ||
+    (typeof result === 'string' && result.trim() === '') ||
+    (Array.isArray(result) && result.length === 0) ||
+    (typeof result === 'object' &&
+      !Array.isArray(result) &&
+      Object.keys(result as object).length === 0)
+  );
+}
+
+/**
+ * Wrap a tool set so a tool that returns an empty/null result `threshold` times
+ * in a turn is short-circuited: further calls return a terminal notice instead
+ * of executing, forcing the model to answer from context. This is the real
+ * enforcement behind the RUNTIME_RULES "don't fabricate results from an empty
+ * tool" guard — streamText (ai@4.x) has no per-step tool gate, and aborting the
+ * stream would truncate a legitimate reply, so we gate at the tool boundary
+ * instead. Pure + exported for testing.
+ */
+export function withEmptyResultBreaker(
+  tools: ToolSet,
+  opts: { threshold?: number; onTrip?: (tool: string) => void } = {},
+): ToolSet {
+  const threshold = opts.threshold ?? 2;
+  const empties: Record<string, number> = {};
+  const wrapped: ToolSet = {};
+  for (const [name, t] of Object.entries(tools)) {
+    const orig = (t as { execute?: (...a: unknown[]) => unknown }).execute;
+    if (typeof orig !== 'function') {
+      wrapped[name] = t;
+      continue;
+    }
+    wrapped[name] = {
+      ...t,
+      execute: async (args: unknown, options: unknown) => {
+        if ((empties[name] ?? 0) >= threshold) {
+          return {
+            error: 'no_results',
+            message: `The '${name}' tool returned no results ${threshold} times this turn. Do not call it again; answer from what you already have, or say you found nothing.`,
+          };
+        }
+        const result = await orig(args, options);
+        if (isEmptyToolResult(result)) {
+          empties[name] = (empties[name] ?? 0) + 1;
+          opts.onTrip?.(name);
+        }
+        return result;
+      },
+    } as ToolSet[string];
+  }
+  return wrapped;
+}
+
 /** Events surfaced to TurnContext.onStreamEvent during the provider loop. */
 export type TurnStreamEvent =
   | { type: 'delta'; text: string }
@@ -322,7 +377,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // is in its set — independent of config.tools, which stays the operator
   // surface for builtins.
   const mcpAllowed = (name: string): boolean => ctx.mcpGate?.get(name)?.has(ctx.channel) === true;
-  const turnTools: ToolSet | undefined = ctx.tools
+  const allowedTools: ToolSet | undefined = ctx.tools
     ? Object.fromEntries(
         Object.entries(ctx.tools).filter(
           ([k]) =>
@@ -333,12 +388,22 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       )
     : undefined;
 
-  // ── Tool-loop / empty-result tracker ──
-  // If a tool returns an empty/null/error payload twice in a row, abort
-  // further tool calls so the model is forced to answer from context.
-  // Kills the "Status update: Good — I can see..." hallucination class
-  // even if dangerous tools sneak back in via misconfiguration.
+  // ── Tool-loop / empty-result breaker ──
+  // A tool that returns empty twice this turn is short-circuited at the tool
+  // boundary (withEmptyResultBreaker): the third call returns a terminal notice
+  // instead of executing, so the model is forced to answer from context rather
+  // than hammer an empty tool and narrate fabricated results — the "Status
+  // update: Good, I can see..." hallucination class. onStepFinish still logs the
+  // empties for the trace.
   const emptyByTool: Record<string, number> = {};
+  const turnTools = allowedTools
+    ? withEmptyResultBreaker(allowedTools, {
+        threshold: 2,
+        onTrip: (name) => {
+          emptyByTool[name] = (emptyByTool[name] ?? 0) + 1;
+        },
+      })
+    : undefined;
 
   // Trace accumulator — every tool call this turn lands here. Persisted by
   // the gateway/REPL after the turn completes for /why + /trace queries.
@@ -387,20 +452,16 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
               ctx.onStreamEvent?.({ type: 'tool', name: t.toolName });
             }
           }
+          // Enforcement lives in withEmptyResultBreaker (the tool wrapper);
+          // here we only surface the trip for the log/trace so operators can see
+          // when a tool went dark mid-turn.
           if (toolResults && toolResults.length > 0) {
             for (const r of toolResults) {
-              const result = (r as { result?: unknown }).result;
-              const empty =
-                result == null ||
-                (typeof result === 'string' && result.trim() === '') ||
-                (Array.isArray(result) && result.length === 0) ||
-                (typeof result === 'object' && Object.keys(result as object).length === 0);
-              if (empty) {
+              if (isEmptyToolResult((r as { result?: unknown }).result)) {
                 const name = (r as { toolName?: string }).toolName ?? 'unknown';
-                emptyByTool[name] = (emptyByTool[name] ?? 0) + 1;
-                if (emptyByTool[name] >= 2) {
+                if ((emptyByTool[name] ?? 0) >= 2) {
                   ctx.logger.warn({
-                    msg: 'tool returned empty twice; subsequent tool calls will be discouraged',
+                    msg: 'tool returned empty repeatedly; further calls are short-circuited this turn',
                     tool: name,
                     count: emptyByTool[name],
                   });

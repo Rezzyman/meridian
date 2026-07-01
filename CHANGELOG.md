@@ -37,6 +37,13 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
 
 ### Fixed
 
+- **The empty-tool loop breaker is now real enforcement, not just a log line.**
+  A tool that returned no results twice in a turn only produced a warning while
+  the model could keep calling it (to the 3-step cap) and narrate fabricated
+  results. A tool that goes empty twice is now short-circuited at the tool
+  boundary: the next call returns a terminal notice instead of executing, so the
+  model must answer from context. Covered by unit tests (per-tool counting, a
+  healthy sibling is unaffected, single-empty recovery does not trip it).
 - **Cross-channel continuity now covers all 9 channels.** `resolveOperator` only
   had branches for telegram, voice, and cli, so a message the operator sent from
   Slack, Discord, WhatsApp, Matrix, or SMS fell through to an isolated
