@@ -315,29 +315,68 @@ export async function runDoctor(): Promise<number> {
       throw new Error('agent env failed schema validation');
     }
     const router = new ProviderRouter(agentEnv);
-    const chain = router.chainFor('hi', config.models);
-    let replied = false;
-    for (const provider of chain) {
-      try {
-        const stream = streamText({
-          model: provider.model,
-          messages: [{ role: 'user', content: 'Say hi.' }],
-          maxRetries: 0,
-          maxSteps: 1,
-          abortSignal: AbortSignal.timeout(15_000),
-        });
-        let out = '';
-        for await (const delta of stream.textStream) out += delta;
-        if (out.trim()) {
-          replied = true;
-          rows.push(row('LLM chain dry-run', 'ok', `${provider.ref} responded`));
-          break;
+    // No resolvable provider = "not configured yet" (a fresh `init` with no key),
+    // not a broken foundation. The Provider keys row already warns, so report
+    // warn with guidance here too rather than a scary fail that flips exit code.
+    let chain: ReturnType<ProviderRouter['chainFor']> | undefined;
+    try {
+      chain = router.chainFor('hi', config.models);
+    } catch {
+      chain = undefined;
+    }
+    if (!chain || chain.length === 0) {
+      rows.push(
+        row(
+          'LLM chain dry-run',
+          'warn',
+          'no model configured yet — add a provider key or a local ollama model, then re-run doctor',
+        ),
+      );
+    } else {
+      let replied = false;
+      for (const provider of chain) {
+        try {
+          const stream = streamText({
+            model: provider.model,
+            messages: [{ role: 'user', content: 'Say hi.' }],
+            maxRetries: 0,
+            maxSteps: 1,
+            abortSignal: AbortSignal.timeout(15_000),
+          });
+          let out = '';
+          for await (const delta of stream.textStream) out += delta;
+          if (out.trim()) {
+            replied = true;
+            rows.push(row('LLM chain dry-run', 'ok', `${provider.ref} responded`));
+            break;
+          }
+        } catch {
+          /* try next */
         }
-      } catch {
-        /* try next */
+      }
+      // If none answered, the severity depends on whether the operator actually
+      // configured a model. A present cloud key that fails is a real failure. But
+      // a fresh agent with no key resolves only the local ollama fallback (ollama
+      // needs no key), and on a box with no ollama running that "fails" merely
+      // because setup is not finished — that is a warning with guidance, not red.
+      if (!replied) {
+        const hasCloudKey = !!(
+          agentEnv.ROUTEXOR_API_KEY ||
+          agentEnv.ANTHROPIC_API_KEY ||
+          agentEnv.OPENAI_API_KEY ||
+          agentEnv.GROQ_API_KEY
+        );
+        rows.push(
+          hasCloudKey
+            ? row('LLM chain dry-run', 'fail', 'a configured provider did not respond')
+            : row(
+                'LLM chain dry-run',
+                'warn',
+                'no model reachable yet — add a provider key, or start a local ollama model, then re-run doctor',
+              ),
+        );
       }
     }
-    if (!replied) rows.push(row('LLM chain dry-run', 'fail', 'no provider responded'));
   } catch (err) {
     rows.push(row('LLM chain dry-run', 'fail', String((err as Error).message)));
   }

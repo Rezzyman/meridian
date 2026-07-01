@@ -50,6 +50,13 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
   resolve to the operator, on any channel (reusing the `senderTrusted` signal).
   Strictly additive: it can only add refusals, never remove the voice guarantee.
   The trusted operator still sees their own topics. SECURITY.md updated to match.
+- **`meridian doctor` on a fresh, keyless agent reports healthy, not failed.**
+  A brand-new agent with no model key made the LLM dry-run a hard failure (red,
+  exit 1), which reads as "broken" right after `init`. The check now distinguishes
+  "no model configured yet" (a warning with guidance to add a key or start ollama)
+  from "a configured cloud key did not respond" (still a real failure). A fresh
+  embedded agent now exits 0 with warnings. Verified from the installed npm
+  tarball end to end (pack, install, init, demo, doctor).
 - **`meridian doctor` is embedded-aware.** Now that `init` defaults to embedded
   memory, a stranger's very next command reported two false failures: the memory
   provider probe threw "embedded requires embeddedDbPath" (doctor did not pass
