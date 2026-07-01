@@ -286,3 +286,94 @@ test('trailing slash in baseUrl is trimmed before building request URLs', async 
 
   assert.equal(calls[0].url, 'http://cortex.test/api/v1/recall');
 });
+
+// ─── request timeouts ────────────────────────────────────────────────────────
+// A CORTEX host that accepts the connection but never answers must not hang
+// recall/encode/health (and with them every turn and `meridian doctor`)
+// forever. Each test drives an abort-aware fake fetch and asserts the request
+// settles in tens of ms, proving the timeout is wired to the request.
+
+/** Node's AbortSignal.timeout() uses an UNref'd timer, so a test whose only
+ *  pending work is that timer lets the event loop go idle — node:test then
+ *  cancels the test before the abort fires. A ref'd interval keeps the loop
+ *  alive for the (few-ms) wait; the finally clears it. */
+async function keepingLoopAlive<T>(fn: () => Promise<T>): Promise<T> {
+  const keepAlive = setInterval(() => {}, 1_000);
+  try {
+    return await fn();
+  } finally {
+    clearInterval(keepAlive);
+  }
+}
+
+/** Fake fetch that never settles on its own — only an abort rejects it.
+ *  Records the signal each call received so tests can assert on wiring. */
+function hangingFetch() {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const impl = ((_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const sig = init?.signal;
+    signals.push(sig);
+    return new Promise<Response>((_resolve, reject) => {
+      if (!sig) return; // no signal → genuinely hangs; that's the bug we guard against
+      if (sig.aborted) return reject(sig.reason ?? new Error('aborted'));
+      sig.addEventListener('abort', () => reject(sig.reason ?? new Error('aborted')), {
+        once: true,
+      });
+    });
+  }) as typeof fetch;
+  return { impl, signals };
+}
+
+test('json() aborts a hung request at the instance timeout', async () => {
+  const { impl, signals } = hangingFetch();
+  const bind = new CortexBind({
+    agentId: 'iso-a',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+    timeoutMs: 25,
+  });
+
+  const started = process.hrtime.bigint();
+  await keepingLoopAlive(() => assert.rejects(bind.recall('q')));
+  const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
+
+  assert.ok(signals[0] instanceof AbortSignal, 'a timeout signal was passed to fetch');
+  assert.ok(elapsedMs < 2_000, `aborted promptly (was ${elapsedMs.toFixed(0)}ms)`);
+});
+
+test('health() degrades to down fast (no hang) when CORTEX never answers', async () => {
+  const { impl, signals } = hangingFetch();
+  const bind = new CortexBind({
+    agentId: 'iso-a',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+    timeoutMs: 15_000, // instance default is generous...
+  });
+
+  const started = process.hrtime.bigint();
+  // ...but the interactive probe passes a tight ceiling
+  const health = await keepingLoopAlive(() => bind.health(25));
+  const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
+
+  assert.deepEqual(health, { status: 'down', database: 'disconnected' });
+  assert.ok(signals[0] instanceof AbortSignal, 'health carries an abort signal');
+  assert.ok(elapsedMs < 2_000, `health degraded fast (was ${elapsedMs.toFixed(0)}ms)`);
+});
+
+test('timeoutMs: 0 opts out — no signal is attached', async () => {
+  const seen: (AbortSignal | null | undefined)[] = [];
+  const impl = ((_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    seen.push(init?.signal);
+    return Promise.resolve(jsonResponse({ status: 'ok', database: 'connected' }));
+  }) as typeof fetch;
+  const bind = new CortexBind({
+    agentId: 'iso-a',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+    timeoutMs: 0,
+  });
+
+  const health = await bind.health(0);
+  assert.deepEqual(health, { status: 'ok', database: 'connected' });
+  assert.equal(seen[0] ?? undefined, undefined, 'no signal attached when timeouts are disabled');
+});

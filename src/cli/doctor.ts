@@ -226,6 +226,7 @@ export async function runDoctor(): Promise<number> {
     try {
       const r = await fetch(`https://api.vapi.ai/assistant/${env.VAPI_ASSISTANT_ID}`, {
         headers: { Authorization: `Bearer ${env.VAPI_API_KEY}` },
+        signal: AbortSignal.timeout(8_000),
       });
       rows.push(
         row(
@@ -246,7 +247,9 @@ export async function runDoctor(): Promise<number> {
   // 8. Telegram channel — bot getMe
   if (env.TELEGRAM_BOT_TOKEN) {
     try {
-      const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`);
+      const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`, {
+        signal: AbortSignal.timeout(8_000),
+      });
       const j = (await r.json()) as { ok: boolean; result?: { username: string } };
       rows.push(
         row(
@@ -300,6 +303,7 @@ export async function runDoctor(): Promise<number> {
           messages: [{ role: 'user', content: 'Say hi.' }],
           maxRetries: 0,
           maxSteps: 1,
+          abortSignal: AbortSignal.timeout(15_000),
         });
         let out = '';
         for await (const delta of stream.textStream) out += delta;

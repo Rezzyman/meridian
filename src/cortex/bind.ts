@@ -24,22 +24,42 @@ export interface CortexBindOptions {
   agentId: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  /**
+   * Per-request wall-clock ceiling in ms. A CORTEX host that accepts the TCP
+   * connection but never answers (firewalled port, wedged server, a proxy that
+   * blackholes) would otherwise hang recall/encode/health forever — and with it
+   * every turn and `meridian doctor`. Default 15s; callers pass a tighter signal
+   * for interactive probes. Set 0 to disable.
+   */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 export class CortexBind implements MemoryProvider {
   readonly agentId: string;
   readonly baseUrl: string;
   private fetchImpl: typeof fetch;
+  private timeoutMs: number;
 
   constructor(opts: CortexBindOptions) {
     this.agentId = opts.agentId;
     this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE).replace(/\/$/, '');
     this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  }
+
+  /** A caller-supplied signal wins; otherwise fall back to the instance timeout. */
+  private timeoutSignal(init?: RequestInit): AbortSignal | undefined {
+    if (init?.signal) return init.signal;
+    if (this.timeoutMs > 0) return AbortSignal.timeout(this.timeoutMs);
+    return undefined;
   }
 
   private async json<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...init,
+      signal: this.timeoutSignal(init),
       headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     });
     if (!res.ok) {
@@ -96,7 +116,9 @@ export class CortexBind implements MemoryProvider {
       sinceHours: String(opts.sinceHours ?? 48),
       limit: String(opts.limit ?? 20),
     });
-    const res = await this.fetchImpl(`${this.baseUrl}/api/v1/artifacts?${params.toString()}`);
+    const res = await this.fetchImpl(`${this.baseUrl}/api/v1/artifacts?${params.toString()}`, {
+      signal: this.timeoutSignal(),
+    });
     if (!res.ok) {
       throw new Error(`CORTEX /artifacts ${res.status}`);
     }
@@ -139,9 +161,17 @@ export class CortexBind implements MemoryProvider {
   }
 
   // ─── Health + stats for boot panel and doctor ────────────────────────────────
-  async health(): Promise<CortexHealth> {
+  /**
+   * @param timeoutMs interactive callers (boot panel, `meridian doctor`) pass a
+   * tight ceiling so an unreachable CORTEX degrades to "down" fast instead of
+   * stalling the whole command on the 15s default.
+   */
+  async health(timeoutMs = 4_000): Promise<CortexHealth> {
     try {
-      return await this.json<CortexHealth>(`/api/v1/health?agent_id=${encodeURIComponent(this.agentId)}`);
+      return await this.json<CortexHealth>(
+        `/api/v1/health?agent_id=${encodeURIComponent(this.agentId)}`,
+        timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : undefined,
+      );
     } catch {
       return { status: 'down', database: 'disconnected' };
     }
