@@ -34,6 +34,11 @@ export interface ConversationOptions {
   verificationChecks?: VerificationCheck[];
   /** Per-agent provenance signer for signed-trust mode (provenance.ts). */
   provenanceSigner?: ProvenanceSigner;
+  /** Is the counterpart on this conversation the trusted operator? Governs
+   *  whether post-turn memories are signed as first-party. A session is keyed
+   *  by operator resolution, so trust is fixed for the conversation's life.
+   *  Absent = local/first-party (REPL) → trusted. */
+  senderTrusted?: boolean;
   resume?: MeridianSession;
   /** When set, every turn's reasoning trace is persisted to this store
    *  so /why and /trace can answer "what backed that claim?" later. */
@@ -98,6 +103,7 @@ export class Conversation {
         mcpGate: this.opts.mcpGate,
         verificationChecks: this.opts.verificationChecks,
         provenanceSigner: this.opts.provenanceSigner,
+        senderTrusted: this.opts.senderTrusted,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,

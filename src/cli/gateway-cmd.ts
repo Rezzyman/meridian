@@ -171,7 +171,12 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
   const IDLE_MS = 60 * 60 * 1000; // 1 hour in-memory; store keeps 7 days
   const sessions = new Map<string, { convo: Conversation; lastSeen: number; opLabel: string }>();
 
-  function buildConvo(channel: ChannelKind, sessionId: string, opLabel: string): Conversation {
+  function buildConvo(
+    channel: ChannelKind,
+    sessionId: string,
+    opLabel: string,
+    senderTrusted: boolean,
+  ): Conversation {
     // Try to resume from disk so history survives restarts.
     const resume = store.loadSession(sessionId) ?? undefined;
     const convo = new Conversation({
@@ -183,6 +188,9 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
       mcpGate: surface.mcpGate,
       verificationChecks,
       provenanceSigner,
+      // Only the resolved operator's turns are signed as first-party; an
+      // unknown external caller's memories stay unsigned so recall screens them.
+      senderTrusted,
       resume,
       store,
     });
@@ -213,7 +221,7 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
       existing.lastSeen = now;
       return { convo: existing.convo, sessionId, operatorLabel: existing.opLabel };
     }
-    const convo = buildConvo(channel, sessionId, opLabel);
+    const convo = buildConvo(channel, sessionId, opLabel, op.source === 'config');
     sessions.set(sessionId, { convo, lastSeen: now, opLabel });
     if (op.source === 'config') {
       logger.info({ msg: 'session resolved', operator: op.id, channel, sessionId });

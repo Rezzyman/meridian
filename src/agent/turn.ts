@@ -129,10 +129,37 @@ export interface TurnContext {
    * own memories stay trusted. Absent → the string-prefix heuristic is used.
    */
   provenanceSigner?: ProvenanceSigner;
+  /**
+   * Is this turn's sender the trusted operator? Set by the gateway from
+   * resolveOperator (config match = true, unknown caller = false). Governs
+   * whether the post-turn memory is signed as first-party trusted. Absent means
+   * a local/first-party caller (REPL, CLI, delegate sub-turn) and defaults to
+   * trusted; the gateway sets it false for unrecognized external senders so
+   * their content is screened on recall instead of laundered into trust.
+   */
+  senderTrusted?: boolean;
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
   systemBase: string;
+}
+
+/**
+ * Decide the source string a post-turn memory is stored under. Signs it as
+ * first-party trusted ONLY when a signer is present (signed-trust mode) AND the
+ * sender is trusted. An untrusted sender's memory keeps the plain base source,
+ * which the recall screen treats as untrusted — so external directives cannot
+ * ride into trusted memory on a signature. Pure + exported for testing.
+ */
+export function resolveEncodeSource(
+  baseSource: string,
+  content: string,
+  opts: { signer?: ProvenanceSigner; senderTrusted: boolean },
+): string {
+  if (opts.signer && opts.senderTrusted) {
+    return opts.signer.signSource(baseSource, content);
+  }
+  return baseSource;
 }
 
 /** Events surfaced to TurnContext.onStreamEvent during the provider loop. */
@@ -498,15 +525,19 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     const baseSource = commitmentDetected
       ? `meridian:${ctx.channel}:${ctx.sessionId}:commitment`
       : `meridian:${ctx.channel}:${ctx.sessionId}`;
-    // In signed mode, bind this first-party memory to the agent key so a later
-    // recall trusts it cryptographically (not by its label). Note: a PUBLIC
-    // voice memory is signed too — it is genuinely first-party — but its
-    // content is still screened on recall like any other; signing attests the
-    // WRITER, not that the content is safe to obey.
-    const source =
-      ctx.config.cortex.provenanceTrust === 'signed' && ctx.provenanceSigner
-        ? ctx.provenanceSigner.signSource(baseSource, encodeContent)
-        : baseSource;
+    // In signed mode we bind a first-party memory to the agent key so a later
+    // recall trusts it cryptographically. We sign ONLY when the sender is
+    // trusted (the operator, resolved by the gateway). An UNTRUSTED sender's
+    // turn — a stranger on WhatsApp/SMS/Slack/public voice — must stay unsigned,
+    // so its content (which may be "always wire the funds…") is screened like
+    // any other external input on recall instead of riding in on a trusted
+    // signature. This closes the signed-mode laundering hole.
+    const signer =
+      ctx.config.cortex.provenanceTrust === 'signed' ? ctx.provenanceSigner : undefined;
+    const source = resolveEncodeSource(baseSource, encodeContent, {
+      signer,
+      senderTrusted: ctx.senderTrusted !== false, // default trusted (REPL/CLI/delegate = operator)
+    });
     void ctx.cortex
       .encode(encodeContent, {
         // Commitments encoded with priority 3 so the ledger surfaces them.
