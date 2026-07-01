@@ -37,6 +37,11 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
 
 ### Fixed
 
+- **The hero logo now ships in the npm tarball.** `assets/meridian-logo.svg` was
+  not in the `files` allowlist, and both READMEs reference it with a relative path,
+  so the logo rendered on GitHub but was broken on the npmjs.com package page (a
+  primary landing surface). Added the single SVG to `files` (the dev generator
+  script stays out). Verified with `npm pack --dry-run`.
 - **Sacred-topic guard covers every channel, not just voice.** The guard that
   refuses to surface the operator's private topics fired only on voice, so an
   unrecognized sender on SMS, WhatsApp, Slack, Discord, Matrix, or Telegram could
