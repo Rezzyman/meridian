@@ -22,6 +22,16 @@ export async function pickAgentInteractive(envOverride?: string): Promise<string
     process.exit(1);
   }
 
+  // Non-interactive stdin (Docker/CI/piped) can't answer the prompt — the read
+  // loop below would spin on EOF forever. Auto-select when the choice is
+  // unambiguous; otherwise exit with actionable guidance instead of hanging.
+  if (process.stdin.isTTY !== true) {
+    if (agents.length === 1) return agents[0]!.slug;
+    console.log(colors.err('Multiple agents and non-interactive stdin — cannot prompt for a choice.'));
+    console.log(colors.muted('Pass --agent <slug> or set MERIDIAN_AGENT to pick one.'));
+    process.exit(1);
+  }
+
   // Render list
   console.log('');
   console.log(colors.cyan('Which agent would you like to interface with?'));

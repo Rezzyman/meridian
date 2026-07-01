@@ -556,11 +556,11 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
   },
   models: {
     primary: 'routexor/claude-4-haiku',
-    fallbacks: [
-      'routexor/claude-sonnet-4.6',
-      'ollama/qwen2.5:14b',
-      'ollama/hermes3:8b',
-    ],
+    // The ollama fallback tag MUST match what onboarding tells users to pull
+    // (`ollama pull qwen2.5` → the `qwen2.5:latest` tag). The old `:14b`/
+    // `hermes3:8b` refs pointed at tags no documented step ever pulls, so the
+    // keyless local path 404'd the moment the fallback fired.
+    fallbacks: ['routexor/claude-sonnet-4.6', 'ollama/qwen2.5'],
     smartRouting: {
       enabled: true,
       maxSimpleChars: 200,

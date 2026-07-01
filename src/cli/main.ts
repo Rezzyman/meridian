@@ -17,7 +17,7 @@ process.removeAllListeners('warning');
 
 import { Command } from 'commander';
 import { join } from 'node:path';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { activeAgentSlug, ensureAgentHome, listAgents, loadAgentConfig, setActiveAgent } from '../config/home.js';
 import { loadAgentEnv, envFileTemplate } from '../config/loader.js';
 import { bindCortex } from '../cortex/bind.js';
@@ -44,11 +44,25 @@ import { runMcpList, runMcpServe } from './mcp-cmd.js';
 import { runDemo } from './demo-cmd.js';
 import { runImport } from './import-cmd.js';
 
+// Read the real version from package.json so `--version` never drifts from the
+// published release. `../../package.json` resolves the same from src/cli (tsx
+// dev) and dist/cli (built) since both sit two levels under the package root.
+function packageVersion(): string {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+    ) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 const program = new Command();
 program
   .name('meridian')
   .description('Meridian: the cognitive agent runtime by ATERNA AI')
-  .version('1.0.1');
+  .version(packageVersion());
 
 program
   .option('-a, --agent <slug>', 'agent slug (overrides MERIDIAN_AGENT env)')
@@ -63,10 +77,22 @@ program
   .description('Initialize a new agent home with the seven-layer AgentOS scaffold')
   .option('--template <name>', 'starter template (frontdesk | receptionist | sales | concierge)')
   .option('--inherits <slug>', 'inherit CONTEXT, MEMORY, CONNECTIONS from a hub agent')
-  .option('--embedded', 'zero-config: local embedded memory, no CORTEX server or keys')
-  .action(async (slug: string, opts: { template?: string; inherits?: string; guided?: boolean; embedded?: boolean }) => {
-    await initAgent(slug, opts);
-  });
+  .option('--embedded', 'force zero-config local memory (the default unless CORTEX creds are present)')
+  .option('--cortex', 'provision for the CORTEX server path (needs NEON_DATABASE_URL + VOYAGE_API_KEY)')
+  .action(
+    async (
+      slug: string,
+      opts: {
+        template?: string;
+        inherits?: string;
+        guided?: boolean;
+        embedded?: boolean;
+        cortex?: boolean;
+      },
+    ) => {
+      await initAgent(slug, opts);
+    },
+  );
 
 program
   .command('onboard')
