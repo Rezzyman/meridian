@@ -40,7 +40,7 @@ import { pickAgentInteractive } from './agent-picker.js';
 import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup, runSkillNew } from './skills-cmd.js';
 import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
-import { runMcpList, runMcpServe } from './mcp-cmd.js';
+import { runMcpAdd, runMcpList, runMcpServe } from './mcp-cmd.js';
 import { runDemo } from './demo-cmd.js';
 import { runImport } from './import-cmd.js';
 
@@ -144,6 +144,43 @@ mcp
   .action(async () => {
     process.exit(await runMcpList());
   });
+mcp
+  .command('add <name>')
+  .description('Register an MCP server in CONNECTIONS/mcp.json (no hand-editing JSON)')
+  .option('--transport <kind>', 'stdio | http | sse', 'stdio')
+  .option('--command <cmd>', 'stdio: the executable to launch (e.g. npx)')
+  .option('--arg <value>', 'stdio: a command argument (repeatable)', (v: string, acc: string[]) => {
+    acc.push(v);
+    return acc;
+  }, [] as string[])
+  .option('--url <url>', 'http/sse: the server endpoint URL')
+  .option('--channels <list>', 'comma-separated channels that may see the tools (default cli)')
+  .option('--force', 'overwrite an existing server of the same name')
+  .action(
+    async (
+      name: string,
+      opts: {
+        transport?: 'stdio' | 'http' | 'sse';
+        command?: string;
+        arg?: string[];
+        url?: string;
+        channels?: string;
+        force?: boolean;
+      },
+    ) => {
+      process.exit(
+        await runMcpAdd({
+          name,
+          transport: opts.transport,
+          command: opts.command,
+          args: opts.arg,
+          url: opts.url,
+          channels: opts.channels?.split(',').map((c) => c.trim()).filter(Boolean),
+          force: opts.force,
+        }),
+      );
+    },
+  );
 mcp
   .command('serve')
   .description('Expose this agent over MCP on stdio (CORTEX recall as a tool)')

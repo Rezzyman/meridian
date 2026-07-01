@@ -7,6 +7,17 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 The "trust the first run" pass. Every fix here targets a place where the product
 did not deliver its own promise at the seam a new user or a skeptic hits first.
 
+### Added
+
+- **`meridian mcp add <name>`** registers an MCP server in `CONNECTIONS/mcp.json`
+  without hand-editing JSON — the on-ramp MCP was missing. stdio:
+  `mcp add github --command npx --arg -y --arg @modelcontextprotocol/server-github`;
+  http/sse: `mcp add data --transport http --url <endpoint>`. Optional
+  `--channels` gates which channels see the tools, `--force` overwrites. It reads
+  the raw config (so a disabled server is never dropped on write-back), validates
+  the entry with a clean error message, and refuses to clobber an existing name
+  without `--force`. The validation + upsert logic is pure and unit-tested.
+
 ### Security
 
 - **Signed-trust mode no longer launders an external sender's content into

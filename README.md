@@ -219,13 +219,14 @@ meridian gateway                   # HTTP gateway on :18889 + Telegram + voice
 meridian                           # interactive REPL (default command)
 open skeleton/web/chat.html        # browser chat — streams tokens live over SSE
 
+meridian mcp add github --command npx --arg -y --arg @modelcontextprotocol/server-github
 meridian mcp list                  # probe MCP servers in CONNECTIONS/mcp.json
 meridian mcp serve                 # serve THIS agent's memory to any MCP client
 meridian init outbound --inherits aria   # a specialist that inherits hub CONTEXT + MEMORY
 ```
 
 **Full command surface:** `init` · `onboard` · `agents` · `use` · `demo` ·
-`doctor` · `deploy` · `audit` · `gateway` · `ingest` · `chat` · `mcp list|serve` ·
+`doctor` · `deploy` · `audit` · `gateway` · `ingest` · `chat` · `mcp add|list|serve` ·
 `voice passphrase|status|call` · `skills list|install|remove|setup|new`.
 
 ### CLI ⇄ messaging quick reference

@@ -12,12 +12,21 @@
  * agent's memory becomes their memory_recall tool.
  */
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { ensureAgentHome, loadAgentConfig } from '../config/home.js';
 import { loadAgentEnv } from '../config/loader.js';
 import { bindCortex } from '../cortex/bind.js';
 import { createLogger } from '../logger/pino.js';
 import { createMemoryProvider } from '../memory/index.js';
-import { connectMcpServers, loadMcpConnections } from '../mcp/index.js';
+import {
+  connectMcpServers,
+  loadMcpConnections,
+  mcpConfigPath,
+  McpConnectionsFileSchema,
+  McpServerConfigSchema,
+  type McpServerConfig,
+} from '../mcp/index.js';
 import { createMeridianMcpServer, serveStdio } from '../mcp/server.js';
 import { ProviderRouter } from '../providers/router.js';
 import { colors } from '../utils/truecolor.js';
@@ -60,6 +69,106 @@ export async function runMcpList(): Promise<number> {
   }
   await surface.close();
   return surface.status.every((s) => s.ok) ? 0 : 1;
+}
+
+export interface McpAddOptions {
+  name: string;
+  transport?: 'stdio' | 'http' | 'sse';
+  command?: string;
+  args?: string[];
+  url?: string;
+  channels?: string[];
+  force?: boolean;
+}
+
+/**
+ * Validate + normalize a server entry from CLI options. Throws a clean Error
+ * (readable message, no Zod blob) on invalid input, e.g. stdio without
+ * --command or http without --url. Pure + exported for testing.
+ */
+export function buildMcpServerEntry(opts: McpAddOptions): McpServerConfig {
+  const transport = opts.transport ?? 'stdio';
+  const raw: Record<string, unknown> = { name: opts.name, transport };
+  if (transport === 'stdio') {
+    if (opts.command) raw.command = opts.command;
+    if (opts.args?.length) raw.args = opts.args;
+  } else if (opts.url) {
+    raw.url = opts.url;
+  }
+  if (opts.channels?.length) raw.channels = opts.channels;
+  const parsed = McpServerConfigSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues.map((i) => i.message).join('; '));
+  }
+  return parsed.data;
+}
+
+/**
+ * Upsert a server into a list by name. Returns a new list. Throws if the name
+ * already exists and `force` is not set, so we never clobber config silently.
+ * Pure + exported for testing.
+ */
+export function upsertMcpServer(
+  servers: McpServerConfig[],
+  entry: McpServerConfig,
+  force: boolean,
+): McpServerConfig[] {
+  const idx = servers.findIndex((s) => s.name === entry.name);
+  if (idx === -1) return [...servers, entry];
+  if (!force) {
+    throw new Error(`server "${entry.name}" already exists — pass --force to overwrite`);
+  }
+  const next = servers.slice();
+  next[idx] = entry;
+  return next;
+}
+
+/**
+ * `meridian mcp add <name>` — register an MCP server in CONNECTIONS/mcp.json
+ * without hand-editing JSON. stdio: `--command npx --arg -y --arg <pkg>`.
+ * http/sse: `--transport http --url <url>`.
+ */
+export async function runMcpAdd(opts: McpAddOptions): Promise<number> {
+  const slug = await pickAgentInteractive(process.env.MERIDIAN_AGENT);
+  const home = ensureAgentHome(slug);
+  const path = mcpConfigPath(home);
+
+  // Read the RAW file (all servers, incl. disabled) — loadMcpConnections filters
+  // to enabled-only, which would silently drop disabled entries on write-back.
+  let servers: McpServerConfig[] = [];
+  if (existsSync(path)) {
+    try {
+      servers = McpConnectionsFileSchema.parse(JSON.parse(readFileSync(path, 'utf8'))).servers;
+    } catch (err) {
+      console.log(colors.err(`CONNECTIONS/mcp.json: ${(err as Error).message}`));
+      return 1;
+    }
+  }
+
+  let entry: McpServerConfig;
+  try {
+    entry = buildMcpServerEntry(opts);
+  } catch (err) {
+    console.log(colors.err(`invalid server: ${(err as Error).message}`));
+    return 1;
+  }
+
+  let next: McpServerConfig[];
+  try {
+    next = upsertMcpServer(servers, entry, opts.force ?? false);
+  } catch (err) {
+    console.log(colors.err((err as Error).message));
+    return 1;
+  }
+
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify({ servers: next }, null, 2)}\n`);
+  console.log(colors.ok(`MCP server "${entry.name}" (${entry.transport}) written to ${path}`));
+  console.log(colors.muted(`  visible on channels: ${entry.channels.join(', ')}`));
+  console.log(
+    colors.muted('  run `meridian mcp list` to probe it, then `meridian` to use its tools.'),
+  );
+  return 0;
 }
 
 export async function runMcpServe(opts: { allowEncode?: boolean }): Promise<void> {
