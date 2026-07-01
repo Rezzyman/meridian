@@ -15,6 +15,11 @@ That's it. The [release workflow](../.github/workflows/release.yml) does the res
 
 ## Cutting a release
 
+Before you bump: run `pnpm test` and update the **tests-passing badge** count in
+`README.md` (and `README.zh-CN.md`) if it changed. It is a hardcoded number, so it
+drifts unless you refresh it here; a stale count is a small but real trust ding on
+the landing page.
+
 ```bash
 # 1. bump the version (updates package.json + creates the commit + tag)
 npm version minor          # or: patch | major | 1.2.0
@@ -46,5 +51,6 @@ meridian demo                  # or: npx @aterna/meridian demo
 - `@aterna/quartz` (the commercial BSL memory layer) is **not** a dependency of
   the public package; the runtime lazy-loads it and falls back to CORTEX when it
   is absent, so the open-source install always works.
-- `better-sqlite3` is a native dependency; npm uses its prebuilt binaries on
-  common platforms (no build tools needed for most users).
+- **Zero native dependencies.** The session store is a pure-JS JSONL append log
+  (`better-sqlite3` was removed in 1.2.1), so `npm i -g @aterna/meridian`
+  installs cleanly on every platform and Node version with no build toolchain.
