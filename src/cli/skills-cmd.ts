@@ -18,6 +18,7 @@ import { activeAgentSlug, ensureAgentHome, loadAgentConfig } from '../config/hom
 import { loadAgentEnv } from '../config/loader.js';
 import { ProviderRouter } from '../providers/router.js';
 import { generateSkillDraft, installSkillDraft, screenSkillDraft } from '../skills/authoring.js';
+import { resolveToolsModule } from '../skills/loader.js';
 import { colors } from '../utils/truecolor.js';
 import type { Vault } from '../secrets/vault.js';
 import type { GogRunOptions, GogRunResult } from '../tools/gog.js';
@@ -286,12 +287,13 @@ export async function runSkillsSetup(name: string): Promise<void> {
   const vault = openAgentVault({ envPath: home.envPath, vaultPath: home.vaultPath });
 
   // ── Per-skill setup() hook ──
-  // If the skill's tools.ts exports a `setup(ctx)` function, run it.
-  // This is how skills with non-standard requirements (OAuth flows,
-  // multi-step credentials, third-party verification) drive their own
-  // walkthrough without us hardcoding per-skill logic in the runner.
-  const toolsTs = join(installed, 'tools.ts');
-  if (existsSync(toolsTs)) {
+  // If the skill's tools module exports a `setup(ctx)` function, run it. This
+  // is how skills with non-standard requirements (OAuth flows, multi-step
+  // credentials, third-party verification) drive their own walkthrough without
+  // us hardcoding per-skill logic in the runner. Resolve the compiled tools.mjs
+  // in preference to raw tools.ts so this works on the shipped node runtime too.
+  const toolsModule = resolveToolsModule(installed);
+  if (toolsModule) {
     try {
       const {
         runGog,
@@ -301,7 +303,7 @@ export async function runSkillsSetup(name: string): Promise<void> {
       } = await import('../tools/gog.js');
       const { spawn } = await import('node:child_process');
       const { pathToFileURL } = await import('node:url');
-      const mod = (await import(pathToFileURL(toolsTs).href)) as {
+      const mod = (await import(pathToFileURL(toolsModule.path).href)) as {
         setup?: (ctx: SetupCtx) => Promise<void>;
       };
       if (typeof mod.setup === 'function') {

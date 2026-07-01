@@ -350,3 +350,59 @@ test('builtinDir param loads builtin skills, overridden by agent layer', async (
   assert.equal(registry.byName('shared')?.source, 'agent');
   assert.equal(registry.byName('shared')?.category, 'agent-cat');
 });
+
+// ─── compiled tools.mjs is preferred over raw tools.ts ───────────────────────
+// The shipped runtime (`node dist/…`) can't import raw .ts on Node 20, so
+// `pnpm build` emits a tools.mjs the loader must prefer. These guard both the
+// preference and the compiled-only path (what a Node 20 user actually runs).
+
+const MJS_TOOL = (toolName: string) =>
+  [
+    '// compiled skill module (plain ESM, loads on any Node)',
+    'export function createTools(ctx) {',
+    '  const { tool, z } = ctx;',
+    '  return {',
+    `    ${toolName}: tool({`,
+    `      description: 'compiled tool ${toolName}',`,
+    "      parameters: z.object({ input: z.string() }),",
+    '      execute: async (args) => ({ echoed: args.input, via: "mjs" }),',
+    '    }),',
+    '  };',
+    '}',
+  ].join('\n');
+
+test('loader prefers a compiled tools.mjs over raw tools.ts', async () => {
+  const { home, skillsDir } = makeWorld();
+  const dir = join(skillsDir, 'dual-skill');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'SKILL.md'), skillMd('dual-skill', { category: 'testing', runtime: 'ts' }));
+  // tools.ts declares a tool that must NOT win; tools.mjs declares the winner.
+  writeFileSync(join(dir, 'tools.ts'), FIXTURE_TOOLS_TS); // exports `fixture_tool`
+  writeFileSync(join(dir, 'tools.mjs'), MJS_TOOL('compiled_tool'));
+
+  const registry = await loadSkills(home, { ctx: makeCtx() });
+  const skill = registry.byName('dual-skill');
+  assert.ok(skill?.dynamicTools, 'dynamic tools loaded');
+  assert.deepEqual(Object.keys(skill.dynamicTools), ['compiled_tool'], 'tools.mjs won over tools.ts');
+  assert.equal(registry.asTools().fixture_tool, undefined, 'the tools.ts tool did not leak in');
+});
+
+test('a compiled-only skill (tools.mjs, no tools.ts) loads its tools', async () => {
+  const { home, skillsDir } = makeWorld();
+  const dir = join(skillsDir, 'compiled-only');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'SKILL.md'),
+    skillMd('compiled-only', { category: 'testing', runtime: 'ts' }),
+  );
+  writeFileSync(join(dir, 'tools.mjs'), MJS_TOOL('only_tool'));
+
+  const registry = await loadSkills(home, { ctx: makeCtx() });
+  const tools = registry.asTools();
+  assert.ok(tools.only_tool, 'compiled tool registered under its declared name');
+  const out = (await tools.only_tool.execute!({ input: 'hi' }, EXEC_OPTS)) as {
+    echoed: string;
+    via: string;
+  };
+  assert.deepEqual(out, { echoed: 'hi', via: 'mjs' });
+});

@@ -61,28 +61,57 @@ function parseManifestYaml(file: string, defaultName: string): SkillManifestV2 |
   }
 }
 
+/**
+ * Resolve a skill's executable module, preferring the PRECOMPILED output.
+ *
+ * The shipped runtime is `node dist/…` with no tsx loader, and plain Node <22
+ * (the documented floor is >=20) throws ERR_UNKNOWN_FILE_EXTENSION on
+ * `import('tools.ts')`. That failure used to be swallowed, so every skill's
+ * real tools silently vanished for anyone on Node 20. `pnpm build` now emits a
+ * `tools.mjs` next to each `tools.ts` (scripts/build-skills.mjs), which loads on
+ * any Node. We prefer it; the raw `.ts` is only a dev/Node-22 fallback.
+ */
+export function resolveToolsModule(
+  skillDir: string,
+): { path: string; compiled: boolean } | undefined {
+  const mjs = join(skillDir, 'tools.mjs');
+  if (existsSync(mjs)) return { path: mjs, compiled: true };
+  const js = join(skillDir, 'tools.js');
+  if (existsSync(js)) return { path: js, compiled: true };
+  const ts = join(skillDir, 'tools.ts');
+  if (existsSync(ts)) return { path: ts, compiled: false };
+  return undefined;
+}
+
 async function loadDynamicTools(
-  toolsTs: string,
+  skillDir: string,
   ctx: SkillToolContext | undefined,
 ): Promise<Record<string, Tool> | undefined> {
-  if (!existsSync(toolsTs) || !ctx) return undefined;
+  if (!ctx) return undefined;
+  const resolved = resolveToolsModule(skillDir);
+  if (!resolved) return undefined;
   try {
-    const url = pathToFileURL(toolsTs).href;
+    const url = pathToFileURL(resolved.path).href;
     const mod = (await import(url)) as {
       createTools?: (ctx: SkillToolContext) => Record<string, Tool>;
     };
     if (typeof mod.createTools !== 'function') {
       ctx.logger.warn({
-        msg: 'skill tools.ts missing createTools export',
-        path: toolsTs,
+        msg: 'skill tools module missing createTools export',
+        path: resolved.path,
       });
       return undefined;
     }
     return mod.createTools(ctx);
   } catch (err) {
-    ctx?.logger.warn({
-      msg: 'skill tools.ts failed to load',
-      path: toolsTs,
+    // A raw .ts that can't load on this runtime is the classic silent failure.
+    // Make it LOUD and actionable rather than dropping the skill's tools.
+    const hint = !resolved.compiled
+      ? ' — run `pnpm build` to emit tools.mjs, or use a TypeScript-capable runtime'
+      : '';
+    ctx.logger.warn({
+      msg: `skill tools failed to load${hint}`,
+      path: resolved.path,
       err: (err as Error).message,
     });
     return undefined;
@@ -108,9 +137,10 @@ async function tryLoadDir(
     const manifest = parseSkillMd(full, skillMd);
     if (!manifest) continue;
 
-    // v2 manifest + executable tools (optional)
+    // v2 manifest + executable tools (optional). Prefer the compiled tools.mjs
+    // over raw tools.ts so executable skills work under the shipped node runtime.
     const manifestV2 = parseManifestYaml(join(full, 'manifest.yaml'), manifest.name);
-    const dynamicTools = await loadDynamicTools(join(full, 'tools.ts'), opts.ctx);
+    const dynamicTools = await loadDynamicTools(full, opts.ctx);
 
     // Generic markdown tool (always available — the agent can ALWAYS read
     // a skill's instructions even when its dynamic tools are not loaded).

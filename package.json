@@ -50,7 +50,8 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli/main.ts",
-    "build": "tsup",
+    "build": "tsup && node scripts/build-skills.mjs",
+    "build:skills": "node scripts/build-skills.mjs",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write .",
     "lint": "biome lint .",
@@ -88,6 +89,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
     "@types/node": "^22.12.0",
+    "esbuild": "^0.27.0",
     "tsup": "^8.5.0",
     "tsx": "^4.20.0",
     "typescript": "^5.7.0"

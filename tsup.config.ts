@@ -14,10 +14,13 @@
  *
  * Externalizing every runtime dep keeps the bundle thin — they're
  * resolved from node_modules at runtime, not duplicated. Skills
- * (skeleton/SKILLS/<name>/tools.ts) are NOT bundled by tsup; they're
- * dynamically imported at runtime against the agent's installed copy
- * under ~/.meridian/<agent>/SKILLS/. The skeleton dir ships with the
- * package but stays as source files.
+ * (skeleton/SKILLS/<name>/tools.ts) are NOT bundled by tsup; instead
+ * `pnpm build` runs scripts/build-skills.mjs after this to emit a
+ * `tools.mjs` next to each `tools.ts`. The loader prefers that compiled
+ * module so executable skills load under `node dist/…` on Node 20+
+ * (raw `import('tools.ts')` throws ERR_UNKNOWN_FILE_EXTENSION there).
+ * The skeleton dir ships with the package; tools.mjs is a build artifact
+ * (gitignored, regenerated at publish via prepublishOnly).
  */
 import { defineConfig } from 'tsup';
 
