@@ -2,6 +2,46 @@
 
 All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
+## [Unreleased]
+
+The "trust the first run" pass. Every fix here targets a place where the product
+did not deliver its own promise at the seam a new user or a skeptic hits first.
+
+### Security
+
+- **`web_fetch` now enforces the SSRF floor.** It previously called plain
+  `fetch()` with no `screenUrl()` and no redirect guard, so a poisoned memory
+  could steer the agent at the cloud metadata endpoint or an internal service.
+  It now routes through the same guard as `http_request` with `redirect: manual`.
+- **The VAPI webhook fails closed.** `verifyWebhook` returned true when no
+  shared secret was set, allowing unauthenticated writes into CORTEX via the
+  end-of-call transcript encode. It now rejects unless `VAPI_WEBHOOK_SECRET`
+  matches (constant-time), and the gateway warns loudly at arm time when unset.
+
+### Fixed
+
+- **Executable skills load under the shipped runtime.** The loader imported raw
+  `tools.ts`, which throws `ERR_UNKNOWN_FILE_EXTENSION` under `node dist/` on
+  Node 20 (the documented floor); the error was swallowed, so github, google,
+  wearables, and web-search lost every real tool. `pnpm build` now compiles each
+  `tools.ts` to a `tools.mjs` the loader prefers, and an unloadable raw `.ts`
+  warns instead of silently dropping tools.
+- **`meridian init` produces a runnable agent with no external infra.** Embedded
+  memory is now the default; `--cortex` or existing `NEON_DATABASE_URL` plus
+  `VOYAGE_API_KEY` select the server path.
+- **`init` and the agent picker no longer hang on non-TTY stdin** (Docker, CI,
+  piped): `init` skips the guided intake, the picker auto-selects a lone agent
+  or exits with guidance.
+- **`meridian --version` reads from package.json** instead of a hardcoded
+  1.0.1.
+- **The default ollama fallback tag matches onboarding.** It pointed at
+  `qwen2.5:14b` while docs tell users to pull `qwen2.5`, so the keyless local
+  path 404'd; it now uses `ollama/qwen2.5`.
+- **`meridian doctor` cannot hang.** Its CORTEX, VAPI, Telegram, and LLM probes
+  each carry a timeout, and the CORTEX client bounds every request.
+- **The boot panel presents the skill catalog as a roadmap** ("N planned, not
+  yet bundled") instead of implying ~79 non-existent skills are installable.
+
 ## [1.2.1] — 2026-06-14
 
 ### Fixed
