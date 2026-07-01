@@ -37,6 +37,14 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
 
 ### Fixed
 
+- **`meridian doctor` is embedded-aware.** Now that `init` defaults to embedded
+  memory, a stranger's very next command reported two false failures: the memory
+  provider probe threw "embedded requires embeddedDbPath" (doctor did not pass
+  the path the runtime uses) and the CORTEX reachability check failed even though
+  embedded agents never talk to CORTEX. Doctor now passes the same embedded JSONL
+  path main.ts/gateway use, and skips the CORTEX probes for embedded agents.
+  Verified live: a fresh embedded agent (local ollama model) now reports healthy
+  and exits 0. Found by running the real first-run flow end to end.
 - **SMS replies paginate instead of truncating.** A reply over 1500 chars was
   hard-sliced and the tail dropped silently, unlike every other channel which
   splits on boundaries. Long SMS answers now go out as multiple messages split on

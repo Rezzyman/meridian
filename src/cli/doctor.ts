@@ -156,14 +156,24 @@ export async function runDoctor(): Promise<number> {
   const agentEnvFile = existsSync(home.envPath) ? readEnvFile(home.envPath) : {};
   const cortexUrl = agentEnvFile.MERIDIAN_CORTEX_URL || process.env.MERIDIAN_CORTEX_URL;
   const cortex = bindCortex(config.cortex.agentId, cortexUrl);
-  const health = await cortex.health();
-  rows.push(
-    row(
-      'CORTEX server reachable',
-      health.status === 'ok' ? 'ok' : health.status === 'degraded' ? 'warn' : 'fail',
-      `${cortex.baseUrl} status=${health.status}`,
-    ),
-  );
+  // Embedded agents (the zero-config default from `meridian init`) keep memory
+  // in a local JSONL and never talk to CORTEX, so a "CORTEX down" reading is
+  // expected, not a failure. Skip the CORTEX probes entirely for them.
+  const embeddedMode = agentEnvFile.MERIDIAN_MEMORY_PROVIDER === 'embedded';
+  const health = embeddedMode
+    ? ({ status: 'down', database: 'disconnected' } as const)
+    : await cortex.health();
+  if (embeddedMode) {
+    rows.push(row('CORTEX server', 'skip', 'embedded memory — no CORTEX server needed'));
+  } else {
+    rows.push(
+      row(
+        'CORTEX server reachable',
+        health.status === 'ok' ? 'ok' : health.status === 'degraded' ? 'warn' : 'fail',
+        `${cortex.baseUrl} status=${health.status}`,
+      ),
+    );
+  }
 
   // 5b. Memory provider — which one will the runtime pick at boot? Tells the
   // operator at a glance whether they're on the open-source CORTEX path or
@@ -176,6 +186,9 @@ export async function runDoctor(): Promise<number> {
       env,
       router: probeRouter,
       cortex,
+      // Match the runtime: the embedded provider needs its local JSONL path, or
+      // it (correctly) refuses to construct. main.ts/gateway derive the same path.
+      embeddedDbPath: join(home.layer('MEMORY'), 'embedded.jsonl'),
       log: () => {
         // doctor is silent about its probes; we only care about the result.
       },
@@ -197,7 +210,9 @@ export async function runDoctor(): Promise<number> {
           'ok',
           selection.selected === 'quartz'
             ? 'quartz (proprietary; @aterna/quartz)'
-            : 'cortex (open-source default)',
+            : selection.selected === 'embedded'
+              ? 'embedded (local JSONL, zero-config)'
+              : 'cortex (open-source default)',
         ),
       );
     }
@@ -281,7 +296,13 @@ export async function runDoctor(): Promise<number> {
       rows.push(row('CORTEX recall live probe', 'fail', String((err as Error).message)));
     }
   } else {
-    rows.push(row('CORTEX recall live probe', 'skip', 'cortex offline'));
+    rows.push(
+      row(
+        'CORTEX recall live probe',
+        'skip',
+        embeddedMode ? 'embedded memory — CORTEX recall not used' : 'cortex offline',
+      ),
+    );
   }
 
   // 10. LLM provider chain dry-run — burn ~10 tokens to confirm the chain
