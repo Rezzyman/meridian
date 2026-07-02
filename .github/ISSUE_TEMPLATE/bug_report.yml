@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in Meridian does not work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing. For a **security vulnerability**, do NOT open a public
+        issue — follow [SECURITY.md](../blob/main/SECURITY.md) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you run, and what did you see? Paste the exact command and output.
+      placeholder: |
+        $ meridian doctor
+        ... (paste the output, redact any secrets) ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Meridian version
+      description: "`meridian --version`"
+      placeholder: "1.2.2"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version and OS
+      description: "`node --version` + your platform"
+      placeholder: "v20.19.0, macOS 14 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: dropdown
+    id: memory
+    attributes:
+      label: Memory backend
+      options:
+        - embedded (zero-config default)
+        - CORTEX server
+        - Quartz
+        - not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I redacted any keys, tokens, or personal data from the output above
+          required: true

@@ -19,8 +19,8 @@ Small, focused PRs land fastest. The tighter the scope, the faster we ship it.
 
 1. **Fork + branch.** Branch off `main`. Name the branch for what it does: `fix/repl-history-truncation`, `feat/slack-skill`, `docs/onboarding-walkthrough`.
 2. **Write the code.** Match the existing style. Run `pnpm exec biome format --write .` before committing.
-3. **Type-check.** `pnpm exec tsc --noEmit` must be clean.
-4. **Smoke the skills loader if you touched plugins.** `pnpm exec tsx scripts/smoke-skills.ts` should still register the expected tool count.
+3. **Type-check, lint, test.** `pnpm typecheck`, `pnpm lint`, and `pnpm test` must all be clean — this is the same gate CI runs across Node 20 / 22 / 24.
+4. **Build if you touched a plugin.** `pnpm build` compiles each skill's `tools.ts` to the `tools.mjs` the loader ships (so executable skills work on the Node 20 floor); it must succeed, and the loader suite in `pnpm test` covers plugin registration.
 5. **Open the PR.** In the description: what changed, why, and how you tested it.
 
 We review with three goals: it works, it doesn't break what already worked, it doesn't add complexity that doesn't earn its keep.
@@ -42,7 +42,7 @@ Plugins live under `skeleton/SKILLS/<name>/`. Copy any existing v2 plugin (`goog
 - `setup.md` — human walkthrough that the runner prints during `meridian skills setup`
 - `tools.ts` — exports `createTools(ctx)` (and optionally `setup(ctx)` for interactive walkthrough)
 
-A working plugin compiles cleanly, registers its tools at boot, and walks the operator through paste-and-validate setup without ever writing bad credentials to the vault. See `skeleton/SKILLS/web-search/tools.ts` for the smallest working example.
+A working plugin compiles cleanly, registers its tools at boot, and walks the operator through paste-and-validate setup without ever writing bad credentials to the vault. See `skeleton/SKILLS/web-search/tools.ts` for the smallest working example, and **[docs/skill-authoring.md](docs/skill-authoring.md)** for the full end-to-end walkthrough (manifest, `createTools(ctx)`, credentials, the `tools.ts` → `tools.mjs` build, install, verify).
 
 ## What we will and won't merge
 
