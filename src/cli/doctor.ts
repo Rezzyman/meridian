@@ -232,7 +232,7 @@ export async function runDoctor(): Promise<number> {
           ? 'Anthropic present'
           : env.OPENAI_API_KEY
             ? 'OpenAI present'
-            : 'no model key — get a free ROUTEXOR key at https://routexor.com, or run a local ollama model',
+            : 'no model key. ROUTEXOR (default): sign up at https://routexor.com, add your provider key in the dashboard, then create a ROUTEXOR key. Or run a local ollama model.',
     ),
   );
 

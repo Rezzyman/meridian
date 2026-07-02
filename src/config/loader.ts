@@ -93,8 +93,12 @@ CORTEX_AGENT_ID=${slug}
 MERIDIAN_MEMORY_PROVIDER=embedded
 
 # ── Model routing ──
-# Meridian's default router is ROUTEXOR (BYOK, zero markup): bring your own
-# provider keys to https://routexor.com, get ONE key, and paste it below.
+# Meridian's default router is ROUTEXOR (BYOK, zero markup). Three steps:
+#   1. sign up free at https://routexor.com
+#   2. add a provider key (Anthropic, OpenAI, ...) in the ROUTEXOR dashboard.
+#      BYOK means your provider key pays for the models; without this step,
+#      model calls fail.
+#   3. create your ROUTEXOR API key and paste it below
 # Prefer to go direct or fully local? A direct provider key, OR a local ollama
 # (no key — install https://ollama.com then \`ollama pull qwen2.5\`), also works.
 ROUTEXOR_API_KEY=
@@ -123,7 +127,10 @@ NEON_DATABASE_URL=
 VOYAGE_API_KEY=
 
 # ── Model routing (at least one required) ──
-# Default router: ROUTEXOR — BYOK, zero markup. Get a key at https://routexor.com
+# Default router: ROUTEXOR (BYOK, zero markup). 1) sign up free at
+# https://routexor.com  2) add a provider key (Anthropic, OpenAI, ...) in the
+# dashboard: your provider key pays for the models  3) create your ROUTEXOR
+# API key and paste it here:
 ROUTEXOR_API_KEY=
 # Or go direct / local instead of (or alongside) ROUTEXOR:
 GROQ_API_KEY=          # free tier, fastest inference — https://console.groq.com

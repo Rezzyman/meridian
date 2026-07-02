@@ -155,8 +155,12 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
     // Zero-config path: memory already works locally, only a model key is left.
     console.log(colors.muted(`  1. Give it a model in ${home.envPath}:`));
     console.log(
-      colors.muted('       • free ROUTEXOR key at https://routexor.com → ROUTEXOR_API_KEY (BYOK, zero markup)'),
+      colors.muted('       • ROUTEXOR (default, BYOK, zero markup): sign up free at https://routexor.com,'),
     );
+    console.log(
+      colors.muted('         add your provider key (Anthropic, OpenAI, ...) in its dashboard, then'),
+    );
+    console.log(colors.muted('         create your ROUTEXOR key → ROUTEXOR_API_KEY'));
     console.log(
       colors.muted('       • or a local model, no key: install ollama then `ollama pull qwen2.5`'),
     );
@@ -167,7 +171,10 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
   } else {
     console.log(colors.muted(`  1. Add a model key to ${home.envPath}:`));
     console.log(
-      colors.muted('       • ROUTEXOR (default — BYOK, zero markup): free key at https://routexor.com → ROUTEXOR_API_KEY'),
+      colors.muted('       • ROUTEXOR (default, BYOK, zero markup): sign up at https://routexor.com, add your'),
+    );
+    console.log(
+      colors.muted('         provider key in its dashboard, create your ROUTEXOR key → ROUTEXOR_API_KEY'),
     );
     console.log(
       colors.muted('       • or a direct provider key (ANTHROPIC/OPENAI/GROQ), or a local `ollama` model (no key)'),

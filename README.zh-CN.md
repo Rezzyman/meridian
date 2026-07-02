@@ -168,9 +168,11 @@ pnpm link --global   # 把 `meridian` 和 `mer` 暴露到 $PATH
   它带来海马体式管线、梦境整合与语义召回。
 
 **模型路由。** 为每个智能体设置一个模型密钥。默认路由器是 **[ROUTEXOR](https://routexor.com)**
-——ATERNA 的 **BYOK、零加价**模型路由：把你自己的服务商密钥带到
-[routexor.com](https://routexor.com)，拿到一把密钥，设为 `ROUTEXOR_API_KEY`（`ROUTEXOR_BASE_URL`
-可覆盖端点）。想直连或完全本地？`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GROQ_API_KEY`
+——ATERNA 的 **BYOK、零加价**模型路由。BYOK 三步：1）在 [routexor.com](https://routexor.com)
+免费注册；2）在 ROUTEXOR 控制台添加你自己的服务商密钥（Anthropic、OpenAI 等）——模型费用由
+你的服务商密钥支付，ROUTEXOR 零加价，跳过这一步模型调用会失败；3）创建你的 ROUTEXOR API
+密钥，设为 `ROUTEXOR_API_KEY`（`ROUTEXOR_BASE_URL` 可覆盖端点）。想直连或完全本地？
+`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GROQ_API_KEY`
 均可，或把 `OLLAMA_BASE_URL` 指向本地模型——无需注册、无需密钥。模型引用格式为
 `provider/model`，例如 `routexor/anthropic/claude-haiku-4.5`、`groq/llama-3.3-70b` 或 `ollama/qwen2.5`。
 
@@ -181,7 +183,8 @@ pnpm link --global   # 把 `meridian` 和 `mer` 暴露到 $PATH
 ```bash
 meridian init aria                 # 在 ~/.meridian/aria/ 搭好七层骨架
 #  → 默认零配置：本地 embedded 记忆，无需服务器。只需在 ~/.meridian/aria/.env
-#    里加一个模型密钥（免费的 ROUTEXOR 密钥，或本地 ollama 模型、无需密钥）。
+#    里加一个模型密钥（ROUTEXOR：免费注册，先在其控制台添加你自己的服务商密钥，
+#    再创建 ROUTEXOR 密钥。或本地 ollama 模型、无需密钥）。
 #    想要完整 CORTEX 服务端路径？用 meridian init aria --cortex
 #    （需要 NEON_DATABASE_URL + VOYAGE_API_KEY）。
 meridian doctor                    # 端到端校验地基

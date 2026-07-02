@@ -154,10 +154,11 @@ export class ProviderRouter {
         // endpoint if it differs from the default.
         if (!this.env.ROUTEXOR_API_KEY) {
           throw new Error(
-            'ROUTEXOR_API_KEY missing — Meridian routes models through ROUTEXOR by default ' +
-              '(BYOK, zero markup). Get a key at https://routexor.com, set ROUTEXOR_API_KEY in ' +
-              "your agent's .env, or switch your model ref to a direct provider " +
-              '(anthropic/openai/groq) or a local `ollama/...` model.',
+            'ROUTEXOR_API_KEY missing. Meridian routes models through ROUTEXOR by default ' +
+              '(BYOK, zero markup): sign up at https://routexor.com, add your provider key ' +
+              '(Anthropic, OpenAI, ...) in the dashboard, create a ROUTEXOR key, and set ' +
+              "ROUTEXOR_API_KEY in your agent's .env. Or switch your model ref to a direct " +
+              'provider (anthropic/openai/groq) or a local `ollama/...` model.',
           );
         }
         const rx = createOpenAI({
