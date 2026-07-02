@@ -119,6 +119,10 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
   each carry a timeout, and the CORTEX client bounds every request.
 - **The boot panel presents the skill catalog as a roadmap** ("N planned, not
   yet bundled") instead of implying ~79 non-existent skills are installable.
+- **`meridian deploy` gives clean errors for a bad intake.** A missing file
+  threw a raw `ENOENT`, invalid JSON a `SyntaxError`, and an invalid intake a Zod
+  blob. Each is now a one-line, actionable message — the schema failure lists
+  exactly which intake fields are missing.
 
 ## [1.2.1] — 2026-06-14
 
@@ -229,7 +233,11 @@ execution, four more channels, and ROUTEXOR as the default model router.
 
 ---
 
-## [Unreleased] — feature/world-class-parity
+## 1.2.0 development notes — feature/world-class-parity
+
+(This section documents the parity-build work that shipped as part of `1.2.0`
+above; it is kept for detail. It is not an active unreleased section — the only
+one of those is `[Unreleased]` at the top of this file.)
 
 Parity build: test suite + CI, MCP both directions, SSE streaming, bounded
 sub-agents, schema-enforced output. Full writeup in the PR.
