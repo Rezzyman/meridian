@@ -73,8 +73,8 @@ passes through untouched. Two tiers:
   like any other untrusted input.
 
 **It's measured, and the benchmark is open.** [MemPoisonBench](scripts/mempoison/)
-takes poisoning success from **100% → 0%** across 33 targeted vectors, with
-**0 false positives** on 11 legitimate memories — and the known limits are
+takes poisoning success from **100% → 0%** across 35 targeted vectors, with
+**0 false positives** on 12 legitimate memories — and the known limits are
 [documented honestly](docs/memory-poisoning.md#honest-limitations-the-roadmap),
 not hidden. Run it against us. Run it against anyone:
 
@@ -326,7 +326,7 @@ Two axes, both reproducible, both inviting you to run rivals through the same
 harness.
 
 **Security — [MemPoisonBench](scripts/mempoison/)** (`scripts/mempoison/`):
-poisoning success **100% → 0%** across 33 vectors, **0 false positives** on 11
+poisoning success **100% → 0%** across 35 vectors, **0 false positives** on 12
 legitimate memories; signed mode closes 4/4 provenance-laundering trials. Catalog
 is version-controlled; the [threat model](docs/memory-poisoning.md) documents the
 residual gaps openly.

@@ -54,6 +54,17 @@ did not deliver its own promise at the seam a new user or a skeptic hits first.
 
 ### Fixed
 
+- **`meridian demo` works from an npm install (the catalog now ships).** The
+  demo — the command the README leads with and the launch's centerpiece — reads
+  `scripts/mempoison/mempoison-attacks.json` to compute its 100%→0% headline, but
+  `scripts/` was not in the `files` allowlist, so `npx @aterna/meridian demo`
+  would have shown **0 vectors** on a real install (the benchmark falls back to
+  empty when the catalog is missing). Added `scripts/mempoison` and
+  `scripts/longmemeval` to the published files, so the demo shows the real numbers
+  and the README's "reproduce the benchmark" command runs from an install.
+  Verified end to end from the packed tarball. Also broadened the benchmark to 35
+  vectors / 12 controls by adding the comma-laundering class (see the memory
+  section); the demo count updates automatically since it reads the catalog.
 - **The hero logo now ships in the npm tarball.** `assets/meridian-logo.svg` was
   not in the `files` allowlist, and both READMEs reference it with a relative path,
   so the logo rendered on GitHub but was broken on the npmjs.com package page (a

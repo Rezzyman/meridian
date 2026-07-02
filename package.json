@@ -39,6 +39,8 @@
     "dist",
     "skeleton",
     "docs",
+    "scripts/mempoison",
+    "scripts/longmemeval",
     "assets/meridian-logo.svg",
     "README.md",
     "README.zh-CN.md",

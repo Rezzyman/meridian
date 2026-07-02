@@ -54,7 +54,7 @@
   （`automation:`、`operator:`）上的指令没有有效签名，于是会和任何其他不可信输入一样被筛查。
 
 **它是被度量过的，而且基准是开放的。** [MemPoisonBench](scripts/mempoison/)
-在 33 个针对性向量上把投毒成功率从 **100% → 0%**，在 11 条合法记忆上**零误报**——
+在 35 个针对性向量上把投毒成功率从 **100% → 0%**，在 12 条合法记忆上**零误报**——
 而已知的局限也被[诚实记录](docs/memory-poisoning.md#honest-limitations-the-roadmap)，并未隐藏。
 拿它来测我们。也拿它来测任何人：
 
@@ -270,7 +270,7 @@ meridian use openclaw-import && meridian
 两条轴线，都可复现，都欢迎你拿同一套工具去测竞品。
 
 **安全 —— [MemPoisonBench](scripts/mempoison/)**（`scripts/mempoison/`）：
-33 个向量上投毒成功率 **100% → 0%**，11 条合法记忆上**零误报**；
+35 个向量上投毒成功率 **100% → 0%**，12 条合法记忆上**零误报**；
 签名模式封堵 4/4 的来源洗白测试。攻击目录纳入版本管理；
 [威胁模型](docs/memory-poisoning.md) 公开记录了残余缺口。
 
