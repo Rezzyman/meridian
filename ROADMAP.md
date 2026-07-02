@@ -6,7 +6,7 @@ This file lives at the repo root because the OSS framework and the upcoming mana
 
 ---
 
-## Working today (`v1.0.0`)
+## Working today (`v1.2`)
 
 ### Core runtime
 
@@ -16,14 +16,14 @@ This file lives at the repo root because the OSS framework and the upcoming mana
 - **MemoryProvider seam** — CORTEX (open-source) by default; ATERNA-licensed Quartz drops in via env flag with graceful fallback
 - **Encrypted vault** (AES-256-GCM, scrypt KDF) for per-skill secrets
 - **Passphrase guards** for sensitive skills (configurable session window)
-- **Voice-channel sacred-topic gates** — regex-blocked patterns refused before the model sees them
+- **Sacred-topic gates on every channel** — regex-blocked patterns refused before the model sees them, for the public voice line and any sender not resolved to the operator (SMS/WhatsApp/Slack/Discord/Matrix/Telegram)
 - **Per-agent isolation** — dedicated Neon DB, Voyage embedding key, model key per agent
 - **Framework-enforced runtime rules** prepended to every system prompt (no tool-call theatre, no hallucinated results, no swallowed errors)
 - **DreamWeaver** in-process consolidation cycle
 - **AutomationManager** for cron-scheduled skill runs
-- **SessionStore** persisting turns to SQLite for cross-restart continuity
-- **Test suite + CI** — 191 tests over the core seams (turn loop, memory contract, vault, router, skills, verification, MCP, gateway, delegation, structured output); GitHub Actions runs typecheck + lint + test + build on every push/PR
-- **MCP client** — `CONNECTIONS/mcp.json` servers (stdio / streamable-http / sse) surface as first-class, channel-gated tools (`mcp_<server>_<tool>`); voice excluded by default; `meridian mcp list` probes
+- **SessionStore** persisting turns to a pure-JS JSONL append log for cross-restart continuity (zero native dependencies)
+- **Test suite + CI** — 587 tests over the core seams (turn loop, memory contract, vault, router, skills, verification, MCP, gateway, delegation, structured output); GitHub Actions runs typecheck + lint + test + build on every push/PR across Node 20 / 22 / 24
+- **MCP client** — `CONNECTIONS/mcp.json` servers (stdio / streamable-http / sse) surface as first-class, channel-gated tools (`mcp_<server>_<tool>`); voice excluded by default; `meridian mcp add` registers a server, `meridian mcp list` probes, `meridian mcp remove` drops one
 - **MCP server** — `meridian mcp serve` exposes CORTEX recall/stats/health over the protocol (encode opt-in via `--allow-encode`); agentId pinned server-side
 - **Bounded sub-agents** — `delegate` built-in: scoped sub-turn, structural depth limit, output-token + wall-clock caps, explicit tool grants, no memory encode by default
 - **Provider circuit breaker** — per-ref open/half-open/closed with an all-open failsafe, fed from the turn loop
@@ -31,12 +31,17 @@ This file lives at the repo root because the OSS framework and the upcoming mana
 - **Memory-poisoning defense** — recall-stage provenance screening quarantines injected directives from untrusted sources before they reach the model; scored on the open, reproducible MemPoisonBench (100%→0% poisoning success, known gaps published as the roadmap)
 - **Runtime VERIFICATION layer** — operator-authored checks run every turn; block-severity withholds the reply, warn-severity records for audit
 
-### Channels
+### Channels (9)
 
 - **CLI / REPL** — primary developer interface
-- **Telegram inbound** — bootstrap-locked to first sender or pinned chat ID
-- **VAPI voice inbound** — public phone line with passphrase unlock for privileged tools
-- **HTTP gateway** — token-auth `/chat` and `/vapi/webhook` endpoints
+- **Telegram** — bootstrap-locked to first sender or pinned chat ID
+- **Slack** — Events API with v0 HMAC signature verification and replay window
+- **Discord** — Interactions endpoint with Ed25519 verification
+- **WhatsApp** — Meta Cloud API with sha256 HMAC verification
+- **Matrix** — client-server /sync long-poll (self-hostable, behind NAT)
+- **SMS** — Twilio, with HMAC-SHA1 verification and reply pagination
+- **VAPI voice** — public phone line with passphrase unlock; the webhook fails closed without a shared secret
+- **HTTP gateway** — token-auth `/chat`, `/chat/stream` (SSE), and per-channel webhooks. One resolved operator shares one conversation across every channel.
 
 ### Skills (bundled)
 
@@ -64,7 +69,9 @@ These features are scaffolded in the codebase but require either polish, headles
 
 ### Distribution
 
-- **Compiled `dist/` for production deployments** — today the CLI runs from `src/` via `tsx`, which is fine for daily use. A real `tsup.config.ts` build pipeline is on the list for operators who want a self-contained tarball.
+- **Remote skill install** (`meridian skills add <github-url>`) — screened through the same malice gate as self-authored skills before install, so the community on-ramp does not become a supply-chain surface. (`meridian mcp add` already lands the MCP half of this.)
+
+> Shipped since this section was written: a compiled `dist/` build (`pnpm build` via `tsup` + `scripts/build-skills.mjs`) and npm publish, so `npm i -g @aterna/meridian` runs the built runtime with no `tsx` on the path.
 
 ---
 
@@ -72,10 +79,11 @@ These features are scaffolded in the codebase but require either polish, headles
 
 ### Channels
 
+(Slack, Discord, WhatsApp, Matrix, and SMS have shipped — see "Working today".)
+
 - **Web chat UI (hosted)** — Next.js component shipped as a standalone page operators can host or embed. (The single-file `skeleton/web/chat.html` ships today with live SSE streaming.)
 - **iMessage** — via a Mac relay agent or Sendblue/LoopMessage API for non-Mac operators
-- **Slack** — dedicated `slack` skill following the same pattern as `github` (bot token + per-workspace OAuth)
-- **WhatsApp Business** — once we clear Meta's API approval gate
+- **Signal** — via signal-cli for operators who want an end-to-end-encrypted channel
 
 ### Skills
 
