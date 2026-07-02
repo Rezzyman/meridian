@@ -167,8 +167,8 @@ export async function runDemo(): Promise<void> {
     line(colors.cyan('     meridian init my-agent --embedded') + colors.muted('   # local memory, no keys'));
     line(colors.cyan('     meridian') + colors.muted('                              # start chatting'));
     line();
-    line(colors.muted('  Reproduce the benchmark:  ') + colors.cyan('npx tsx scripts/mempoison/mempoisonbench.mts'));
-    line(colors.muted('  Threat model + design:    ') + colors.cyan('docs/memory-poisoning.md'));
+    line(colors.muted('  Reproduce the full benchmark (in a clone):  ') + colors.cyan('pnpm tsx scripts/mempoison/mempoisonbench.mts'));
+    line(colors.muted('  Repo + threat model:      ') + colors.cyan('github.com/Rezzyman/meridian  ·  docs/memory-poisoning.md'));
     line();
   } finally {
     rmSync(dir, { recursive: true, force: true });

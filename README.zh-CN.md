@@ -56,11 +56,14 @@
 **它是被度量过的，而且基准是开放的。** [MemPoisonBench](scripts/mempoison/)
 在 35 个针对性向量上把投毒成功率从 **100% → 0%**，在 12 条合法记忆上**零误报**——
 而已知的局限也被[诚实记录](docs/memory-poisoning.md#honest-limitations-the-roadmap)，并未隐藏。
-拿它来测我们。也拿它来测任何人：
+拿它来测我们。也拿它来测任何人（从本仓库的克隆运行）：
 
 ```bash
-npx tsx scripts/mempoison/mempoisonbench.mts
+git clone https://github.com/Rezzyman/meridian && cd meridian && pnpm install
+pnpm tsx scripts/mempoison/mempoisonbench.mts
 ```
+
+（`npx @aterna/meridian demo` 会零配置跑出 100% → 0% 的头条结论；完整目录在仓库里。）
 
 没有任何其他开源智能体框架内置这样的防御，更别说为它提供一个可复现的基准了。这就是切入点。
 
@@ -275,8 +278,9 @@ meridian use openclaw-import && meridian
 [威胁模型](docs/memory-poisoning.md) 公开记录了残余缺口。
 
 ```bash
-npx tsx scripts/mempoison/mempoisonbench.mts        # 安全基准
-npx tsx scripts/mempoison/compare-harnesses.mts     # 与其他框架的对比，仅基于公开行为
+# 从克隆运行（git clone … && pnpm install）：
+pnpm tsx scripts/mempoison/mempoisonbench.mts        # 安全基准
+pnpm tsx scripts/mempoison/compare-harnesses.mts     # 与其他框架的对比，仅基于公开行为
 ```
 
 **准确率 —— [LongMemEval 工具](scripts/longmemeval/)**（`scripts/longmemeval/`）：

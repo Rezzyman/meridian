@@ -76,11 +76,15 @@ passes through untouched. Two tiers:
 takes poisoning success from **100% → 0%** across 35 targeted vectors, with
 **0 false positives** on 12 legitimate memories — and the known limits are
 [documented honestly](docs/memory-poisoning.md#honest-limitations-the-roadmap),
-not hidden. Run it against us. Run it against anyone:
+not hidden. Run it against us. Run it against anyone (from a clone of this repo):
 
 ```bash
-npx tsx scripts/mempoison/mempoisonbench.mts
+git clone https://github.com/Rezzyman/meridian && cd meridian && pnpm install
+pnpm tsx scripts/mempoison/mempoisonbench.mts
 ```
+
+(`npx @aterna/meridian demo` runs the headline 100%→0% check with zero setup; the
+full catalog above lives in the repo.)
 
 No other open-source agent harness ships a defense like this, let alone a
 reproducible benchmark for it. That's the wedge.
@@ -332,8 +336,10 @@ is version-controlled; the [threat model](docs/memory-poisoning.md) documents th
 residual gaps openly.
 
 ```bash
-npx tsx scripts/mempoison/mempoisonbench.mts        # the security benchmark
-npx tsx scripts/mempoison/compare-harnesses.mts     # posture vs other harnesses, from published behavior only
+# from a clone (git clone … && pnpm install):
+pnpm tsx scripts/mempoison/mempoisonbench.mts        # the security benchmark
+pnpm tsx scripts/mempoison/compare-harnesses.mts     # posture vs other harnesses, from published behavior only
+pnpm tsx scripts/longmemeval/run-longmemeval.mts --dataset ./longmemeval_oracle.json   # memory accuracy (bring the dataset)
 ```
 
 **Accuracy — [LongMemEval harness](scripts/longmemeval/)** (`scripts/longmemeval/`):
