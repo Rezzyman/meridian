@@ -1,6 +1,6 @@
 {
   "name": "@aterna/meridian",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Meridian: the Agentic Operating System runtime. CORTEX-native cognitive memory, voice-native VAPI integration, 20-minute deployment.",
   "type": "module",
   "license": "MIT",
