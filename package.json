@@ -57,7 +57,7 @@
     "typecheck": "tsc --noEmit",
     "format": "biome format --write .",
     "lint": "biome lint .",
-    "test": "node --test --import tsx 'test/**/*.test.ts'",
+    "test": "node scripts/run-tests.mjs",
     "start": "node dist/cli/main.js",
     "prepublishOnly": "pnpm run build"
   },
