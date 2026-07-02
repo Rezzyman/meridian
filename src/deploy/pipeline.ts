@@ -25,8 +25,27 @@ function slugify(s: string): string {
 
 export async function runDeploy(opts: { intake: string; allowWrite?: boolean }): Promise<void> {
   const started = Date.now();
-  const json = JSON.parse(readFileSync(opts.intake, 'utf8')) as unknown;
-  const intake: Intake = IntakeSchema.parse(json);
+  // Give the three intake failure modes clean, actionable messages instead of a
+  // raw ENOENT / SyntaxError / Zod blob — this is the first thing a deploy hits.
+  if (!existsSync(opts.intake)) {
+    throw new Error(
+      `intake file not found: ${opts.intake}. Point --intake at an intake.json matching IntakeSchema.`,
+    );
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(readFileSync(opts.intake, 'utf8'));
+  } catch (err) {
+    throw new Error(`intake is not valid JSON (${opts.intake}): ${(err as Error).message}`);
+  }
+  const validated = IntakeSchema.safeParse(json);
+  if (!validated.success) {
+    const msg = validated.error.issues
+      .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('; ');
+    throw new Error(`intake failed validation: ${msg}`);
+  }
+  const intake: Intake = validated.data;
   const slug = slugify(intake.q3_agent_name);
   console.log(colors.cyan(`Deploying ${intake.q3_agent_name} (${slug}) for ${intake.q1_business_name}`));
 
