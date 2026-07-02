@@ -21,6 +21,7 @@ import type { Conversation } from '../agent/conversation.js';
 import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
 import type { AutomationManager } from '../automations/manager.js';
+import { readWaitlist, recordWaitlist } from '../hosted/waitlist.js';
 
 export interface GatewayOptions {
   port: number;
@@ -34,6 +35,10 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Opt-in `POST /waitlist` capture (a landing page's signup target). The
+   *  route exists ONLY when this is provided — a gateway must never grow an
+   *  anonymous write endpoint silently. */
+  waitlist?: { dbPath: string };
 }
 
 export async function startGateway(opts: GatewayOptions): Promise<FastifyInstance> {
@@ -72,6 +77,85 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     sessionId: opts.conversation.sessionId,
     ts: new Date().toISOString(),
   }));
+
+  // ── Waitlist capture (opt-in) ──
+  // Deliberately NO bearer: a public landing page cannot hold a secret, and
+  // gating signups behind the operator token would defeat the purpose.
+  // Compensating controls instead: opt-in registration, a per-IP rate limit,
+  // field length caps, a global cap, and duplicate answers that use the same
+  // status code as success (no membership oracle via status).
+  if (opts.waitlist) {
+    const wl = opts.waitlist;
+    const RATE_WINDOW_MS = 60_000;
+    const RATE_MAX = 10;
+    const GLOBAL_CAP = 5000;
+    const hits = new Map<string, { count: number; windowStart: number }>();
+    const allowed = (ip: string): boolean => {
+      const now = Date.now();
+      const h = hits.get(ip);
+      if (!h || now - h.windowStart >= RATE_WINDOW_MS) {
+        hits.set(ip, { count: 1, windowStart: now });
+        return true;
+      }
+      h.count += 1;
+      return h.count <= RATE_MAX;
+    };
+
+    // CORS is scoped to THIS route only (the landing page is cross-origin).
+    app.options('/waitlist', async (_req, reply) => {
+      await reply
+        .code(204)
+        .header('access-control-allow-origin', '*')
+        .header('access-control-allow-methods', 'POST, OPTIONS')
+        .header('access-control-allow-headers', 'content-type')
+        .send();
+    });
+
+    app.post<{ Body: { email?: string; plan?: string; note?: string; source?: string } }>(
+      '/waitlist',
+      async (req, reply) => {
+        reply.header('access-control-allow-origin', '*');
+        if (!allowed(req.ip)) {
+          reply.code(429);
+          return { error: 'rate limited' };
+        }
+        const { email, plan, note, source } = req.body ?? {};
+        const capped = (v: unknown): v is string | undefined =>
+          v === undefined || (typeof v === 'string' && v.length <= 200);
+        if (
+          typeof email !== 'string' ||
+          email.length > 254 ||
+          !capped(plan) ||
+          !capped(note) ||
+          !capped(source)
+        ) {
+          reply.code(400);
+          return { error: 'invalid fields' };
+        }
+        // recordWaitlist re-reads the JSONL per call (O(n) dedupe) — fine at
+        // waitlist scale, unbounded is not.
+        if (readWaitlist(wl.dbPath).length >= GLOBAL_CAP) {
+          reply.code(503);
+          return { error: 'waitlist full' };
+        }
+        try {
+          const saved = recordWaitlist(
+            { email, plan, note, source: source ?? 'gateway', ts: new Date().toISOString() },
+            wl.dbPath,
+          );
+          return { ok: true, email: saved.email };
+        } catch (err) {
+          if (/already on the waitlist/.test((err as Error).message)) {
+            // Same status code as success: the status line never confirms
+            // whether an arbitrary email was already subscribed.
+            return { ok: true, duplicate: true };
+          }
+          reply.code(400);
+          return { error: 'invalid email' };
+        }
+      },
+    );
+  }
 
   app.post<{ Body: { input: string }; Headers: { authorization?: string } }>(
     '/chat',

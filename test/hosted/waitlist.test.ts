@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { recordWaitlist, readWaitlist } from '../../scripts/hosted/waitlist.mts';
+import { recordWaitlist, readWaitlist } from '../../src/hosted/waitlist.js';
 
 function tmpDb(): { path: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'wl-'));

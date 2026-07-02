@@ -1,11 +1,8 @@
 /**
- * Hosted-lane waitlist intent capture — READY TO RUN, fully local.
- *
- * "Wire the paid lane before virality, not after." A landing page
- * ("Hosted MERIDIAN / Quartz — join the waitlist") POSTs signups here; this
- * appends them to a local JSONL. No external service, no keys, no network — it
- * is the smallest honest thing that captures intent during a launch spike so
- * the paid lane has a pipeline from day one.
+ * Hosted-lane waitlist CLI — a thin wrapper over the shared core in
+ * `src/hosted/waitlist.ts` (the module the gateway's opt-in `POST /waitlist`
+ * endpoint also uses; arm that with MERIDIAN_WAITLIST_ENDPOINT=1 when a
+ * landing page needs somewhere to POST).
  *
  *   npx tsx scripts/hosted/waitlist.mts add --email you@example.com --plan secure-memory --note "from HN"
  *   npx tsx scripts/hosted/waitlist.mts list
@@ -14,56 +11,12 @@
  * Storage: $MERIDIAN_WAITLIST (default ~/.meridian/waitlist.jsonl).
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { readWaitlist, recordWaitlist } from '../../src/hosted/waitlist.js';
 
-export interface WaitlistEntry {
-  email: string;
-  plan?: string;
-  note?: string;
-  source?: string;
-  /** ISO timestamp; injected by the caller (kept out of core for determinism). */
-  ts: string;
-}
-
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-/** Validate + append one entry. Pure given (entry, path): the caller supplies
- *  the timestamp so this is deterministic and unit-testable. Returns the
- *  normalized entry. Throws on an invalid email or a duplicate. */
-export function recordWaitlist(entry: WaitlistEntry, dbPath: string): WaitlistEntry {
-  const email = entry.email.trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) throw new Error(`invalid email: ${entry.email}`);
-  const normalized: WaitlistEntry = {
-    email,
-    plan: entry.plan?.trim() || undefined,
-    note: entry.note?.trim() || undefined,
-    source: entry.source?.trim() || undefined,
-    ts: entry.ts,
-  };
-  if (readWaitlist(dbPath).some((e) => e.email === email)) {
-    throw new Error(`already on the waitlist: ${email}`);
-  }
-  mkdirSync(dirname(dbPath), { recursive: true });
-  appendFileSync(dbPath, `${JSON.stringify(normalized)}\n`);
-  return normalized;
-}
-
-/** Read all entries; skips any corrupt line rather than throwing. */
-export function readWaitlist(dbPath: string): WaitlistEntry[] {
-  if (!existsSync(dbPath)) return [];
-  const out: WaitlistEntry[] = [];
-  for (const line of readFileSync(dbPath, 'utf8').split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      out.push(JSON.parse(line) as WaitlistEntry);
-    } catch {
-      // skip corrupt line
-    }
-  }
-  return out;
-}
+export { EMAIL_RE, readWaitlist, recordWaitlist } from '../../src/hosted/waitlist.js';
+export type { WaitlistEntry } from '../../src/hosted/waitlist.js';
 
 // ─── CLI ───────────────────────────────────────────────────────────────────
 // Guarded so importing this module (e.g. from a test) never runs the CLI.

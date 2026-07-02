@@ -49,12 +49,18 @@ this mirrors — MIT core + BSL Quartz.
 - **Memory-over-HTTP** already exists two ways: the gateway (`src/gateway/`) and
   the MCP server (`meridian mcp serve`, read-only memory tools). A hosted tier is
   these, deployed behind auth + per-tenant isolation — not new surface area.
-- **Waitlist intent capture** — `scripts/hosted/waitlist.mts`. A landing page
-  ("Hosted MERIDIAN / Quartz — join the waitlist") POSTs to it; it appends to a
-  local JSONL. No external service, no keys. Captures intent during the launch
-  spike so the paid lane has a pipeline from day one.
+- **Waitlist intent capture** — shared core in `src/hosted/waitlist.ts`, two
+  surfaces. (1) The gateway ships an opt-in `POST /waitlist` endpoint: run the
+  gateway with `MERIDIAN_WAITLIST_ENDPOINT=1` and a landing page ("Hosted
+  MERIDIAN / Quartz — join the waitlist") POSTs `{email, plan?, note?}`
+  straight to it (per-IP rate limit, length caps, global cap, route-scoped
+  CORS, duplicates answer with the same status as success). (2)
+  `scripts/hosted/waitlist.mts` is the local CLI. Both append to the same
+  local JSONL. No external service, no keys. Captures intent during the
+  launch spike so the paid lane has a pipeline from day one.
 
   ```bash
+  MERIDIAN_WAITLIST_ENDPOINT=1 meridian gateway     # arm POST /waitlist
   npx tsx scripts/hosted/waitlist.mts add --email you@example.com --plan secure-memory --note "from HN"
   npx tsx scripts/hosted/waitlist.mts list
   ```

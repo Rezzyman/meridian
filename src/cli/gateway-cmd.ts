@@ -8,6 +8,7 @@
  */
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { activeAgentSlug, ensureAgentHome, loadAgentConfig } from '../config/home.js';
@@ -539,6 +540,11 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     },
   } as unknown as Conversation;
   const port = opts.port ?? config.channels.gateway.port ?? env.MERIDIAN_GATEWAY_PORT;
+  // Opt-in waitlist capture: armed only when the operator asks for it, so a
+  // default gateway never exposes an anonymous write endpoint.
+  const waitlist = process.env.MERIDIAN_WAITLIST_ENDPOINT
+    ? { dbPath: process.env.MERIDIAN_WAITLIST ?? join(homedir(), '.meridian', 'waitlist.jsonl') }
+    : undefined;
   await startGateway({
     port,
     token: env.MERIDIAN_GATEWAY_TOKEN,
@@ -551,9 +557,13 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     sms,
     sentinel,
     automations,
+    waitlist,
   });
 
   console.log(colors.ok(`Meridian gateway live on :${port} for agent ${slug}`));
+  if (waitlist) {
+    console.log(colors.ok(`  waitlist endpoint armed (POST /waitlist → ${waitlist.dbPath})`));
+  }
   console.log(colors.muted(`  channels: ${[
     'cli (REPL)',
     env.TELEGRAM_BOT_TOKEN ? 'telegram (gated)' : null,
