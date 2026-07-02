@@ -9,7 +9,8 @@
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { activeAgentSlug, ensureAgentHome, loadAgentConfig } from '../config/home.js';
 import { loadAgentEnv } from '../config/loader.js';
@@ -58,7 +59,7 @@ function readSystemBase(home: ReturnType<typeof ensureAgentHome>, agentName: str
   return parts.join('\n\n');
 }
 
-export async function runGateway(opts: { port?: number }): Promise<void> {
+export async function runGateway(opts: { port?: number; web?: boolean }): Promise<void> {
   const slug = activeAgentSlug();
   const home = ensureAgentHome(slug);
   const config = loadAgentConfig(home);
@@ -545,6 +546,19 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
   const waitlist = process.env.MERIDIAN_WAITLIST_ENDPOINT
     ? { dbPath: process.env.MERIDIAN_WAITLIST ?? join(homedir(), '.meridian', 'waitlist.jsonl') }
     : undefined;
+  // Opt-in web chat: `meridian gateway --web` (or MERIDIAN_GATEWAY_WEB=1)
+  // serves the bundled single-file UI at / with same-origin autoconfig, making
+  // self-host web chat one command. The two-deep resolve works identically
+  // from src (dev/tsx) and dist/cli (tsup bundle) — same trick as import-cmd.
+  const web =
+    opts.web || process.env.MERIDIAN_GATEWAY_WEB
+      ? {
+          htmlPath: resolve(
+            dirname(fileURLToPath(import.meta.url)),
+            '../../skeleton/web/chat.html',
+          ),
+        }
+      : undefined;
   await startGateway({
     port,
     token: env.MERIDIAN_GATEWAY_TOKEN,
@@ -558,11 +572,15 @@ export async function runGateway(opts: { port?: number }): Promise<void> {
     sentinel,
     automations,
     waitlist,
+    web,
   });
 
   console.log(colors.ok(`Meridian gateway live on :${port} for agent ${slug}`));
   if (waitlist) {
     console.log(colors.ok(`  waitlist endpoint armed (POST /waitlist → ${waitlist.dbPath})`));
+  }
+  if (web) {
+    console.log(colors.ok(`  web chat at http://127.0.0.1:${port}/ (same-origin autoconfig)`));
   }
   console.log(colors.muted(`  channels: ${[
     'cli (REPL)',

@@ -194,7 +194,7 @@
       </div>
       <div class="config-row">
         <div style="flex:1">
-          <label for="gateway-token">Gateway Token (Bearer)</label>
+          <label for="gateway-token">Gateway Token (Bearer) — leave empty for a tokenless gateway</label>
           <input id="gateway-token" type="password" placeholder="MERIDIAN_GATEWAY_TOKEN" />
         </div>
         <button id="config-save">save</button>
@@ -229,18 +229,44 @@
       token: 'meridian.gatewayToken',
     };
 
+    // ── Config bootstrap ──
+    // Precedence: #hash params > localStorage > same-origin > localhost.
+    // Hash fragments never reach server logs or Referer headers, so a hosting
+    // flow can hand this page its config (chat.html#token=...&url=...); the
+    // fragment is persisted and stripped from the address bar immediately.
+    (function bootstrapFromHash() {
+      if (location.hash.length <= 1) return;
+      const params = new URLSearchParams(location.hash.slice(1));
+      const u = params.get('url');
+      const t = params.get('token');
+      if (u === null && t === null) return;
+      if (u) localStorage.setItem(LS.url, u.trim());
+      if (t) localStorage.setItem(LS.token, t.trim());
+      history.replaceState(null, '', location.pathname + location.search);
+    })();
+
+    // Served over http(s) with no explicit URL → this origin IS the gateway
+    // (the `meridian gateway --web` / hosted flow). file:// keeps localhost.
+    function defaultUrl() {
+      return /^https?:$/.test(location.protocol) ? location.origin : 'http://127.0.0.1:18889';
+    }
+
+    function statusLabel() {
+      if (localStorage.getItem(LS.token)) return 'configured';
+      if (!localStorage.getItem(LS.url) && /^https?:$/.test(location.protocol)) return 'same-origin';
+      return 'no token (open gateway)';
+    }
+
     function loadConfig() {
-      const url = localStorage.getItem(LS.url) || 'http://127.0.0.1:18889';
-      const token = localStorage.getItem(LS.token) || '';
-      gatewayUrlInput.value = url;
-      gatewayTokenInput.value = token;
-      sessionStatus.textContent = token ? 'configured' : 'needs token';
+      gatewayUrlInput.value = localStorage.getItem(LS.url) || defaultUrl();
+      gatewayTokenInput.value = localStorage.getItem(LS.token) || '';
+      sessionStatus.textContent = statusLabel();
     }
 
     function saveConfig() {
       localStorage.setItem(LS.url, gatewayUrlInput.value.trim());
       localStorage.setItem(LS.token, gatewayTokenInput.value.trim());
-      sessionStatus.textContent = gatewayTokenInput.value.trim() ? 'configured' : 'needs token';
+      sessionStatus.textContent = statusLabel();
       configEl.classList.add('hidden');
       addSystemMessage('Settings saved.');
     }
@@ -283,10 +309,12 @@
     // Falls back to blocking /chat if the stream endpoint is missing (older
     // gateway) or errors at the transport level.
     async function sendMessage(text) {
-      const url = (localStorage.getItem(LS.url) || '').replace(/\/$/, '');
+      const url = (localStorage.getItem(LS.url) || defaultUrl()).replace(/\/$/, '');
+      // A token is only needed when the gateway has one (server-side auth is
+      // optional) — a tokenless local gateway is a valid target.
       const token = localStorage.getItem(LS.token) || '';
-      if (!url || !token) {
-        addErrorMessage('Configure gateway URL and token in settings first.');
+      if (!url) {
+        addErrorMessage('Configure the gateway URL in settings first.');
         configEl.classList.remove('hidden');
         return;
       }
@@ -305,14 +333,17 @@
       }
     }
 
+    function authHeaders(token) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      return headers;
+    }
+
     /** Returns true if the streaming path handled the message. */
     async function sendStreaming(url, token, text) {
       const res = await fetch(url + '/chat/stream', {
         method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({ input: text }),
       });
       if (res.status === 404) return false; // older gateway — use /chat
@@ -378,10 +409,7 @@
     async function sendBlocking(url, token, text) {
       const res = await fetch(url + '/chat', {
         method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(token),
         body: JSON.stringify({ input: text }),
       });
       if (!res.ok) {
@@ -414,9 +442,11 @@
     configSave.addEventListener('click', saveConfig);
 
     loadConfig();
-    if (!localStorage.getItem(LS.token)) {
+    if (!localStorage.getItem(LS.token) && !/^https?:$/.test(location.protocol)) {
+      // file:// with no saved token: ask for config up front (old behavior).
+      // Served over http(s), same-origin autoconfig means we can just chat.
       configEl.classList.remove('hidden');
-      addSystemMessage('Welcome. Configure your gateway URL and token to start chatting.');
+      addSystemMessage('Welcome. Set your gateway URL (and token, if the gateway has one) to start chatting.');
     } else {
       addSystemMessage('Connected. Send a message to begin.');
     }

@@ -241,7 +241,8 @@ program
   .command('gateway')
   .description('Start the HTTP gateway + configured channels for the active agent')
   .option('--port <port>', 'override gateway port', (v) => parseInt(v, 10))
-  .action(async (opts: { port?: number }) => {
+  .option('--web', 'serve the bundled web chat UI at / (same-origin autoconfig)')
+  .action(async (opts: { port?: number; web?: boolean }) => {
     await runGateway(opts);
   });
 

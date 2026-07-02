@@ -9,6 +9,7 @@
  * One above OpenClaw's 18789 by design.
  */
 
+import { readFileSync } from 'node:fs';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
@@ -39,6 +40,10 @@ export interface GatewayOptions {
    *  route exists ONLY when this is provided — a gateway must never grow an
    *  anonymous write endpoint silently. */
   waitlist?: { dbPath: string };
+  /** Opt-in: serve the bundled web chat UI at GET / and /chat.html. The page
+   *  auto-configures against THIS origin, so self-host web chat needs no
+   *  manual URL/token paste. */
+  web?: { htmlPath: string };
 }
 
 export async function startGateway(opts: GatewayOptions): Promise<FastifyInstance> {
@@ -77,6 +82,23 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     sessionId: opts.conversation.sessionId,
     ts: new Date().toISOString(),
   }));
+
+  // ── Web chat (opt-in) ──
+  // Cached at boot: the file ships in the package and doesn't change at
+  // runtime. Registered only when provided; the default gateway stays
+  // API-only. Deliberately NO CSP header — the page legitimately supports
+  // pointing at a DIFFERENT gateway via its settings panel, and a
+  // connect-src 'self' policy would break that documented feature (noted in
+  // skeleton/web/README.md instead).
+  if (opts.web) {
+    const html = readFileSync(opts.web.htmlPath, 'utf8');
+    const serveChat = async (_req: unknown, reply: { header: (k: string, v: string) => unknown }) => {
+      reply.header('content-type', 'text/html; charset=utf-8');
+      return html;
+    };
+    app.get('/', serveChat);
+    app.get('/chat.html', serveChat);
+  }
 
   // ── Waitlist capture (opt-in) ──
   // Deliberately NO bearer: a public landing page cannot hold a secret, and
