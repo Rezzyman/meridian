@@ -27,8 +27,8 @@
     "node": ">=20.0.0"
   },
   "bin": {
-    "meridian": "./bin/meridian",
-    "mer": "./bin/meridian"
+    "meridian": "bin/meridian",
+    "mer": "bin/meridian"
   },
   "main": "./dist/index.js",
   "exports": {
