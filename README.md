@@ -226,7 +226,7 @@ meridian init outbound --inherits aria   # a specialist that inherits hub CONTEX
 ```
 
 **Full command surface:** `init` · `onboard` · `agents` · `use` · `demo` ·
-`doctor` · `deploy` · `audit` · `gateway` · `ingest` · `chat` · `mcp add|list|remove|serve` ·
+`doctor` · `deploy` · `audit` · `gateway` · `ingest` · `chat` · `mcp add|list|enable|disable|remove|serve` ·
 `voice passphrase|status|call` · `skills list|install|remove|setup|new`.
 
 ### CLI ⇄ messaging quick reference

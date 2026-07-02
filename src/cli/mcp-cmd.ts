@@ -184,6 +184,58 @@ export function removeMcpServer(
   return { servers: next, removed: next.length !== servers.length };
 }
 
+/**
+ * Set a server's `enabled` flag by name. Returns `{ servers, changed }` where
+ * `changed` is false if no server matched OR it was already in the target state.
+ * Pure + exported for testing.
+ */
+export function setMcpServerEnabled(
+  servers: McpServerConfig[],
+  name: string,
+  enabled: boolean,
+): { servers: McpServerConfig[]; changed: boolean; found: boolean } {
+  let found = false;
+  let changed = false;
+  const next = servers.map((s) => {
+    if (s.name !== name) return s;
+    found = true;
+    if (s.enabled === enabled) return s;
+    changed = true;
+    return { ...s, enabled };
+  });
+  return { servers: next, changed, found };
+}
+
+/** `meridian mcp enable|disable <name>` — toggle a server without losing its config. */
+export async function runMcpToggle(name: string, enabled: boolean): Promise<number> {
+  const slug = await pickAgentInteractive(process.env.MERIDIAN_AGENT);
+  const home = ensureAgentHome(slug);
+  const path = mcpConfigPath(home);
+  if (!existsSync(path)) {
+    console.log(colors.muted('No CONNECTIONS/mcp.json yet — nothing to toggle.'));
+    return 1;
+  }
+  let servers: McpServerConfig[];
+  try {
+    servers = McpConnectionsFileSchema.parse(JSON.parse(readFileSync(path, 'utf8'))).servers;
+  } catch (err) {
+    console.log(colors.err(`CONNECTIONS/mcp.json: ${(err as Error).message}`));
+    return 1;
+  }
+  const { servers: next, changed, found } = setMcpServerEnabled(servers, name, enabled);
+  if (!found) {
+    console.log(colors.err(`no MCP server named "${name}" (have: ${servers.map((s) => s.name).join(', ') || 'none'})`));
+    return 1;
+  }
+  if (!changed) {
+    console.log(colors.muted(`"${name}" is already ${enabled ? 'enabled' : 'disabled'}.`));
+    return 0;
+  }
+  writeFileSync(path, `${JSON.stringify({ servers: next }, null, 2)}\n`);
+  console.log(colors.ok(`${enabled ? 'Enabled' : 'Disabled'} MCP server "${name}".`));
+  return 0;
+}
+
 /** `meridian mcp remove <name>` — drop a server from CONNECTIONS/mcp.json. */
 export async function runMcpRemove(name: string): Promise<number> {
   const slug = await pickAgentInteractive(process.env.MERIDIAN_AGENT);

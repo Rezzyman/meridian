@@ -40,7 +40,7 @@ import { pickAgentInteractive } from './agent-picker.js';
 import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup, runSkillNew } from './skills-cmd.js';
 import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
-import { runMcpAdd, runMcpList, runMcpRemove, runMcpServe } from './mcp-cmd.js';
+import { runMcpAdd, runMcpList, runMcpRemove, runMcpServe, runMcpToggle } from './mcp-cmd.js';
 import { runDemo } from './demo-cmd.js';
 import { runImport } from './import-cmd.js';
 
@@ -186,6 +186,18 @@ mcp
   .description('Remove an MCP server from CONNECTIONS/mcp.json')
   .action(async (name: string) => {
     process.exit(await runMcpRemove(name));
+  });
+mcp
+  .command('enable <name>')
+  .description('Enable a server (its tools load) without changing its config')
+  .action(async (name: string) => {
+    process.exit(await runMcpToggle(name, true));
+  });
+mcp
+  .command('disable <name>')
+  .description('Disable a server (keeps its config, stops loading its tools)')
+  .action(async (name: string) => {
+    process.exit(await runMcpToggle(name, false));
   });
 mcp
   .command('serve')

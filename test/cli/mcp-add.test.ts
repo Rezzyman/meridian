@@ -6,7 +6,12 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildMcpServerEntry, removeMcpServer, upsertMcpServer } from '../../src/cli/mcp-cmd.js';
+import {
+  buildMcpServerEntry,
+  removeMcpServer,
+  setMcpServerEnabled,
+  upsertMcpServer,
+} from '../../src/cli/mcp-cmd.js';
 import type { McpServerConfig } from '../../src/mcp/index.js';
 
 describe('buildMcpServerEntry', () => {
@@ -108,3 +113,32 @@ describe('removeMcpServer', () => {
     assert.equal(input.length, 2);
   });
 });
+
+describe('setMcpServerEnabled', () => {
+  const a = buildMcpServerEntry({ name: 'a', command: 'x' }); // enabled: true by default
+
+  it('disables an enabled server', () => {
+    const { servers, changed, found } = setMcpServerEnabled([a] as McpServerConfig[], 'a', false);
+    assert.equal(found, true);
+    assert.equal(changed, true);
+    assert.equal(servers[0].enabled, false);
+  });
+
+  it('re-enables and reports changed=false when already in target state', () => {
+    const { changed, found } = setMcpServerEnabled([a] as McpServerConfig[], 'a', true);
+    assert.equal(found, true);
+    assert.equal(changed, false, 'already enabled → no-op');
+  });
+
+  it('reports found=false for an unknown name', () => {
+    const { found, changed } = setMcpServerEnabled([a] as McpServerConfig[], 'nope', false);
+    assert.equal(found, false);
+    assert.equal(changed, false);
+  });
+
+  it('does not mutate the input', () => {
+    const input = [a] as McpServerConfig[];
+    setMcpServerEnabled(input, 'a', false);
+    assert.equal(input[0].enabled, true, 'original untouched');
+  });
+})
