@@ -4,6 +4,77 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+Switch from Hermes in one command, honest ROUTEXOR onboarding, and a web chat
+that serves itself.
+
+### Added
+
+- **`meridian import hermes` now matches the real Hermes anatomy.** The hermes
+  profile was a clone of openclaw's filename guesses and missed every real
+  path. It now maps: `SOUL.md` → `IDENTITY/AGENT.md` (with the auto-refreshed
+  `LIVE-STATE` block stripped), `memories/USER.md` → `IDENTITY/USER.md`,
+  `memories/MEMORY.md` → `MEMORY/imported/MEMORY.md`, and copies
+  `config.yaml` + `cron/jobs.json` + `channel_directory.json` into `CONTEXT/`
+  **sanitized** (secret-shaped values redacted) for review. Python `plugins/`
+  are summarized as a generated note (they do not run in Meridian) and the
+  `skills/.hub` machine registry is excluded from the skills copy. Verified
+  against a real Hermes home in dry-run: all documents mapped, all secrets
+  surfaced by name, nothing written.
+- **Opt-in `POST /waitlist` on the gateway** — the landing-page signup target
+  the hosted-lane docs promised. Armed with `MERIDIAN_WAITLIST_ENDPOINT=1`;
+  the route does not exist otherwise. No bearer by design (a public landing
+  page cannot hold a secret); compensating controls: per-IP rate limit, field
+  length caps, a global cap, route-scoped CORS, and duplicates answering with
+  the success status code (no membership oracle). The waitlist core moved to
+  `src/hosted/waitlist.ts` so the shipped package actually contains it; the
+  `scripts/hosted/waitlist.mts` CLI wraps the same module.
+- **`meridian gateway --web`** (or `MERIDIAN_GATEWAY_WEB=1`) serves the bundled
+  web chat UI at `/` and `/chat.html` — self-host web chat in one command.
+  Opt-in; the default gateway stays API-only.
+- **chat.html same-origin autoconfig.** Served over http(s), the page targets
+  the origin it was loaded from — no URL paste. A hosting flow can hand over
+  config via the URL fragment (`#url=…&token=…`; fragments never reach server
+  logs or Referer, persisted then stripped immediately). Tokenless gateways
+  are now a valid target: the Authorization header is sent only when a token
+  exists (the old guard demanded a token even though gateway auth is optional).
+- **Keyless ROUTEXOR seam.** With an explicit `ROUTEXOR_BASE_URL` (a hosted
+  control plane's key-injecting proxy), `ROUTEXOR_API_KEY` may be blank: the
+  router sends a placeholder bearer the proxy replaces. The DEFAULT endpoint
+  still requires a real key and keeps the actionable error. `doctor` reports
+  the keyless posture as ok, and a configured-but-dead keyless endpoint as a
+  real failure.
+
+### Changed
+
+- **ROUTEXOR onboarding copy tells the whole truth.** A fresh ROUTEXOR key
+  routes nothing until you add your own provider key in the ROUTEXOR dashboard
+  (BYOK). Every place that says "get a ROUTEXOR key" — `.env` templates, init
+  next-steps, doctor guidance, the router's missing-key error, both READMEs —
+  now spells out the three steps: sign up, add a provider key, create your
+  ROUTEXOR key.
+
+### Fixed
+
+- Hermes import: the profile's wrong filename assumptions and the
+  `skills/openclaw-imports` double-copy bug.
+- `skeleton/web/README.md` claimed "no streaming" — the page has streamed via
+  `/chat/stream` since the SSE endpoint shipped. Docs caught up, including the
+  new serve-from-gateway and fragment-autoconfig sections.
+- The waitlist docstring promised a landing-page endpoint that did not exist.
+  Now it exists (see Added) and the docs describe what is actually there.
+
+### Security
+
+- **Importer secret detection closes three gaps.** Credential stores like
+  Hermes `auth.json` are flagged by NAME (pool provider names surfaced) even
+  when their shape evades the env parser; everything under a declared
+  `secrets/` dir is flagged even when its content dodges the value regex
+  (service-account PEMs contain spaces); and `sk-` value detection covers
+  hyphenated key families (`sk-or-v1-…`). Copied skill trees never carry
+  secret-named files, excluded registries, or symlinks (lstat, never follow).
+
+## [1.3.0] — 2026-07-02
+
 The "trust the first run" pass. Every fix here targets a place where the product
 did not deliver its own promise at the seam a new user or a skeptic hits first.
 
