@@ -152,7 +152,15 @@ export class ProviderRouter {
         // a local ollama all keep working for operators who prefer them. BYOK:
         // the operator supplies ROUTEXOR_API_KEY; ROUTEXOR_BASE_URL overrides the
         // endpoint if it differs from the default.
-        if (!this.env.ROUTEXOR_API_KEY) {
+        //
+        // Keyless seam: a hosted control plane may point ROUTEXOR_BASE_URL at a
+        // server-side key-injecting proxy, in which case ROUTEXOR_API_KEY may be
+        // blank. We then send a non-empty placeholder bearer (the AI SDK refuses
+        // an empty key and would otherwise fall back to OPENAI_API_KEY — the
+        // WRONG credential); the proxy replaces it. The DEFAULT endpoint still
+        // requires a real key and keeps the actionable error below.
+        const customBase = !!this.env.ROUTEXOR_BASE_URL;
+        if (!this.env.ROUTEXOR_API_KEY && !customBase) {
           throw new Error(
             'ROUTEXOR_API_KEY missing. Meridian routes models through ROUTEXOR by default ' +
               '(BYOK, zero markup): sign up at https://routexor.com, add your provider key ' +
@@ -162,7 +170,7 @@ export class ProviderRouter {
           );
         }
         const rx = createOpenAI({
-          apiKey: this.env.ROUTEXOR_API_KEY,
+          apiKey: this.env.ROUTEXOR_API_KEY || 'meridian-keyless',
           baseURL: this.env.ROUTEXOR_BASE_URL ?? 'https://api.routexor.com/v1',
           name: 'routexor',
         });

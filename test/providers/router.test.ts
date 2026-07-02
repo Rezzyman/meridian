@@ -56,6 +56,23 @@ describe('ProviderRouter.resolve', () => {
     assert.ok(router.resolve('routexor/some-model').model);
   });
 
+  it('keyless proxy seam: resolves routexor with NO key when ROUTEXOR_BASE_URL is set', () => {
+    // A hosted control plane points agents at a server-side key-injecting
+    // proxy. The blank key must not throw here, and must not fall through to
+    // OPENAI_API_KEY (the placeholder bearer prevents the AI SDK's fallback).
+    const router = new ProviderRouter(makeEnv({ ROUTEXOR_BASE_URL: 'https://proxy.internal/v1' }));
+    const resolved = router.resolve('routexor/claude-4-haiku');
+    assert.equal(resolved.provider, 'routexor');
+    assert.ok(resolved.model, 'model constructed with the placeholder bearer');
+  });
+
+  it('keyless seam does not weaken the default path (no key, no base URL → same actionable error)', () => {
+    const router = new ProviderRouter(makeEnv());
+    assert.throws(() => router.resolve('routexor/claude-4-haiku'), /ROUTEXOR_API_KEY/);
+    assert.throws(() => router.resolve('routexor/claude-4-haiku'), /routexor\.com/);
+    assert.throws(() => router.resolve('routexor/claude-4-haiku'), /dashboard/);
+  });
+
   it('throws naming the env var when the provider key is missing', () => {
     // Default makeEnv has none of the LLM provider keys set.
     const router = new ProviderRouter(makeEnv());

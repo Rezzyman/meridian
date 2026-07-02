@@ -222,17 +222,24 @@ export async function runDoctor(): Promise<number> {
 
   // 6. Provider keys (just check presence; doctor doesn't burn tokens)
   const env = readEnvFile(home.envPath);
+  // A custom ROUTEXOR_BASE_URL with no key is the keyless-proxy posture
+  // (a hosted control plane injects the real key server-side) — valid, not a warn.
+  const keylessRoutexor = !!env.ROUTEXOR_BASE_URL && !env.ROUTEXOR_API_KEY;
   rows.push(
     row(
       'Provider keys',
-      env.ROUTEXOR_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY ? 'ok' : 'warn',
+      env.ROUTEXOR_API_KEY || keylessRoutexor || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY
+        ? 'ok'
+        : 'warn',
       env.ROUTEXOR_API_KEY
         ? 'ROUTEXOR present (default router)'
-        : env.ANTHROPIC_API_KEY
-          ? 'Anthropic present'
-          : env.OPENAI_API_KEY
-            ? 'OpenAI present'
-            : 'no model key. ROUTEXOR (default): sign up at https://routexor.com, add your provider key in the dashboard, then create a ROUTEXOR key. Or run a local ollama model.',
+        : keylessRoutexor
+          ? 'keyless ROUTEXOR endpoint (custom ROUTEXOR_BASE_URL, keys injected server-side)'
+          : env.ANTHROPIC_API_KEY
+            ? 'Anthropic present'
+            : env.OPENAI_API_KEY
+              ? 'OpenAI present'
+              : 'no model key. ROUTEXOR (default): sign up at https://routexor.com, add your provider key in the dashboard, then create a ROUTEXOR key. Or run a local ollama model.',
     ),
   );
 
@@ -362,6 +369,8 @@ export async function runDoctor(): Promise<number> {
       if (!replied) {
         const hasCloudKey = !!(
           agentEnv.ROUTEXOR_API_KEY ||
+          // keyless proxy posture: a configured endpoint that fails IS a real failure
+          agentEnv.ROUTEXOR_BASE_URL ||
           agentEnv.ANTHROPIC_API_KEY ||
           agentEnv.OPENAI_API_KEY ||
           agentEnv.GROQ_API_KEY
