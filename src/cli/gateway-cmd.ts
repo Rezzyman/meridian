@@ -35,6 +35,7 @@ import { resolveOperator, operatorSessionId } from '../agent/operator.js';
 import { SessionStore } from '../session/store.js';
 import { ProactiveSentinel } from '../proactive/sentinel.js';
 import { AutomationManager } from '../automations/manager.js';
+import { armHeartbeat } from '../heartbeat/scheduler.js';
 import { watchInbox } from '../ingest/file-ingest.js';
 import { mkdirSync } from 'node:fs';
 import type { ChannelKind } from '../agent/operator.js';
@@ -505,6 +506,43 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     for (const d of autoDefs) {
       console.log(colors.muted(`  • ${d.name}  ${d.schedule}`));
     }
+  }
+
+  // ── Heartbeat — periodic self-check turn, migrated from Hermes/OpenClaw ──
+  // Same lifecycle pattern as the sentinel + automations above: constructed
+  // only when config.heartbeat.enabled, started after the channels are up,
+  // stop() available alongside sentinel.stop()/automations.stop(). Each beat
+  // flows through the SAME operator-keyed turn() machinery as every channel
+  // (like the HTTP /chat facade below), so a beat is a real, session-persisted
+  // conversation turn — not a dangling timer. Interval (`every: '30m'`) and
+  // activeHours come from config.heartbeat; the scheduler translates the
+  // interval via intervalToCron and skips beats outside the active window.
+  const heartbeatConvoFacade = {
+    sessionId: 'gateway-heartbeat',
+    historyCount: 0,
+    send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) => {
+      const reply = await turn('gateway', 'heartbeat', text, sendOpts);
+      return {
+        id: `t_${Date.now().toString(36)}`,
+        sessionId: 'gateway-heartbeat',
+        role: 'assistant' as const,
+        content: reply,
+        channel: 'gateway' as const,
+        ts: new Date().toISOString(),
+      };
+    },
+  } as unknown as Conversation;
+  const heartbeat = armHeartbeat({
+    conversation: heartbeatConvoFacade,
+    heartbeat: config.heartbeat,
+    logger,
+  });
+  if (heartbeat) {
+    console.log(
+      colors.ok(
+        `heartbeat armed: every ${config.heartbeat.every} (active ${config.heartbeat.activeHours.start}–${config.heartbeat.activeHours.end})`,
+      ),
+    );
   }
 
 
