@@ -16,3 +16,11 @@ Pull from CORTEX (last 7 days) and compose a tight retrospective:
 4. **One observation** — a pattern you noticed in the operator's week
 
 Under 14 lines. Be honest about drift. Cite memory ids.
+
+## Silence contract
+
+If — after doing the work above — there is nothing that warrants the operator's
+attention, or a required tool is unavailable, begin your reply with `[SILENT]`
+followed by a one-line internal note. The runtime will log and remember it but
+will NOT push anything to the operator. Never push narration, intentions, or
+"nothing to report" messages.

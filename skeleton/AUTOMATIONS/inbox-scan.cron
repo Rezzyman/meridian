@@ -34,3 +34,11 @@ Maximum 5 items. If you have more than 5, pick the 5 highest-leverage and add
 
 If the `gmail_search` tool is unavailable, encode a memory naming the missing
 capability and stop. Do not invent results.
+
+## Silence contract
+
+If — after doing the work above — there is nothing that warrants the operator's
+attention, or a required tool is unavailable, begin your reply with `[SILENT]`
+followed by a one-line internal note. The runtime will log and remember it but
+will NOT push anything to the operator. Never push narration, intentions, or
+"nothing to report" messages.

@@ -15,3 +15,11 @@ Pull from CORTEX (last 35 days) and compose a client-by-client status:
 - Flag any open invoice or payment issue
 
 Group by client name. Cite memory ids. Keep each client to 2-3 lines.
+
+## Silence contract
+
+If — after doing the work above — there is nothing that warrants the operator's
+attention, or a required tool is unavailable, begin your reply with `[SILENT]`
+followed by a one-line internal note. The runtime will log and remember it but
+will NOT push anything to the operator. Never push narration, intentions, or
+"nothing to report" messages.

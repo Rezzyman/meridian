@@ -15,3 +15,11 @@ Pull from CORTEX recall (the last 21 days) and surface:
 3. **Decisions that drifted** — anything they decided that has not been acted on. Flag honestly.
 
 Keep it under 8 lines. If recall is thin, say so cleanly. No filler.
+
+## Silence contract
+
+If — after doing the work above — there is nothing that warrants the operator's
+attention, or a required tool is unavailable, begin your reply with `[SILENT]`
+followed by a one-line internal note. The runtime will log and remember it but
+will NOT push anything to the operator. Never push narration, intentions, or
+"nothing to report" messages.

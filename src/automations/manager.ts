@@ -110,6 +110,21 @@ export function loadAutomationDefs(home: MeridianHome): AutomationDef[] {
   return out;
 }
 
+/**
+ * [SILENT] contract: automation prompts routinely say "only push when it
+ * matters" — this is the runtime half of that promise. A reply opening with
+ * [SILENT] (or a run whose whole provider chain failed) is logged + encoded
+ * but never pushed to the operator. Matches the Hermes fleet's suppression
+ * idiom, so imported prompts keep their semantics.
+ */
+export function automationRunIsSilent(reply: string, defName: string): boolean {
+  return /^\s*\[SILENT\]/i.test(reply) || reply.startsWith(`(${defName} produced no output`);
+}
+
+export function stripSilentMarker(reply: string): string {
+  return reply.replace(/^\s*\[SILENT\]\s*/i, '') || '(silent run, no content)';
+}
+
 export class AutomationManager {
   private tasks: ScheduledTask[] = [];
   private lastRuns = new Map<string, AutomationRunResult>();
@@ -228,9 +243,15 @@ export class AutomationManager {
       reply = `(${def.name} produced no output — provider chain exhausted)`;
     }
 
-    // Push to operator channel if configured.
+    const silent = automationRunIsSilent(reply, def.name);
+    if (silent) {
+      reply = stripSilentMarker(reply);
+      this.opts.logger.info({ msg: 'automation ran silent — push suppressed', name });
+    }
+
+    // Push to operator channel if configured (and the run was not silent).
     const pushed: string[] = [];
-    if (def.pushTo === 'telegram') {
+    if (!silent && def.pushTo === 'telegram') {
       const tg = this.opts.channels.get('telegram');
       if (tg?.send && op?.channels.telegram[0]) {
         try {
