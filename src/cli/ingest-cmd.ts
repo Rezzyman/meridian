@@ -8,17 +8,34 @@
 
 import { existsSync, statSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { activeAgentSlug, ensureAgentHome } from '../config/home.js';
+import { activeAgentSlug, ensureAgentHome, loadAgentConfig } from '../config/home.js';
 import { loadAgentEnv } from '../config/loader.js';
 import { bindCortex } from '../cortex/bind.js';
-import { ingestFile } from '../ingest/file-ingest.js';
+import { ingestFile, type IngestOptions } from '../ingest/file-ingest.js';
+import { ProviderRouter } from '../providers/router.js';
+import { analyzeImage } from '../vision/analyze.js';
 import { colors } from '../utils/truecolor.js';
 
 export async function runIngest(path: string): Promise<void> {
   const slug = activeAgentSlug();
   const home = ensureAgentHome(slug);
+  const config = loadAgentConfig(home);
   const env = loadAgentEnv(home);
   const cortex = bindCortex(env.CORTEX_AGENT_ID, env.MERIDIAN_CORTEX_URL);
+  const router = new ProviderRouter(env);
+
+  // Vision + PDF caps from config.yaml — images get real analysis when
+  // vision.enabled; PDFs respect maxPages/maxBytesMb.
+  const ingestOpts: IngestOptions = {
+    vision: {
+      enabled: config.vision.enabled,
+      analyze: config.vision.enabled
+        ? (p: string) =>
+            analyzeImage(p, { router, models: config.models, vision: config.vision })
+        : undefined,
+    },
+    pdf: { maxPages: config.pdf.maxPages, maxBytesMb: config.pdf.maxBytesMb },
+  };
 
   const abs = resolve(path);
   if (!existsSync(abs)) {
@@ -46,7 +63,7 @@ export async function runIngest(path: string): Promise<void> {
   for (const t of targets) {
     process.stdout.write(`  ${colors.muted('·')} ${t} ... `);
     try {
-      const r = await ingestFile(cortex, t);
+      const r = await ingestFile(cortex, t, ingestOpts);
       const memCites =
         r.memoryIds.length > 3
           ? `${r.memoryIds.slice(0, 3).map((i) => `#${i}`).join(', ')} +${r.memoryIds.length - 3}`
@@ -55,6 +72,9 @@ export async function runIngest(path: string): Promise<void> {
         colors.ok('ok') +
           colors.muted(`  ${r.type}, ${r.chunks} chunks → ${memCites} (${r.durationMs}ms)`),
       );
+      for (const w of r.warnings ?? []) {
+        console.log(`    ${colors.warn(`warning: ${w}`)}`);
+      }
     } catch (err) {
       console.log(colors.err(`failed: ${(err as Error).message}`));
     }

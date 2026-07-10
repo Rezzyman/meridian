@@ -172,5 +172,6 @@ test('resume: a role:tool turn poisons history — next send() rejects (current 
   const conv = makeConversation({ resume });
   assert.equal(conv.historyCount, 3); // it loads fine; the failure is at send time
 
-  await assert.rejects(conv.send('continue'), /All providers failed/);
+  // RULE ZERO: the surfaced message is the client-safe generic, not raw provider detail.
+  await assert.rejects(conv.send('continue'), /Quick hiccup on my end/);
 });

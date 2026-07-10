@@ -7,17 +7,48 @@
  *   adapter writes the lock back to .env on disk).
  * - Untrusted chat_ids get a polite refusal and never reach the conversation
  *   loop. Their messages are not encoded into CORTEX.
+ *
+ * Inbound images (photos + image documents) are downloaded to the agent's
+ * media dir, run through the vision runtime (operator's custom prompt), and
+ * fed to the turn as the caption plus a CLEARLY MARKED analysis block. Trust
+ * gating is identical to text — media from an untrusted chat never touches
+ * disk or the model.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, extname, join } from 'node:path';
 import { Bot } from 'grammy';
 import type { ChannelAdapter, ChannelStartOptions } from './types.js';
 import type { Logger } from 'pino';
+import { sanitizeOutbound } from '../safety/error-firewall.js';
+
+/** Vision hook wired by the gateway; absent = vision disabled. */
+export interface TelegramVisionDeps {
+  /** Analyze a downloaded image file (the gateway closes this over the
+   *  agent's router + vision config, including the operator prompt). */
+  analyze: (path: string, caption?: string) => Promise<{ description: string; model: string }>;
+}
+
+/** Structural slice of the grammy context the media handler needs — kept
+ *  minimal so tests can drive it without a live Bot. */
+export interface TelegramMediaContext {
+  chat: { id: number | string };
+  from?: { username?: string };
+  message: {
+    caption?: string;
+    photo?: Array<{ file_id: string; file_size?: number }>;
+    document?: { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
+  };
+  getFile(): Promise<{ file_unique_id: string; file_size?: number; file_path?: string }>;
+  reply(text: string): Promise<unknown>;
+  replyWithChatAction(action: 'typing'): Promise<unknown>;
+}
 
 export class TelegramChannel implements ChannelAdapter {
   readonly name = 'telegram';
   private bot: Bot | null = null;
   private trustedChatId: string | null;
+  private fetchFile: (url: string) => Promise<Buffer>;
 
   constructor(
     private opts: {
@@ -28,9 +59,24 @@ export class TelegramChannel implements ChannelAdapter {
        *  Defaults to "this agent" when not provided. */
       agentName?: string;
       logger: Logger;
+      /** Where inbound media lands (MEMORY/media). No dir = media disabled. */
+      mediaDir?: string;
+      /** Inbound media size cap in bytes (default 25 MB). */
+      maxMediaBytes?: number;
+      /** Vision runtime hook; absent = images are saved + noted, not analyzed. */
+      vision?: TelegramVisionDeps;
+      /** Injectable downloader (tests). Defaults to fetch(). */
+      fetchFile?: (url: string) => Promise<Buffer>;
     },
   ) {
     this.trustedChatId = opts.defaultChatId?.trim() || null;
+    this.fetchFile =
+      opts.fetchFile ??
+      (async (url: string) => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`file download failed: HTTP ${res.status}`);
+        return Buffer.from(await res.arrayBuffer());
+      });
   }
 
   async start(_c: unknown, opts: ChannelStartOptions): Promise<void> {
@@ -46,37 +92,14 @@ export class TelegramChannel implements ChannelAdapter {
     });
 
     this.bot.on('message:text', async (ctx) => {
+      if (!this.gateTrusted(String(ctx.chat.id), ctx.from?.username, (t) => ctx.reply(t))) return;
       const fromChatId = String(ctx.chat.id);
-
-      // Bootstrap: first sender becomes trusted.
-      if (this.trustedChatId === null) {
-        this.trustedChatId = fromChatId;
-        this.persistTrustedChatId(fromChatId);
-        this.opts.logger.info({ msg: 'telegram trusted chat locked', chatId: fromChatId });
-      }
-
-      // Reject anyone who isn't the trusted chat.
-      if (fromChatId !== this.trustedChatId) {
-        await ctx.reply(
-          'I do not recognize this chat. This agent only responds to its trusted operator.',
-        );
-        this.opts.logger.warn({
-          msg: 'telegram rejected untrusted chat',
-          fromChatId,
-          username: ctx.from?.username,
-        });
-        return;
-      }
 
       // Typing indicator: Telegram's "typing" lasts ~5s, refresh it every 4s
       // until the turn completes. Gives the operator visual feedback that the
       // agent is actively thinking (CORTEX recall + LLM stream + encode can
       // take 30-90s).
-      await ctx.replyWithChatAction('typing').catch(() => {});
-      let stillThinking = true;
-      const typingHeartbeat = setInterval(() => {
-        if (stillThinking) ctx.replyWithChatAction('typing').catch(() => {});
-      }, 4000);
+      const stopTyping = this.startTyping(ctx);
 
       try {
         const reply = await opts.onInbound({
@@ -85,17 +108,26 @@ export class TelegramChannel implements ChannelAdapter {
           text: ctx.message.text,
           meta: { username: ctx.from?.username, trusted: true },
         });
-        stillThinking = false;
-        clearInterval(typingHeartbeat);
-        for (const chunk of splitForTelegram(reply)) {
+        stopTyping();
+        // Last-mile RULE ZERO net (defense-in-depth; turn.ts already sanitizes,
+        // but a non-turn onInbound or future caller is covered here too).
+        for (const chunk of splitForTelegram(sanitizeOutbound(reply))) {
           await ctx.reply(chunk);
         }
       } catch (err) {
-        stillThinking = false;
-        clearInterval(typingHeartbeat);
+        stopTyping();
         this.opts.logger.error({ msg: 'telegram inbound error', err });
         await ctx.reply('Something went wrong on my end. I have logged it.');
       }
+    });
+
+    // Inbound media: photos, and documents that are images. Same trust lock
+    // as text; the handler downloads, analyzes, and feeds the turn.
+    this.bot.on('message:photo', async (ctx) => {
+      await this.handleMediaMessage(ctx as unknown as TelegramMediaContext, opts.onInbound);
+    });
+    this.bot.on('message:document', async (ctx) => {
+      await this.handleMediaMessage(ctx as unknown as TelegramMediaContext, opts.onInbound);
     });
 
     this.bot.catch((err) => this.opts.logger.error({ msg: 'telegram error', err }));
@@ -108,6 +140,118 @@ export class TelegramChannel implements ChannelAdapter {
     });
   }
 
+  /**
+   * Inbound photo / image-document handler. Public so tests can drive it with
+   * a structural mock context — no live Bot required.
+   */
+  async handleMediaMessage(
+    ctx: TelegramMediaContext,
+    onInbound: ChannelStartOptions['onInbound'],
+  ): Promise<void> {
+    const fromChatId = String(ctx.chat.id);
+    if (!this.gateTrusted(fromChatId, ctx.from?.username, (t) => ctx.reply(t))) return;
+
+    const doc = ctx.message.document;
+    const isPhoto = (ctx.message.photo?.length ?? 0) > 0;
+    const isImageDoc = !!doc?.mime_type?.startsWith('image/');
+    if (!isPhoto && !isImageDoc) {
+      if (doc) {
+        await ctx.reply(
+          'I can only view images over chat right now. For documents, drop the file in my ingest inbox or run `meridian ingest <path>`.',
+        );
+      }
+      return;
+    }
+    if (!this.opts.mediaDir) {
+      await ctx.reply('I received the image, but media handling is not configured on this agent.');
+      return;
+    }
+
+    const maxBytes = this.opts.maxMediaBytes ?? 25 * 1024 * 1024;
+    const declaredSize = doc?.file_size ?? ctx.message.photo?.at(-1)?.file_size;
+    if (declaredSize && declaredSize > maxBytes) {
+      await ctx.reply(
+        `That image is too large for me to process (limit ${Math.floor(maxBytes / (1024 * 1024))} MB).`,
+      );
+      return;
+    }
+
+    const stopTyping = this.startTyping(ctx);
+    try {
+      // grammy's ctx.getFile() resolves the message's media (largest photo size).
+      const file = await ctx.getFile();
+      if (!file.file_path) throw new Error('telegram returned no file_path');
+      if (file.file_size && file.file_size > maxBytes) {
+        stopTyping();
+        await ctx.reply(
+          `That image is too large for me to process (limit ${Math.floor(maxBytes / (1024 * 1024))} MB).`,
+        );
+        return;
+      }
+      const data = await this.fetchFile(
+        `https://api.telegram.org/file/bot${this.opts.token}/${file.file_path}`,
+      );
+      if (data.byteLength > maxBytes) {
+        stopTyping();
+        await ctx.reply(
+          `That image is too large for me to process (limit ${Math.floor(maxBytes / (1024 * 1024))} MB).`,
+        );
+        return;
+      }
+      mkdirSync(this.opts.mediaDir, { recursive: true });
+      const ext = extname(doc?.file_name ?? basename(file.file_path)) || '.jpg';
+      const filename = `tg-${Date.now().toString(36)}-${file.file_unique_id}${ext}`;
+      const savedPath = join(this.opts.mediaDir, filename);
+      writeFileSync(savedPath, data);
+
+      const caption = ctx.message.caption?.trim() || '';
+
+      // Vision pass — the operator's custom prompt lives inside `analyze`
+      // (wired by the gateway from config.vision). Failure falls back to a
+      // path note; the sanitized error message is safe to show.
+      let analysisBlock: string;
+      if (this.opts.vision) {
+        try {
+          const a = await this.opts.vision.analyze(savedPath, caption || undefined);
+          analysisBlock =
+            `[Attached image "${filename}" — automated vision analysis via ${a.model}; ` +
+            `this description was generated by a model, not written by the sender]\n${a.description}`;
+        } catch (err) {
+          this.opts.logger.warn({ msg: 'telegram image analysis failed', err });
+          analysisBlock = `[Attached image "${filename}" saved to ${savedPath} — vision analysis failed, so no description is available]`;
+        }
+      } else {
+        analysisBlock = `[Attached image "${filename}" saved to ${savedPath} — vision analysis is disabled on this agent]`;
+      }
+
+      const turnText = [
+        caption || '(The user sent an image with no caption.)',
+        '',
+        analysisBlock,
+      ].join('\n');
+
+      const reply = await onInbound({
+        channel: 'telegram',
+        from: fromChatId,
+        text: turnText,
+        meta: {
+          username: ctx.from?.username,
+          trusted: true,
+          media: { path: savedPath, kind: isPhoto ? 'photo' : 'document-image' },
+        },
+      });
+      stopTyping();
+      // Same last-mile RULE ZERO net as the text path.
+      for (const chunk of splitForTelegram(sanitizeOutbound(reply))) {
+        await ctx.reply(chunk);
+      }
+    } catch (err) {
+      stopTyping();
+      this.opts.logger.error({ msg: 'telegram media inbound error', err });
+      await ctx.reply('I could not process that image. I have logged the issue.');
+    }
+  }
+
   async stop(): Promise<void> {
     await this.bot?.stop();
     this.bot = null;
@@ -118,6 +262,48 @@ export class TelegramChannel implements ChannelAdapter {
     for (const chunk of splitForTelegram(msg.text)) {
       await this.bot.api.sendMessage(msg.to, chunk);
     }
+  }
+
+  /**
+   * Shared trust lock for text AND media. Bootstrap: the first sender becomes
+   * trusted (persisted to .env); everyone else gets a refusal and never
+   * reaches the conversation loop.
+   */
+  private gateTrusted(
+    fromChatId: string,
+    username: string | undefined,
+    reply: (text: string) => Promise<unknown>,
+  ): boolean {
+    if (this.trustedChatId === null) {
+      this.trustedChatId = fromChatId;
+      this.persistTrustedChatId(fromChatId);
+      this.opts.logger.info({ msg: 'telegram trusted chat locked', chatId: fromChatId });
+    }
+    if (fromChatId !== this.trustedChatId) {
+      void reply(
+        'I do not recognize this chat. This agent only responds to its trusted operator.',
+      ).catch(() => {});
+      this.opts.logger.warn({
+        msg: 'telegram rejected untrusted chat',
+        fromChatId,
+        username,
+      });
+      return false;
+    }
+    return true;
+  }
+
+  /** Refreshing typing indicator; returns a stop function. */
+  private startTyping(ctx: { replyWithChatAction(action: 'typing'): Promise<unknown> }): () => void {
+    void ctx.replyWithChatAction('typing').catch(() => {});
+    let alive = true;
+    const heartbeat = setInterval(() => {
+      if (alive) void ctx.replyWithChatAction('typing').catch(() => {});
+    }, 4000);
+    return () => {
+      alive = false;
+      clearInterval(heartbeat);
+    };
   }
 
   private persistTrustedChatId(chatId: string): void {

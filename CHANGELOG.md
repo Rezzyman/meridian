@@ -9,6 +9,60 @@ that serves itself.
 
 ### Added
 
+- **Vision.** Meridian can finally see. New `vision` config block (`enabled`,
+  optional pinned `model`, operator-custom analysis `prompt`, `maxBytes`,
+  `timeoutSeconds`) drives a provider-routed multimodal pipeline
+  (`src/vision/analyze.ts`) with the same fallback-chain + circuit-breaker
+  semantics as text turns and the error firewall on every failure path. Wired
+  everywhere an image can arrive: a new `image_analyze` builtin tool (never on
+  voice), Telegram photo/document-image inbound (trust-lock preserved; media
+  from untrusted chats never touches disk), and file ingest — images now
+  encode a real model-written description instead of a "saw an image" stub.
+  An operator rubric (e.g. a roofing damage-assessment protocol) rides in
+  `vision.prompt` and applies automatically on every path.
+- **PDF ingestion caps** (`pdf.maxPages` default 50, `pdf.maxBytesMb` default
+  32, optional `pdf.model`): oversize PDFs are rejected with a clear report
+  line and pages past the cap are skipped with a logged warning — no silent
+  truncation. OpenClaw parity.
+- **`meridian import hermes` carries the operational substance, not just
+  identity.** `state.db` is now read (read-only; `node:sqlite` when available,
+  a zero-dep pure-JS SQLite reader otherwise) — memory-like tables land in
+  `MEMORY/imported/` sanitized, sessions become a summary doc (raw JSONL only
+  with `--sessions`). `cron/jobs.json` translates into real AUTOMATIONS
+  entries (enabled state + agent-local timezone honored — `AutomationManager`
+  now respects both). Model pinning translates into the models chain
+  (`openrouter/anthropic/*` mapped to `routexor/*` with a verify warning).
+  `channel_directory.json` sets `channels.telegram.defaultChatId` and writes a
+  full binding inventory. `credential_pool` multi-key structure (counts,
+  priorities, oauth vs api_key, expiry) is surfaced by name, and `--systemd`
+  (default on) surfaces env var NAMES from the agent's gateway unit drop-ins —
+  the file that actually holds the live keys on a real Hermes box.
+- **`meridian import openclaw` reaches parity.** `openclaw.json` translates:
+  models chain, Telegram channel (bot token surfaced by name), MCP servers →
+  `CONNECTIONS/mcp.json` with secret-shaped env stripped by name (stripped
+  servers import disabled), the vision prompt is preserved, and heartbeat-style
+  `main` agents become a disabled automation suggestion.
+- **Heartbeat is real.** The `heartbeat` config block was validated but never
+  started; `armHeartbeat` now wires it into gateway boot beside the sentinel
+  and automations. A beat is a genuine conversation turn (tool surface, memory
+  recall, session persistence), gated by `activeHours` in agent-local time.
+- **Opt-in `POST /ingest` on the gateway** — the upload seam for external
+  portals (a client dashboard POSTing survey PDFs). Armed only by a DEDICATED
+  `MERIDIAN_INGEST_TOKEN` bearer so a portal never holds the operator gateway
+  token. Documents land atomically (tmp+rename) in `MEMORY/inbox/` for the
+  existing watcher; filenames are traversal-proofed; 48 MB cap.
+
+### Security
+
+- **RULE ZERO egress firewall** (`src/safety/error-firewall.ts`, ported from
+  the Hermes fleet hardening): `ProviderChainError.message` is client-safe by
+  construction with raw chain detail preserved on `internalDetail` for
+  operator logs; leak-signal screening + internal-disclosure redaction
+  (providers, runtimes, server paths, MCP/tool identifiers, team handles) on
+  every outbound Telegram reply as a last-mile net. The gateway's last two raw
+  error surfaces (`/chat/stream` error frames, `/vapi/call` failures) now pass
+  through `sanitizeUserFacingError`, full detail to the operator log only.
+
 - **`meridian import hermes` now matches the real Hermes anatomy.** The hermes
   profile was a clone of openclaw's filename guesses and missed every real
   path. It now maps: `SOUL.md` → `IDENTITY/AGENT.md` (with the auto-refreshed

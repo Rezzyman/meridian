@@ -122,7 +122,9 @@ describe('delegate happy path', () => {
       unknown
     >;
     assert.equal(res.ok, false);
-    assert.match(String(res.error), /All providers failed/);
+    // RULE ZERO: the delegate surfaces the client-safe generic, never raw provider text.
+    assert.match(String(res.error), /Quick hiccup on my end/);
+    assert.doesNotMatch(String(res.error), /provider dead/);
     assert.equal(res.depth, 1);
   });
 });

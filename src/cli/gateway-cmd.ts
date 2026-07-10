@@ -35,7 +35,9 @@ import { resolveOperator, operatorSessionId } from '../agent/operator.js';
 import { SessionStore } from '../session/store.js';
 import { ProactiveSentinel } from '../proactive/sentinel.js';
 import { AutomationManager } from '../automations/manager.js';
+import { armHeartbeat } from '../heartbeat/scheduler.js';
 import { watchInbox } from '../ingest/file-ingest.js';
+import { analyzeImage } from '../vision/analyze.js';
 import { mkdirSync } from 'node:fs';
 import type { ChannelKind } from '../agent/operator.js';
 import type { MeridianTurn } from '../agent/types.js';
@@ -276,6 +278,19 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // Channel registry — ProactiveSentinel uses this to push briefs.
   const channelMap = new Map<string, ChannelAdapter>();
 
+  // ── Vision hook — one closure shared by Telegram media + the inbox ingest ──
+  // Carries the operator's custom analysis prompt (config.vision.prompt) and
+  // the resolved vision model chain. undefined when vision is disabled.
+  const visionAnalyze = config.vision.enabled
+    ? (path: string) =>
+        analyzeImage(path, {
+          router,
+          models: config.models,
+          vision: config.vision,
+          logger,
+        })
+    : undefined;
+
   // ── Telegram channel — trusted chat ID, full sensitivity ──
   // Constructed first so VapiChannel can reach it for end-of-call handoffs.
   let telegram: TelegramChannel | undefined;
@@ -285,6 +300,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       defaultChatId: env.TELEGRAM_DEFAULT_CHAT_ID,
       envPath: home.envPath,
       logger,
+      mediaDir: join(home.layer('MEMORY'), 'media'),
+      maxMediaBytes: config.vision.maxBytes,
+      vision: visionAnalyze ? { analyze: visionAnalyze } : undefined,
     });
     await telegram.start(undefined, {
       onInbound: async (m) => turn('telegram', m.from, m.text),
@@ -507,6 +525,43 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     }
   }
 
+  // ── Heartbeat — periodic self-check turn, migrated from Hermes/OpenClaw ──
+  // Same lifecycle pattern as the sentinel + automations above: constructed
+  // only when config.heartbeat.enabled, started after the channels are up,
+  // stop() available alongside sentinel.stop()/automations.stop(). Each beat
+  // flows through the SAME operator-keyed turn() machinery as every channel
+  // (like the HTTP /chat facade below), so a beat is a real, session-persisted
+  // conversation turn — not a dangling timer. Interval (`every: '30m'`) and
+  // activeHours come from config.heartbeat; the scheduler translates the
+  // interval via intervalToCron and skips beats outside the active window.
+  const heartbeatConvoFacade = {
+    sessionId: 'gateway-heartbeat',
+    historyCount: 0,
+    send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) => {
+      const reply = await turn('gateway', 'heartbeat', text, sendOpts);
+      return {
+        id: `t_${Date.now().toString(36)}`,
+        sessionId: 'gateway-heartbeat',
+        role: 'assistant' as const,
+        content: reply,
+        channel: 'gateway' as const,
+        ts: new Date().toISOString(),
+      };
+    },
+  } as unknown as Conversation;
+  const heartbeat = armHeartbeat({
+    conversation: heartbeatConvoFacade,
+    heartbeat: config.heartbeat,
+    logger,
+  });
+  if (heartbeat) {
+    console.log(
+      colors.ok(
+        `heartbeat armed: every ${config.heartbeat.every} (active ${config.heartbeat.activeHours.start}–${config.heartbeat.activeHours.end})`,
+      ),
+    );
+  }
+
 
   // ── Inbox watcher — drop a file in MEMORY/inbox/ and the agent ingests it ──
   // Multimodal capability: PDFs, markdown, text, image stubs all flow into
@@ -518,7 +573,11 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   } catch {
     /* dir exists */
   }
-  void watchInbox(cortex, inbox, { logger });
+  void watchInbox(cortex, inbox, {
+    logger,
+    vision: { enabled: config.vision.enabled, analyze: visionAnalyze },
+    pdf: { maxPages: config.pdf.maxPages, maxBytesMb: config.pdf.maxBytesMb },
+  });
   console.log(colors.ok(`inbox watcher armed at ${inbox}`));
 
   // Gateway HTTP server (used by VAPI webhook + chat API).
@@ -559,6 +618,13 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
           ),
         }
       : undefined;
+  // Opt-in document ingest: armed only by a DEDICATED token so an upload
+  // portal never holds the operator gateway token. Reuses the same inbox the
+  // watcher already tails, so an HTTP upload and a local file drop are the
+  // same pipeline.
+  const ingest = process.env.MERIDIAN_INGEST_TOKEN
+    ? { inboxDir: inbox, token: process.env.MERIDIAN_INGEST_TOKEN }
+    : undefined;
   await startGateway({
     port,
     token: env.MERIDIAN_GATEWAY_TOKEN,
@@ -573,11 +639,15 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     automations,
     waitlist,
     web,
+    ingest,
   });
 
   console.log(colors.ok(`Meridian gateway live on :${port} for agent ${slug}`));
   if (waitlist) {
     console.log(colors.ok(`  waitlist endpoint armed (POST /waitlist → ${waitlist.dbPath})`));
+  }
+  if (ingest) {
+    console.log(colors.ok(`  ingest endpoint armed (POST /ingest → ${ingest.inboxDir})`));
   }
   if (web) {
     console.log(colors.ok(`  web chat at http://127.0.0.1:${port}/ (same-origin autoconfig)`));

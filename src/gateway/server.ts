@@ -10,6 +10,9 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { basename, join } from 'node:path';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
@@ -23,6 +26,7 @@ import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
 import type { AutomationManager } from '../automations/manager.js';
 import { readWaitlist, recordWaitlist } from '../hosted/waitlist.js';
+import { sanitizeUserFacingError } from '../safety/error-firewall.js';
 
 export interface GatewayOptions {
   port: number;
@@ -44,6 +48,12 @@ export interface GatewayOptions {
    *  auto-configures against THIS origin, so self-host web chat needs no
    *  manual URL/token paste. */
   web?: { htmlPath: string };
+  /** Opt-in `POST /ingest`: accept a document and drop it into the agent's
+   *  MEMORY/inbox for the ingest watcher. Built for external upload portals
+   *  (a client dashboard POSTing survey PDFs) that must not hold the operator
+   *  gateway token — `token` here is a DEDICATED ingest credential. The route
+   *  exists only when this is provided, and never without a token. */
+  ingest?: { inboxDir: string; token: string };
 }
 
 export async function startGateway(opts: GatewayOptions): Promise<FastifyInstance> {
@@ -179,6 +189,56 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     );
   }
 
+  // ── Document ingest (opt-in) ──
+  // The public upload seam for external portals: a token-gated POST that drops
+  // the document into MEMORY/inbox and lets the ingest watcher do the rest.
+  // The bearer is a DEDICATED ingest token — a portal never holds the operator
+  // gateway token, so leaking it exposes uploads, not chat. Files land via
+  // tmp+rename so the watcher can never observe a half-written document.
+  if (opts.ingest) {
+    const ing = opts.ingest;
+    const MAX_INGEST_BYTES = 48 * 1024 * 1024; // 32 MB binary survives base64 inflation
+    app.post<{
+      Body: { filename?: string; content?: string; encoding?: 'utf8' | 'base64' };
+      Headers: { authorization?: string };
+    }>('/ingest', { bodyLimit: 64 * 1024 * 1024 }, async (req, reply) => {
+      const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (got !== ing.token) {
+        reply.code(401);
+        return { error: 'unauthorized' };
+      }
+      const { filename, content, encoding } = req.body ?? {};
+      if (!filename || typeof filename !== 'string' || !content || typeof content !== 'string') {
+        reply.code(400);
+        return { error: 'filename and content required' };
+      }
+      // basename() + charset allowlist: an upload names a file, never a path.
+      const safeName = basename(filename).replace(/[^\w.\- ]+/g, '_').slice(0, 140);
+      if (!safeName || safeName.startsWith('.')) {
+        reply.code(400);
+        return { error: 'invalid filename' };
+      }
+      const buf = Buffer.from(content, encoding === 'base64' ? 'base64' : 'utf8');
+      if (buf.byteLength === 0 || buf.byteLength > MAX_INGEST_BYTES) {
+        reply.code(413);
+        return { error: `content must be 1 byte to ${MAX_INGEST_BYTES} bytes` };
+      }
+      const stored = `${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
+      try {
+        await mkdir(ing.inboxDir, { recursive: true });
+        const tmp = join(ing.inboxDir, `.${stored}.part`);
+        await writeFile(tmp, buf);
+        await rename(tmp, join(ing.inboxDir, stored));
+      } catch (err) {
+        opts.logger.error({ msg: 'ingest write failed', err });
+        reply.code(500);
+        return { error: 'ingest failed' };
+      }
+      opts.logger.info({ msg: 'document ingested', file: stored, bytes: buf.byteLength });
+      return { ok: true, file: stored, bytes: buf.byteLength };
+    });
+  }
+
   app.post<{ Body: { input: string }; Headers: { authorization?: string } }>(
     '/chat',
     async (req, reply) => {
@@ -248,7 +308,10 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
         });
         emit('done', { reply: turn.content, turnId: turn.id, ts: turn.ts });
       } catch (err) {
-        emit('error', { error: (err as Error).message });
+        // RULE ZERO: the SSE consumer may render this to an end user. Full
+        // detail goes to the operator log; the wire gets the safe surface.
+        opts.logger.error({ msg: 'stream turn failed', err });
+        emit('error', { error: sanitizeUserFacingError((err as Error).message) });
       }
       reply.raw.end();
     },
@@ -410,8 +473,11 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       const result = await opts.vapi.placeOutboundCall(req.body);
       return result;
     } catch (err) {
+      // Token-gated, but responses get pasted into tickets and client chats.
+      // Log the raw failure; answer with the leak-screened version.
+      opts.logger.error({ msg: 'outbound call failed', err });
       reply.code(500);
-      return { error: (err as Error).message };
+      return { error: sanitizeUserFacingError((err as Error).message) };
     }
   });
 

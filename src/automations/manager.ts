@@ -31,6 +31,9 @@ const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
 export interface AutomationDef {
   name: string;
   schedule: string;          // cron expression
+  /** IANA tz the schedule fires in (imported jobs keep their source agent's
+   *  local tz); absent = process TZ / America/Chicago. */
+  timezone?: string;
   mode: 'direct' | 'draft';  // direct = push immediately; draft = save + tag for approval
   requiresApproval: boolean;
   pushTo?: 'telegram' | 'none';
@@ -87,12 +90,16 @@ export function loadAutomationDefs(home: MeridianHome): AutomationDef[] {
     }
     const name = String(meta.name ?? entry.replace(/\.(cron|yaml|md)$/, ''));
     if (RESERVED_NAMES.has(name)) continue;
+    // `enabled: false` parks a job without deleting it (imported-but-disabled
+    // schedules land this way and must never fire until flipped on).
+    if (meta.enabled === false) continue;
     const schedule = typeof meta.schedule === 'string' ? meta.schedule : null;
     if (!schedule) continue;
     const body = text.slice(m[0].length).trim();
     out.push({
       name,
       schedule,
+      ...(typeof meta.timezone === 'string' ? { timezone: meta.timezone } : {}),
       mode: meta.mode === 'direct' ? 'direct' : 'draft',
       requiresApproval: meta.requiresApproval !== false,
       pushTo: meta.pushTo === 'none' ? 'none' : 'telegram',
@@ -120,7 +127,7 @@ export class AutomationManager {
             this.opts.logger.error({ msg: 'automation failed', name: def.name, err }),
           );
         },
-        { timezone: process.env.TZ ?? 'America/Chicago' },
+        { timezone: def.timezone ?? process.env.TZ ?? 'America/Chicago' },
       );
       this.tasks.push(task);
       this.opts.logger.info({

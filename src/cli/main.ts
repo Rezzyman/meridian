@@ -264,10 +264,20 @@ program
   .option('--cortex', 'use the full CORTEX backend instead of zero-config embedded memory')
   .option('--overwrite', 'overwrite an existing agent home of the same slug')
   .option('--dry-run', 'preview the import without writing anything')
+  .option('--sessions', 'also copy raw session transcripts (JSONL) — they can run 50-160MB')
+  .option('--no-systemd', 'skip scanning systemd units for the source home\'s env var names')
   .action(
     async (
       source: string,
-      opts: { from?: string; slug?: string; cortex?: boolean; overwrite?: boolean; dryRun?: boolean },
+      opts: {
+        from?: string;
+        slug?: string;
+        cortex?: boolean;
+        overwrite?: boolean;
+        dryRun?: boolean;
+        sessions?: boolean;
+        systemd?: boolean;
+      },
     ) => {
       await runImport(source, opts);
     },
