@@ -298,6 +298,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     telegram = new TelegramChannel({
       token: env.TELEGRAM_BOT_TOKEN,
       defaultChatId: env.TELEGRAM_DEFAULT_CHAT_ID,
+      allowedChatIds: config.channels.telegram.allowedChatIds,
       envPath: home.envPath,
       logger,
       mediaDir: join(home.layer('MEMORY'), 'media'),

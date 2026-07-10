@@ -150,6 +150,10 @@ export const ChannelConfigSchema = z.object({
     .object({
       enabled: z.boolean().default(false),
       defaultChatId: z.string().optional(),
+      /** Additional trusted chat ids (DMs and groups) beyond defaultChatId.
+       *  A migrated agent often serves several chats — operator DM, client DM,
+       *  a team group. Empty + no defaultChatId = bootstrap-lock first sender. */
+      allowedChatIds: z.array(z.string()).default([]),
     })
     .default({ enabled: false }),
   slack: z
@@ -629,7 +633,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
   },
   channels: {
     cli: { enabled: true },
-    telegram: { enabled: false },
+    telegram: { enabled: false, allowedChatIds: [] },
     slack: { enabled: false, allowedChannels: [] },
     discord: { enabled: false },
     whatsapp: { enabled: false, allowedNumbers: [] },

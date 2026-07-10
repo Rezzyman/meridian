@@ -32,7 +32,8 @@ interface Harness {
 function makeChannel(opts: {
   vision?: TelegramVisionDeps | 'default';
   maxMediaBytes?: number;
-  defaultChatId?: string;
+  defaultChatId?: string | null;
+  allowedChatIds?: string[];
   mediaDir?: string | null;
 } = {}): Harness {
   const mediaDir =
@@ -50,7 +51,8 @@ function makeChannel(opts: {
       : opts.vision;
   const channel = new TelegramChannel({
     token: 'tg-test-token',
-    defaultChatId: opts.defaultChatId ?? '42',
+    defaultChatId: opts.defaultChatId === null ? undefined : (opts.defaultChatId ?? '42'),
+    allowedChatIds: opts.allowedChatIds,
     logger: silent,
     mediaDir,
     maxMediaBytes: opts.maxMediaBytes,
@@ -227,5 +229,44 @@ describe('telegram media — caps and non-images', () => {
     await run(h, ctx);
     assert.equal(h.inbound.length, 0);
     assert.ok(replies[0].includes('only view images'));
+  });
+});
+
+describe('telegram multi-chat trust', () => {
+  it('accepts every chat in allowedChatIds, not just defaultChatId', async () => {
+    const h = makeChannel({ vision: 'default', allowedChatIds: ['777', '-100888'] });
+    for (const chatId of ['42', '777', '-100888']) {
+      const { ctx } = photoCtx({ chatId });
+      await run(h, ctx);
+    }
+    assert.equal(h.inbound.length, 3, 'operator DM, client DM, and group all reach the turn');
+  });
+
+  it('refuses a chat outside the trusted set and never runs the turn', async () => {
+    const h = makeChannel({ vision: 'default', allowedChatIds: ['777'] });
+    const { ctx, replies } = photoCtx({ chatId: '999' });
+    await run(h, ctx);
+    assert.equal(h.inbound.length, 0);
+    assert.ok(replies.some((r) => /do not recognize this chat/.test(r)));
+  });
+
+  it('configured chats disable the bootstrap lock — a stranger cannot claim trust', async () => {
+    const h = makeChannel({ vision: 'default', defaultChatId: null, allowedChatIds: ['777'] });
+    const stranger = photoCtx({ chatId: '999' });
+    await run(h, stranger.ctx);
+    assert.equal(h.inbound.length, 0, 'stranger refused even though defaultChatId is unset');
+    const trusted = photoCtx({ chatId: '777' });
+    await run(h, trusted.ctx);
+    assert.equal(h.inbound.length, 1);
+  });
+
+  it('bootstrap still locks the first sender when nothing is configured', async () => {
+    const h = makeChannel({ vision: 'default', defaultChatId: null });
+    const first = photoCtx({ chatId: '555' });
+    await run(h, first.ctx);
+    assert.equal(h.inbound.length, 1, 'first sender locks and is served');
+    const second = photoCtx({ chatId: '999' });
+    await run(h, second.ctx);
+    assert.equal(h.inbound.length, 1, 'later stranger refused');
   });
 });

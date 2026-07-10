@@ -47,13 +47,15 @@ export interface TelegramMediaContext {
 export class TelegramChannel implements ChannelAdapter {
   readonly name = 'telegram';
   private bot: Bot | null = null;
-  private trustedChatId: string | null;
+  private trustedChatIds: Set<string>;
   private fetchFile: (url: string) => Promise<Buffer>;
 
   constructor(
     private opts: {
       token: string;
       defaultChatId?: string;
+      /** Additional trusted chats (client DMs, team groups) beyond defaultChatId. */
+      allowedChatIds?: string[];
       envPath?: string; // ~/.meridian/<agent>/.env, used to persist the bootstrap lock
       /** Display name the agent introduces itself with on first message.
        *  Defaults to "this agent" when not provided. */
@@ -69,7 +71,11 @@ export class TelegramChannel implements ChannelAdapter {
       fetchFile?: (url: string) => Promise<Buffer>;
     },
   ) {
-    this.trustedChatId = opts.defaultChatId?.trim() || null;
+    this.trustedChatIds = new Set(
+      [opts.defaultChatId, ...(opts.allowedChatIds ?? [])]
+        .map((id) => id?.trim())
+        .filter((id): id is string => !!id),
+    );
     this.fetchFile =
       opts.fetchFile ??
       (async (url: string) => {
@@ -85,7 +91,7 @@ export class TelegramChannel implements ChannelAdapter {
     const greeting = this.opts.agentName ?? 'this agent';
     this.bot.command('start', (ctx) => {
       ctx.reply(
-        this.trustedChatId === null
+        this.trustedChatIds.size === 0
           ? `${greeting} here. You are the first to message on Meridian. Locking your chat as trusted.`
           : `${greeting} here.`,
       );
@@ -136,7 +142,10 @@ export class TelegramChannel implements ChannelAdapter {
     });
     this.opts.logger.info({
       msg: 'telegram channel started',
-      trustedChatId: this.trustedChatId ?? '(awaiting first sender to lock)',
+      trustedChatIds:
+        this.trustedChatIds.size > 0
+          ? [...this.trustedChatIds].join(',')
+          : '(awaiting first sender to lock)',
     });
   }
 
@@ -265,21 +274,23 @@ export class TelegramChannel implements ChannelAdapter {
   }
 
   /**
-   * Shared trust lock for text AND media. Bootstrap: the first sender becomes
-   * trusted (persisted to .env); everyone else gets a refusal and never
-   * reaches the conversation loop.
+   * Shared trust lock for text AND media. Trusted = defaultChatId plus every
+   * configured allowedChatIds entry (a migrated agent often serves an operator
+   * DM, client DMs, and a team group). Bootstrap: with NO configured chats, the
+   * first sender becomes trusted (persisted to .env); everyone else gets a
+   * refusal and never reaches the conversation loop.
    */
   private gateTrusted(
     fromChatId: string,
     username: string | undefined,
     reply: (text: string) => Promise<unknown>,
   ): boolean {
-    if (this.trustedChatId === null) {
-      this.trustedChatId = fromChatId;
+    if (this.trustedChatIds.size === 0) {
+      this.trustedChatIds.add(fromChatId);
       this.persistTrustedChatId(fromChatId);
       this.opts.logger.info({ msg: 'telegram trusted chat locked', chatId: fromChatId });
     }
-    if (fromChatId !== this.trustedChatId) {
+    if (!this.trustedChatIds.has(fromChatId)) {
       void reply(
         'I do not recognize this chat. This agent only responds to its trusted operator.',
       ).catch(() => {});
