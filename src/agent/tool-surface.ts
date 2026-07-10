@@ -92,6 +92,16 @@ export async function buildToolSurface(inputs: ToolSurfaceInputs): Promise<ToolS
           getParentTools: () => assembled,
         }
       : undefined,
+    // image_analyze — registered whenever a router exists; vision.enabled is
+    // re-checked at call time so a disabled agent refuses cleanly.
+    vision: inputs.router
+      ? {
+          router: inputs.router,
+          config,
+          logger,
+          mediaDir: join(home.layer('MEMORY'), 'media'),
+        }
+      : undefined,
   });
 
   // Skills v2: open the encrypted vault, build a SkillToolContext, and let
