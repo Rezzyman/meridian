@@ -565,15 +565,17 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
 
   // ── Inbox watcher — drop a file in MEMORY/inbox/ and the agent ingests it ──
   // Multimodal capability: PDFs, markdown, text, image stubs all flow into
-  // CORTEX automatically. After ingest the file is renamed to .processed
-  // so re-runs don't double-encode.
+  // memory automatically. After ingest the file is renamed to .processed
+  // so re-runs don't double-encode. Encodes through the SELECTED memory
+  // provider (not raw CortexBind) — on an embedded-memory agent the raw bind
+  // has no server and every chunk would silently vanish.
   const inbox = join(home.layer('MEMORY'), 'inbox');
   try {
     mkdirSync(inbox, { recursive: true });
   } catch {
     /* dir exists */
   }
-  void watchInbox(cortex, inbox, {
+  void watchInbox(memorySelection.provider, inbox, {
     logger,
     vision: { enabled: config.vision.enabled, analyze: visionAnalyze },
     pdf: { maxPages: config.pdf.maxPages, maxBytesMb: config.pdf.maxBytesMb },

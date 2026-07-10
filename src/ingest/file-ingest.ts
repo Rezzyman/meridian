@@ -282,7 +282,8 @@ export function watchInbox(
   const pending = new Map<string, NodeJS.Timeout>();
   const watcher = watch(dir, { persistent: false }, (_event, filename) => {
     if (!filename) return;
-    if (filename.endsWith('.processed') || filename.startsWith('.')) return;
+    if (filename.endsWith('.processed') || filename.endsWith('.failed') || filename.startsWith('.'))
+      return;
     const existing = pending.get(filename);
     if (existing) clearTimeout(existing);
     const t = setTimeout(async () => {
@@ -296,15 +297,29 @@ export function watchInbox(
           vision: opts.vision,
           pdf: opts.pdf,
         });
+        const { renameSync } = await import('node:fs');
+        if (result.chunks > 0 && result.memoryIds.length === 0) {
+          // Every chunk failed to encode — that is a LOST document, not a
+          // processed one. Park it as .failed so the operator can see it and
+          // a fixed backend can re-ingest by stripping the suffix.
+          opts.logger?.warn({
+            msg: 'inbox ingest stored nothing — marked .failed',
+            file: filename,
+            type: result.type,
+            chunks: result.chunks,
+          });
+          renameSync(path, `${path}.failed`);
+          return;
+        }
         opts.logger?.info({
           msg: 'inbox ingested',
           file: filename,
           type: result.type,
           chunks: result.chunks,
+          stored: result.memoryIds.length,
           ...(result.warnings?.length ? { warnings: result.warnings } : {}),
         });
         // Rename to .processed so re-runs skip it.
-        const { renameSync } = await import('node:fs');
         renameSync(path, `${path}.processed`);
       } catch (err) {
         opts.logger?.warn({ msg: 'inbox ingest failed', err, path });

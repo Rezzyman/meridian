@@ -11,6 +11,7 @@ import { join, resolve } from 'node:path';
 import { activeAgentSlug, ensureAgentHome, loadAgentConfig } from '../config/home.js';
 import { loadAgentEnv } from '../config/loader.js';
 import { bindCortex } from '../cortex/bind.js';
+import { createMemoryProvider } from '../memory/index.js';
 import { ingestFile, type IngestOptions } from '../ingest/file-ingest.js';
 import { ProviderRouter } from '../providers/router.js';
 import { analyzeImage } from '../vision/analyze.js';
@@ -23,6 +24,15 @@ export async function runIngest(path: string): Promise<void> {
   const env = loadAgentEnv(home);
   const cortex = bindCortex(env.CORTEX_AGENT_ID, env.MERIDIAN_CORTEX_URL);
   const router = new ProviderRouter(env);
+  // Encode through the SELECTED provider — an embedded-memory agent has no
+  // CORTEX server, and raw CortexBind would drop every chunk on the floor.
+  const memorySelection = await createMemoryProvider({
+    env,
+    router,
+    cortex,
+    embeddedDbPath: join(home.layer('MEMORY'), 'embedded.jsonl'),
+    log: () => {},
+  });
 
   // Vision + PDF caps from config.yaml — images get real analysis when
   // vision.enabled; PDFs respect maxPages/maxBytesMb.
@@ -63,7 +73,7 @@ export async function runIngest(path: string): Promise<void> {
   for (const t of targets) {
     process.stdout.write(`  ${colors.muted('·')} ${t} ... `);
     try {
-      const r = await ingestFile(cortex, t, ingestOpts);
+      const r = await ingestFile(memorySelection.provider, t, ingestOpts);
       const memCites =
         r.memoryIds.length > 3
           ? `${r.memoryIds.slice(0, 3).map((i) => `#${i}`).join(', ')} +${r.memoryIds.length - 3}`

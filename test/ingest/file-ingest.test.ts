@@ -6,11 +6,11 @@
  * fixtures checked in.
  */
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { ingestFile } from '../../src/ingest/file-ingest.js';
+import { ingestFile, watchInbox } from '../../src/ingest/file-ingest.js';
 import { mockCortex, silentLogger } from '../helpers/fixtures.js';
 
 function tmpDir(): string {
@@ -156,5 +156,40 @@ describe('pdf caps', () => {
     const r = await ingestFile(cortex, pdf, { logger: silentLogger, pdf: { maxPages: 50 } });
     assert.equal(r.warnings, undefined);
     assert.ok(cortex.encodeCalls[0].content.includes('Only page here'));
+  });
+});
+
+describe('inbox watcher failure semantics', () => {
+  it('marks a document .failed (not .processed) when every chunk fails to encode', async () => {
+    const dir = tmpDir();
+    const dead = mockCortex();
+    dead.encode = async () => {
+      throw new Error('no backend');
+    };
+    const stop = watchInbox(dead, dir, { logger: silentLogger, debounceMs: 50 });
+    writeFileSync(join(dir, 'doc.md'), '# survey\n\nreal content that must not vanish');
+    // Watcher debounce (50ms) + async ingest; poll for the rename.
+    for (let i = 0; i < 100; i += 1) {
+      await new Promise((r) => setTimeout(r, 50));
+      if (readdirSync(dir).some((f) => f.endsWith('.failed') || f.endsWith('.processed'))) break;
+    }
+    stop();
+    const files = readdirSync(dir);
+    assert.ok(files.includes('doc.md.failed'), `expected doc.md.failed, got: ${files.join(',')}`);
+    assert.ok(!files.includes('doc.md.processed'), 'a lost document must never look processed');
+  });
+
+  it('marks a document .processed when chunks store, and records the count', async () => {
+    const dir = tmpDir();
+    const cortex = mockCortex();
+    const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50 });
+    writeFileSync(join(dir, 'ok.md'), '# note\n\ncontent that stores fine');
+    for (let i = 0; i < 100; i += 1) {
+      await new Promise((r) => setTimeout(r, 50));
+      if (readdirSync(dir).some((f) => f.endsWith('.processed'))) break;
+    }
+    stop();
+    assert.ok(readdirSync(dir).includes('ok.md.processed'));
+    assert.ok(cortex.encodeCalls.length > 0);
   });
 });
