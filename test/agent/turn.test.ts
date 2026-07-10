@@ -10,6 +10,7 @@ import { tool, type LanguageModelV1, type LanguageModelV1StreamPart, type ToolSe
 import { MockLanguageModelV1, simulateReadableStream } from 'ai/test';
 import { z } from 'zod';
 import { runTurn, type TurnContext } from '../../src/agent/turn.js';
+import { ProviderChainError } from '../../src/safety/error-firewall.js';
 import {
   failingModel,
   makeConfig,
@@ -227,9 +228,19 @@ describe('runTurn provider fallback', () => {
     assert.equal(res.trace.model, 'anthropic/mock-1');
   });
 
-  it('rejects with All providers failed carrying per-provider detail', async () => {
+  it('rejects with a client-safe message; per-provider detail stays on internalDetail', async () => {
     const ctx = makeCtx({ router: mockRouter(failingModel('a'), failingModel('b')) });
-    await assert.rejects(() => runTurn(ctx, 'hi'), /All providers failed.*mock-0.*mock-1/s);
+    await assert.rejects(
+      () => runTurn(ctx, 'hi'),
+      (err: unknown) => {
+        assert.ok(err instanceof ProviderChainError);
+        // RULE ZERO: the message a channel would print must not name providers.
+        assert.doesNotMatch(err.message, /mock-0|mock-1|anthropic/);
+        // The full chain detail survives for operator logs and debugging.
+        assert.match(err.internalDetail, /mock-0.*mock-1/s);
+        return true;
+      },
+    );
   });
 });
 
