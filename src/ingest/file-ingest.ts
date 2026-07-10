@@ -18,7 +18,7 @@
  * landed where.
  */
 
-import { existsSync, readFileSync, statSync, watch } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, watch } from 'node:fs';
 import { extname, basename, resolve } from 'node:path';
 import type { Logger } from 'pino';
 import type { MemoryProvider } from '../memory/provider.js';
@@ -280,8 +280,7 @@ export function watchInbox(
   if (!existsSync(dir)) return () => {};
   const debounce = opts.debounceMs ?? 1500;
   const pending = new Map<string, NodeJS.Timeout>();
-  const watcher = watch(dir, { persistent: false }, (_event, filename) => {
-    if (!filename) return;
+  const enqueue = (filename: string): void => {
     if (filename.endsWith('.processed') || filename.endsWith('.failed') || filename.startsWith('.'))
       return;
     const existing = pending.get(filename);
@@ -326,6 +325,15 @@ export function watchInbox(
       }
     }, debounce);
     pending.set(filename, t);
+  };
+  const watcher = watch(dir, { persistent: false }, (_event, filename) => {
+    if (filename) enqueue(filename);
   });
-  return () => watcher.close();
+  // Startup scan: documents parked while no gateway was running (downtime
+  // drops, pre-boot copies) emit no fs event — sweep them into the same queue.
+  for (const existing of readdirSync(dir)) enqueue(existing);
+  return () => {
+    watcher.close();
+    for (const t of pending.values()) clearTimeout(t);
+  };
 }

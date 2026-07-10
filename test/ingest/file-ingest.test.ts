@@ -193,3 +193,19 @@ describe('inbox watcher failure semantics', () => {
     assert.ok(cortex.encodeCalls.length > 0);
   });
 });
+
+describe('inbox startup scan', () => {
+  it('ingests a document that was parked before the watcher armed', async () => {
+    const dir = tmpDir();
+    writeFileSync(join(dir, 'parked.md'), '# parked\n\nplaced during downtime');
+    const cortex = mockCortex();
+    const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50 });
+    for (let i = 0; i < 100; i += 1) {
+      await new Promise((r) => setTimeout(r, 50));
+      if (readdirSync(dir).includes('parked.md.processed')) break;
+    }
+    stop();
+    assert.ok(readdirSync(dir).includes('parked.md.processed'));
+    assert.ok(cortex.encodeCalls.length > 0);
+  });
+});
