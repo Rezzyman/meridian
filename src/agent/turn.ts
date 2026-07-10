@@ -74,7 +74,11 @@ function pickToolAllowlist(
     return new Set(cfg?.cli ?? TOOLS_CLI_DEFAULT);
   }
   // voice / telegram / gateway / system all use the chat allowlist.
-  return new Set(cfg?.chat ?? TOOLS_CHAT_DEFAULT);
+  const allow = new Set(cfg?.chat ?? TOOLS_CHAT_DEFAULT);
+  // A phone call cannot carry an image; offering image_analyze on voice
+  // only invites hallucinated calls. Available everywhere else.
+  if (channel === 'voice') allow.delete('image_analyze');
+  return allow;
 }
 
 export interface TurnContext {

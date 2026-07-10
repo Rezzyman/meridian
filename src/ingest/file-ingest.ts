@@ -5,12 +5,14 @@
  * `MEMORY/inbox/` directory. Each file lands in CORTEX as one or more
  * memories with full source attribution.
  *
- * v0.7 supported types:
+ * Supported types:
  *   - text/markdown — direct, chunked at paragraph boundaries
- *   - PDF           — pdfjs-dist text extraction, page-aware chunks
- *   - image         — encoded as a "saw an image at <path>" stub memory
- *                     (multimodal Voyage embeddings come in v0.2)
- *   - audio         — same stub treatment; Whisper transcription is v0.2
+ *   - PDF           — pdfjs-dist text extraction, page-aware chunks, capped
+ *                     at pdf.maxPages (loud truncation warning) and rejected
+ *                     over pdf.maxBytesMb
+ *   - image         — real vision analysis when vision is enabled (pass an
+ *                     `analyze` hook); "saw an image at <path>" stub otherwise
+ *   - audio         — stub treatment; Whisper transcription is v0.2
  *
  * Returns a summary object so callers (CLI + watcher) can report what
  * landed where.
@@ -28,7 +30,28 @@ export interface IngestResult {
   memoryIds: number[];
   bytes: number;
   durationMs: number;
+  /** Non-fatal notes the operator should see (e.g. PDF page truncation). */
+  warnings?: string[];
 }
+
+export interface IngestOptions {
+  logger?: Logger;
+  sourceTag?: string;
+  /** Vision hook — when enabled, images are analyzed for real instead of
+   *  landing as path stubs. `analyze` errors fall back to the stub. */
+  vision?: {
+    enabled: boolean;
+    analyze?: (path: string) => Promise<{ description: string; model: string }>;
+  };
+  /** PDF ingestion caps (OpenClaw parity: 50 pages / 32 MB). */
+  pdf?: {
+    maxPages?: number;
+    maxBytesMb?: number;
+  };
+}
+
+export const PDF_MAX_PAGES_DEFAULT = 50;
+export const PDF_MAX_BYTES_MB_DEFAULT = 32;
 
 const TEXT_EXT = new Set(['.txt', '.log', '.json', '.csv', '.tsv', '.yml', '.yaml']);
 const MARKDOWN_EXT = new Set(['.md', '.markdown', '.mdx']);
@@ -74,13 +97,17 @@ function chunk(text: string): string[] {
   return out;
 }
 
-async function extractPdf(path: string): Promise<string> {
+async function extractPdf(
+  path: string,
+  maxPages: number,
+): Promise<{ text: string; totalPages: number; extractedPages: number }> {
   // pdfjs-dist is ESM-only; use the legacy build for Node compatibility.
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const data = new Uint8Array(readFileSync(path));
   const doc = await pdfjs.getDocument({ data, useSystemFonts: true }).promise;
   const out: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
+  const extractedPages = Math.min(doc.numPages, maxPages);
+  for (let i = 1; i <= extractedPages; i++) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
     const text = content.items
@@ -90,13 +117,13 @@ async function extractPdf(path: string): Promise<string> {
       .trim();
     if (text) out.push(`[page ${i}]\n${text}`);
   }
-  return out.join('\n\n');
+  return { text: out.join('\n\n'), totalPages: doc.numPages, extractedPages };
 }
 
 export async function ingestFile(
   cortex: MemoryProvider,
   filePath: string,
-  opts: { logger?: Logger; sourceTag?: string } = {},
+  opts: IngestOptions = {},
 ): Promise<IngestResult> {
   const started = Date.now();
   const abs = resolve(filePath);
@@ -134,9 +161,33 @@ export async function ingestFile(
   }
 
   if (type === 'pdf') {
+    // Size cap FIRST — a 300 MB scan would otherwise be pulled whole into
+    // memory by pdfjs. Rejection is a thrown error so the ingest report
+    // (CLI + inbox watcher) shows a clear failure line, never a silent skip.
+    const maxBytesMb = opts.pdf?.maxBytesMb ?? PDF_MAX_BYTES_MB_DEFAULT;
+    const maxBytes = maxBytesMb * 1024 * 1024;
+    if (st.size > maxBytes) {
+      throw new Error(
+        `PDF rejected: ${(st.size / (1024 * 1024)).toFixed(1)} MB exceeds the ${maxBytesMb} MB limit (pdf.maxBytesMb)`,
+      );
+    }
+    const maxPages = opts.pdf?.maxPages ?? PDF_MAX_PAGES_DEFAULT;
+    const warnings: string[] = [];
     let text = '';
     try {
-      text = await extractPdf(abs);
+      const extracted = await extractPdf(abs, maxPages);
+      text = extracted.text;
+      if (extracted.totalPages > extracted.extractedPages) {
+        const w = `PDF truncated: ingested ${extracted.extractedPages} of ${extracted.totalPages} pages (pdf.maxPages=${maxPages}); pages ${extracted.extractedPages + 1}-${extracted.totalPages} were skipped`;
+        warnings.push(w);
+        opts.logger?.warn({
+          msg: 'pdf page-cap truncation',
+          path: abs,
+          totalPages: extracted.totalPages,
+          extractedPages: extracted.extractedPages,
+          maxPages,
+        });
+      }
     } catch (err) {
       opts.logger?.warn({ msg: 'pdf extract failed', err, path: abs });
     }
@@ -160,13 +211,32 @@ export async function ingestFile(
       memoryIds,
       bytes: st.size,
       durationMs: Date.now() - started,
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   }
 
   if (type === 'image' || type === 'audio') {
-    // Stub memory — file path + metadata only. Real multimodal embedding
-    // (Voyage multimodal for images, Whisper for audio) is v0.2.
-    const stub = `[${type}] ${basename(abs)}\nFile path: ${abs}\nSize: ${st.size} bytes\nIngested: ${new Date().toISOString()}`;
+    // Images: real vision analysis when the hook is enabled; the description
+    // becomes the memory (searchable by content, not just filename). Audio —
+    // and any vision failure/disabled path — falls back to the metadata stub.
+    let content: string | undefined;
+    if (type === 'image' && opts.vision?.enabled && opts.vision.analyze) {
+      try {
+        const a = await opts.vision.analyze(abs);
+        content =
+          `[image] ${basename(abs)}\nFile path: ${abs}\n` +
+          `Vision analysis (${a.model}):\n${a.description}`;
+      } catch (err) {
+        opts.logger?.warn({
+          msg: 'vision analysis failed during ingest; falling back to stub',
+          err,
+          path: abs,
+        });
+      }
+    }
+    const stub =
+      content ??
+      `[${type}] ${basename(abs)}\nFile path: ${abs}\nSize: ${st.size} bytes\nIngested: ${new Date().toISOString()}`;
     try {
       const r = await cortex.encode(stub, {
         source: sourceTag,
@@ -205,7 +275,7 @@ export async function ingestFile(
 export function watchInbox(
   cortex: MemoryProvider,
   dir: string,
-  opts: { logger?: Logger; debounceMs?: number } = {},
+  opts: { logger?: Logger; debounceMs?: number; vision?: IngestOptions['vision']; pdf?: IngestOptions['pdf'] } = {},
 ): () => void {
   if (!existsSync(dir)) return () => {};
   const debounce = opts.debounceMs ?? 1500;
@@ -223,12 +293,15 @@ export function watchInbox(
         const result = await ingestFile(cortex, path, {
           logger: opts.logger,
           sourceTag: `meridian:inbox:${filename}`,
+          vision: opts.vision,
+          pdf: opts.pdf,
         });
         opts.logger?.info({
           msg: 'inbox ingested',
           file: filename,
           type: result.type,
           chunks: result.chunks,
+          ...(result.warnings?.length ? { warnings: result.warnings } : {}),
         });
         // Rename to .processed so re-runs skip it.
         const { renameSync } = await import('node:fs');

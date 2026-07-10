@@ -36,6 +36,7 @@ import { SessionStore } from '../session/store.js';
 import { ProactiveSentinel } from '../proactive/sentinel.js';
 import { AutomationManager } from '../automations/manager.js';
 import { watchInbox } from '../ingest/file-ingest.js';
+import { analyzeImage } from '../vision/analyze.js';
 import { mkdirSync } from 'node:fs';
 import type { ChannelKind } from '../agent/operator.js';
 import type { MeridianTurn } from '../agent/types.js';
@@ -276,6 +277,19 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // Channel registry — ProactiveSentinel uses this to push briefs.
   const channelMap = new Map<string, ChannelAdapter>();
 
+  // ── Vision hook — one closure shared by Telegram media + the inbox ingest ──
+  // Carries the operator's custom analysis prompt (config.vision.prompt) and
+  // the resolved vision model chain. undefined when vision is disabled.
+  const visionAnalyze = config.vision.enabled
+    ? (path: string) =>
+        analyzeImage(path, {
+          router,
+          models: config.models,
+          vision: config.vision,
+          logger,
+        })
+    : undefined;
+
   // ── Telegram channel — trusted chat ID, full sensitivity ──
   // Constructed first so VapiChannel can reach it for end-of-call handoffs.
   let telegram: TelegramChannel | undefined;
@@ -285,6 +299,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       defaultChatId: env.TELEGRAM_DEFAULT_CHAT_ID,
       envPath: home.envPath,
       logger,
+      mediaDir: join(home.layer('MEMORY'), 'media'),
+      maxMediaBytes: config.vision.maxBytes,
+      vision: visionAnalyze ? { analyze: visionAnalyze } : undefined,
     });
     await telegram.start(undefined, {
       onInbound: async (m) => turn('telegram', m.from, m.text),
@@ -518,7 +535,11 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   } catch {
     /* dir exists */
   }
-  void watchInbox(cortex, inbox, { logger });
+  void watchInbox(cortex, inbox, {
+    logger,
+    vision: { enabled: config.vision.enabled, analyze: visionAnalyze },
+    pdf: { maxPages: config.pdf.maxPages, maxBytesMb: config.pdf.maxBytesMb },
+  });
   console.log(colors.ok(`inbox watcher armed at ${inbox}`));
 
   // Gateway HTTP server (used by VAPI webhook + chat API).

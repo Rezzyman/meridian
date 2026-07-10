@@ -15,6 +15,7 @@ import { execTools } from './exec-tools.js';
 import { type DelegateDeps, delegateTools } from './delegate-tools.js';
 import { voiceTools } from './vapi-tools.js';
 import { telegramTools } from './telegram-tools.js';
+import { type VisionToolDeps, visionTools } from './vision-tools.js';
 import { webTools } from './web-tools.js';
 
 export interface BuiltinToolsOptions {
@@ -25,6 +26,8 @@ export interface BuiltinToolsOptions {
   allowVoice?: boolean;
   /** When provided, the bounded `delegate` sub-agent tool is registered. */
   delegation?: DelegateDeps;
+  /** When provided, the `image_analyze` vision tool is registered. */
+  vision?: VisionToolDeps;
 }
 
 export function builtinTools(opts: BuiltinToolsOptions): ToolSet {
@@ -55,6 +58,11 @@ export function builtinTools(opts: BuiltinToolsOptions): ToolSet {
   }
   if (opts.delegation) {
     for (const [k, v] of Object.entries(delegateTools(opts.delegation))) out[k] = v;
+  }
+  // Vision: image_analyze needs a provider router; gated per channel by the
+  // allowlist (chat + CLI defaults; turn.ts strips it from voice).
+  if (opts.vision) {
+    for (const [k, v] of Object.entries(visionTools(opts.vision))) out[k] = v;
   }
   return out;
 }

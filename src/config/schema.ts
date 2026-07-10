@@ -204,6 +204,44 @@ export const ChannelConfigSchema = z.object({
 });
 export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
 
+// ─── Vision (image understanding) ──────────────────────────────────────────────
+// Turns inbound images (Telegram photos, `meridian ingest photo.jpg`, the
+// image_analyze tool) into real model-written descriptions instead of path
+// stubs. The model is a plain ModelRef string ("provider/model"); when
+// omitted, the runtime walks the agent's model chain and picks the first
+// vision-capable provider — so a default agent gets vision for free while
+// an operator can pin a dedicated multimodal model. `prompt` is the
+// operator's custom analysis prompt (e.g. a roofing damage-assessment
+// rubric) prepended to every analysis call.
+export const VisionConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  /** ModelRef "provider/model". Absent → resolved via the agent's model chain. */
+  model: z.string().optional(),
+  /** Operator-custom analysis prompt (domain rubric, tone, output format). */
+  prompt: z.string().optional(),
+  /** Hard cap on image size fed to the model. */
+  maxBytes: z
+    .number()
+    .int()
+    .positive()
+    .default(25 * 1024 * 1024),
+  /** Wall-clock cap per analysis call. */
+  timeoutSeconds: z.number().int().positive().default(120),
+});
+export type VisionConfig = z.infer<typeof VisionConfigSchema>;
+
+// ─── PDF ingestion caps ────────────────────────────────────────────────────────
+// OpenClaw parity: pdfMaxPages 50 / pdfMaxBytesMb 32. Pages past maxPages are
+// skipped WITH a truncation warning (never silent); files over maxBytesMb are
+// rejected outright with a clear ingest report line.
+export const PdfConfigSchema = z.object({
+  maxPages: z.number().int().positive().default(50),
+  maxBytesMb: z.number().positive().default(32),
+  /** Optional ModelRef for PDF-heavy summarization passes. */
+  model: z.string().optional(),
+});
+export type PdfConfig = z.infer<typeof PdfConfigSchema>;
+
 // ─── Dream cycle config ────────────────────────────────────────────────────────
 export const DreamConfigSchema = z.object({
   enabled: z.boolean().default(true),
@@ -240,6 +278,7 @@ const CHAT_SAFE_DEFAULT = [
   'voice_status',
   'cortex_dream',
   'telegram_dm',
+  'image_analyze',
   ...SAFE_UTILITIES,
 ] as const;
 const CLI_SAFE_DEFAULT = [
@@ -247,6 +286,7 @@ const CLI_SAFE_DEFAULT = [
   'voice_status',
   'cortex_dream',
   'telegram_dm',
+  'image_analyze',
   'bash',
   'read',
   'write',
@@ -375,6 +415,8 @@ export const AgentConfigSchema = z.object({
   channels: ChannelConfigSchema,
   heartbeat: HeartbeatSchema,
   dream: DreamConfigSchema,
+  vision: VisionConfigSchema.default({}),
+  pdf: PdfConfigSchema.default({}),
   proactive: ProactiveConfigSchema.optional(),
   tools: ToolsConfigSchema.optional(),
   delegation: DelegationConfigSchema.optional(),
@@ -605,6 +647,12 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     ackMaxChars: 500,
   },
   dream: { enabled: true, schedule: '0 2 * * *', mode: 'full', inProcess: true },
+  vision: {
+    enabled: true,
+    maxBytes: 25 * 1024 * 1024,
+    timeoutSeconds: 120,
+  },
+  pdf: { maxPages: 50, maxBytesMb: 32 },
   cortex: {
     agentId: slug,
     recallTopK: 8,
