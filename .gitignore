@@ -27,3 +27,4 @@ INCIDENT-*.md
 POSTMORTEM-*.md
 *-DRAFT.md
 DEMO-*.md
+.claude/

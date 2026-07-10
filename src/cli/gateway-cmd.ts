@@ -559,6 +559,13 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
           ),
         }
       : undefined;
+  // Opt-in document ingest: armed only by a DEDICATED token so an upload
+  // portal never holds the operator gateway token. Reuses the same inbox the
+  // watcher already tails, so an HTTP upload and a local file drop are the
+  // same pipeline.
+  const ingest = process.env.MERIDIAN_INGEST_TOKEN
+    ? { inboxDir: inbox, token: process.env.MERIDIAN_INGEST_TOKEN }
+    : undefined;
   await startGateway({
     port,
     token: env.MERIDIAN_GATEWAY_TOKEN,
@@ -573,11 +580,15 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     automations,
     waitlist,
     web,
+    ingest,
   });
 
   console.log(colors.ok(`Meridian gateway live on :${port} for agent ${slug}`));
   if (waitlist) {
     console.log(colors.ok(`  waitlist endpoint armed (POST /waitlist → ${waitlist.dbPath})`));
+  }
+  if (ingest) {
+    console.log(colors.ok(`  ingest endpoint armed (POST /ingest → ${ingest.inboxDir})`));
   }
   if (web) {
     console.log(colors.ok(`  web chat at http://127.0.0.1:${port}/ (same-origin autoconfig)`));

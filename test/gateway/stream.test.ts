@@ -138,7 +138,9 @@ describe('POST /chat/stream', () => {
       frames.map((f) => f.event),
       ['error'],
     );
-    assert.match(String(frames[0].data.error), /All providers failed/);
+    // RULE ZERO: the frame carries the sanitized surface, never provider text.
+    assert.match(String(frames[0].data.error), /Quick hiccup on my end/);
+    assert.doesNotMatch(String(frames[0].data.error), /providers failed|boom/);
   });
 
   it('enforces the same bearer auth as /chat', async () => {
