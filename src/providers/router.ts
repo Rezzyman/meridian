@@ -23,6 +23,24 @@ export interface ResolvedProvider {
   model: LanguageModel;
 }
 
+/** ROUTEXOR exposes an OpenAI-compatible endpoint, but current Anthropic
+ * reasoning models reject the OpenAI SDK's implicit `temperature: 0` field.
+ * Strip only that implicit value for Claude models; preserve every explicit
+ * non-zero setting and every non-Claude request. */
+const routexorFetch: typeof globalThis.fetch = async (input, init) => {
+  if (typeof init?.body !== 'string') return globalThis.fetch(input, init);
+  try {
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    if (typeof body.model === 'string' && body.model.startsWith('claude-') && body.temperature === 0) {
+      delete body.temperature;
+      return globalThis.fetch(input, { ...init, body: JSON.stringify(body) });
+    }
+  } catch {
+    // Non-JSON bodies pass through unchanged.
+  }
+  return globalThis.fetch(input, init);
+};
+
 /** Route ollama doStream calls by payload: tools → simulated streaming
  *  (tool calls parse), no tools → true streaming (live tokens). See the
  *  ollama case in ProviderRouter.build for the full rationale. */
@@ -173,6 +191,7 @@ export class ProviderRouter {
           apiKey: this.env.ROUTEXOR_API_KEY || 'meridian-keyless',
           baseURL: this.env.ROUTEXOR_BASE_URL ?? 'https://api.routexor.com/v1',
           name: 'routexor',
+          fetch: routexorFetch,
         });
         return rx(modelId);
       }
