@@ -9,12 +9,12 @@ agent:
 models:
   primary: routexor/claude-sonnet-4.6
   fallbacks:
-    - routexor/claude-4-haiku
+    - routexor/claude-haiku-4.5
   smartRouting:
     enabled: true
     maxSimpleChars: 160
     maxSimpleWords: 25
-    cheapModel: routexor/claude-4-haiku
+    cheapModel: routexor/claude-haiku-4.5
 
 # External channels stay disabled in the distributable profile. Deployment must
 # add explicit operator/sender allowlists before enabling any of them.
@@ -33,7 +33,7 @@ heartbeat:
   activeHours:
     start: "07:00"
     end: "19:00"
-  model: routexor/claude-4-haiku
+  model: routexor/claude-haiku-4.5
   target: last
   ackMaxChars: 300
 

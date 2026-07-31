@@ -229,6 +229,6 @@ export class CortexBind implements MemoryProvider {
   }
 }
 
-export function bindCortex(agentId: string, baseUrl?: string): CortexBind {
-  return new CortexBind({ agentId, baseUrl });
+export function bindCortex(agentId: string, baseUrl?: string, serviceToken?: string): CortexBind {
+  return new CortexBind({ agentId, baseUrl, serviceToken });
 }

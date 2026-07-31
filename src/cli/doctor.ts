@@ -155,7 +155,11 @@ export async function runDoctor(): Promise<number> {
   // their dedicated CORTEX on a non-default port like 3101).
   const agentEnvFile = existsSync(home.envPath) ? readEnvFile(home.envPath) : {};
   const cortexUrl = agentEnvFile.MERIDIAN_CORTEX_URL || process.env.MERIDIAN_CORTEX_URL;
-  const cortex = bindCortex(config.cortex.agentId, cortexUrl);
+  const cortex = bindCortex(
+    config.cortex.agentId,
+    cortexUrl,
+    agentEnvFile.MERIDIAN_CORTEX_TOKEN || process.env.MERIDIAN_CORTEX_TOKEN,
+  );
   // Embedded agents (the zero-config default from `meridian init`) keep memory
   // in a local JSONL and never talk to CORTEX, so a "CORTEX down" reading is
   // expected, not a failure. Skip the CORTEX probes entirely for them.
