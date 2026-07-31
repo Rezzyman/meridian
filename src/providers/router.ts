@@ -33,8 +33,21 @@ const routexorFetch: typeof globalThis.fetch = async (input, init) => {
     const body = JSON.parse(init.body) as Record<string, unknown>;
     if (body.model === 'claude-sonnet-5' && body.temperature === 0) {
       delete body.temperature;
-      return globalThis.fetch(input, { ...init, body: JSON.stringify(body) });
     }
+    if (typeof body.model === 'string' && body.model.startsWith('gpt-') && Array.isArray(body.tools)) {
+      const stripFormats = (value: unknown): void => {
+        if (!value || typeof value !== 'object') return;
+        if (Array.isArray(value)) {
+          for (const item of value) stripFormats(item);
+          return;
+        }
+        const record = value as Record<string, unknown>;
+        delete record.format;
+        for (const child of Object.values(record)) stripFormats(child);
+      };
+      stripFormats(body.tools);
+    }
+    return globalThis.fetch(input, { ...init, body: JSON.stringify(body) });
   } catch {
     // Non-JSON bodies pass through unchanged.
   }
