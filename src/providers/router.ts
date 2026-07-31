@@ -7,7 +7,7 @@
  * Vercel AI SDK does that. We just route.
  */
 
-import type { LanguageModel } from 'ai';
+import { simulateStreamingMiddleware, wrapLanguageModel, type LanguageModel } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGroq } from '@ai-sdk/groq';
@@ -206,7 +206,15 @@ export class ProviderRouter {
           name: 'routexor',
           fetch: routexorFetch,
         });
-        return rx(modelId);
+        const live = rx(modelId);
+        const simulated = wrapLanguageModel({
+          model: rx(modelId),
+          middleware: simulateStreamingMiddleware(),
+        });
+        // ROUTEXOR's Anthropic streaming path has intermittently dropped tool
+        // call deltas. Generate tool-bearing turns non-streaming and expose the
+        // result as a stream; keep true streaming for ordinary conversation.
+        return hybridOllama(live, simulated);
       }
       case 'groq': {
         if (!this.env.GROQ_API_KEY) {
