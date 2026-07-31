@@ -13,11 +13,13 @@ import type { MeridianHome } from '../../config/home.js';
 import type { SkillRegistry } from '../../skills/types.js';
 import type { SessionStore } from '../../session/store.js';
 import type { PassphraseGuard } from '../../skills/runtime.js';
+import type { AgentConfig } from '../../config/schema.js';
 import { commandsByCategory, findCommand } from './registry.js';
 import { runAudit, writeReport } from '../../audit/retrospective.js';
 
 export interface HandlerCtx {
   home: MeridianHome;
+  config: AgentConfig;
   conversation: Conversation;
   cortex: MemoryProvider;
   dream: DreamWeaver;
@@ -327,13 +329,18 @@ function handleApprove(ctx: HandlerCtx, arg: string): string {
   if (!toolName) return 'usage: /approve <tool> [minutes]';
   const minutes = minutesRaw ? Number(minutesRaw) : 5;
   if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 60) return colors.warn('minutes must be between 1 and 60');
-  const grant = ctx.store.grantApproval(ctx.conversation.sessionId, toolName, minutes);
+  const automationScope = toolName.startsWith('automation:');
+  if (automationScope && !ctx.config.operator?.id) return colors.warn('cannot approve an automation without operator.id in config');
+  const sessionId = automationScope ? `op:${ctx.config.operator!.id}` : ctx.conversation.sessionId;
+  const grant = ctx.store.grantApproval(sessionId, toolName, minutes);
   return colors.ok(`approved one use of ${toolName} for ${minutes} minute(s) · ${grant.grantId}`);
 }
 
 function renderApprovals(ctx: HandlerCtx): string {
   if (!ctx.store) return colors.warn('approval store not wired into this REPL');
-  const grants = ctx.store.listApprovals(ctx.conversation.sessionId);
+  const sessionIds = new Set([ctx.conversation.sessionId]);
+  if (ctx.config.operator?.id) sessionIds.add(`op:${ctx.config.operator.id}`);
+  const grants = ctx.store.listApprovals().filter((grant) => sessionIds.has(grant.sessionId));
   if (!grants.length) return colors.muted('no approval grants for this session');
   const now = new Date().toISOString();
   return [colors.cyan('Approval grants'), ...grants.slice(0, 20).map((g) => {

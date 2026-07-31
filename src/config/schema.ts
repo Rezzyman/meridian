@@ -133,6 +133,9 @@ export type ModelChain = z.infer<typeof ModelChainSchema>;
 // ─── Heartbeat & active hours ──────────────────────────────────────────────────
 export const HeartbeatSchema = z.object({
   enabled: z.boolean().default(true),
+  /** Shadow records decisions without notifying; live may notify only on a
+   * novel, sufficiently confident actionable assessment. */
+  mode: z.enum(['shadow', 'live']).default('shadow'),
   every: z.string().default('2h'),
   activeHours: z.object({
     start: z.string().default('06:00'),
@@ -141,6 +144,9 @@ export const HeartbeatSchema = z.object({
   model: z.string().default('routexor/claude-4-haiku'),
   target: z.string().default('last'),
   ackMaxChars: z.number().default(500),
+  minConfidence: z.number().min(0).max(1).default(0.75),
+  cooldownMinutes: z.number().positive().default(240),
+  leaseMinutes: z.number().positive().default(15),
 });
 export type Heartbeat = z.infer<typeof HeartbeatSchema>;
 
@@ -655,11 +661,15 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
   },
   heartbeat: {
     enabled: true,
+    mode: 'shadow',
     every: '2h',
     activeHours: { start: '06:00', end: '23:30' },
     model: 'routexor/claude-4-haiku',
     target: 'last',
     ackMaxChars: 500,
+    minConfidence: 0.75,
+    cooldownMinutes: 240,
+    leaseMinutes: 15,
   },
   dream: { enabled: true, schedule: '0 2 * * *', mode: 'full', inProcess: true },
   vision: {

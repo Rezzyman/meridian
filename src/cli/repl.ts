@@ -249,7 +249,7 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
       const text = line.trim();
       if (!text) return ask();
       if (text.startsWith('/')) {
-        const out = await dispatch(text, { home, conversation, cortex, dream, skills, store, passphraseGuard });
+        const out = await dispatch(text, { home, config, conversation, cortex, dream, skills, store, passphraseGuard });
         if (out !== undefined) console.log(out);
         return ask();
       }
