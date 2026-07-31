@@ -461,6 +461,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
 
   for (const provider of chain) {
     try {
+      const toolTraceStart = toolCallTrace.length;
       // streamText (ai@4.x) does NOT throw on provider failure: errors are
       // routed to onError and textStream completes empty. Without capturing
       // them here the catch below never fires and the fallback chain is
@@ -525,6 +526,14 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       }
       if (streamError !== undefined) {
         throw streamError instanceof Error ? streamError : new Error(String(streamError));
+      }
+      if (!out.trim()) {
+        if (toolCallTrace.length === toolTraceStart) {
+          throw new Error('provider returned an empty response before executing a tool');
+        }
+        // A tool already ran, so retrying through another provider could replay
+        // a side effect. Stop safely with an honest summary instead.
+        out = 'The tool completed, but the model produced no final summary.';
       }
       reply = out;
       providerUsed = provider.ref;
