@@ -1,13 +1,13 @@
 /** Evidence-driven heartbeat governed by the durable autonomy control plane. */
 
 import { generateText } from 'ai';
-import { schedule as cronSchedule, type ScheduledTask } from 'node-cron';
 import type { AgentConfig, Heartbeat } from '../config/schema.js';
 import type { MeridianHome } from '../config/home.js';
 import type { Logger } from 'pino';
 import type { MemoryProvider } from '../memory/provider.js';
 import type { ProviderRouter } from '../providers/router.js';
 import { AutonomyControlPlane } from '../autonomy/control-plane.js';
+import { scheduleDeterministic, type DeterministicTask } from '../autonomy/scheduler.js';
 
 export const HEARTBEAT_PROMPT = `Evaluate only the supplied evidence for anything stale, overdue, blocked, or materially actionable.
 Return JSON only with this exact shape:
@@ -122,7 +122,7 @@ export interface HeartbeatSchedulerOptions {
 }
 
 export class HeartbeatScheduler {
-  private task: ScheduledTask | null = null;
+  private task: DeterministicTask | null = null;
   private readonly controlPlane: AutonomyControlPlane;
 
   constructor(private opts: HeartbeatSchedulerOptions) {
@@ -140,8 +140,10 @@ export class HeartbeatScheduler {
       this.opts.logger.error({ msg: 'heartbeat run recovered to dead letter', ...recovered });
     }
     const expr = intervalToCron(this.opts.heartbeat.every);
-    this.task = cronSchedule(expr, () => { void this.beat(); });
-    this.controlPlane.setNextScheduledAt('heartbeat', this.task.getNextRun());
+    this.task = scheduleDeterministic(expr, async (scheduledAt) => { await this.beat(scheduledAt); }, {
+      timezone: process.env.TZ ?? 'America/Chicago',
+      onScheduled: (next) => this.controlPlane.setNextScheduledAt('heartbeat', next),
+    });
     this.opts.logger.info({ msg: 'heartbeat scheduled', expr, every: this.opts.heartbeat.every, mode: this.opts.heartbeat.mode });
   }
 
@@ -171,8 +173,6 @@ export class HeartbeatScheduler {
       this.controlPlane.finish('heartbeat', runId, 'failed', { reason: error instanceof Error ? error.message : String(error) });
       this.opts.logger.warn({ msg: 'heartbeat failed', runId, error });
       return false;
-    } finally {
-      if (this.task) this.controlPlane.setNextScheduledAt('heartbeat', this.task.getNextRun());
     }
   }
 

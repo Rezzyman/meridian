@@ -16,7 +16,6 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { schedule as cronSchedule, type ScheduledTask } from 'node-cron';
 import { parse as parseYaml } from 'yaml';
 import { streamText, type ToolSet } from 'ai';
 import type { Logger } from 'pino';
@@ -28,6 +27,7 @@ import type { MeridianHome } from '../config/home.js';
 import { AutonomyControlPlane, type AutonomyOutcome } from '../autonomy/control-plane.js';
 import { governToolSet } from '../governance/action-policy.js';
 import type { SessionStore } from '../session/store.js';
+import { scheduleDeterministic, type DeterministicTask } from '../autonomy/scheduler.js';
 
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
 
@@ -162,7 +162,7 @@ export function stripSilentMarker(reply: string): string {
 }
 
 export class AutomationManager {
-  private tasks: ScheduledTask[] = [];
+  private tasks: DeterministicTask[] = [];
   private lastRuns = new Map<string, AutomationRunResult>();
   private defs: AutomationDef[] = [];
   private readonly controlPlane: AutonomyControlPlane;
@@ -179,19 +179,19 @@ export class AutomationManager {
     this.defs = loadAutomationDefs(this.opts.home);
     for (const def of this.defs) {
       const missedAt = this.controlPlane.getNextScheduledAt(def.name);
-      const task = cronSchedule(
+      const task = scheduleDeterministic(
         def.schedule,
-        () => {
-          const scheduledAt = new Date();
+        (scheduledAt) => {
           this.fire(def.name, scheduledAt).catch((err) =>
             this.opts.logger.error({ msg: 'automation failed', name: def.name, err }),
           );
-          this.recordNext(def.name, task);
         },
-        { timezone: def.timezone ?? process.env.TZ ?? 'America/Chicago' },
+        {
+          timezone: def.timezone ?? process.env.TZ ?? 'America/Chicago',
+          onScheduled: (next) => this.controlPlane.setNextScheduledAt(def.name, next),
+        },
       );
       this.tasks.push(task);
-      this.recordNext(def.name, task);
       if (missedAt && missedAt <= now && now.getTime() - missedAt.getTime() <= def.misfireGraceMinutes * 60_000) {
         void this.fire(def.name, missedAt).catch((err) =>
           this.opts.logger.error({ msg: 'automation catch-up failed', name: def.name, err }),
@@ -205,10 +205,6 @@ export class AutomationManager {
       });
     }
     return this.defs;
-  }
-
-  private recordNext(name: string, task: ScheduledTask): void {
-    this.controlPlane.setNextScheduledAt(name, task.getNextRun());
   }
 
   stop(): void {
