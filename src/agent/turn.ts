@@ -23,6 +23,7 @@ import { runChecks, blocking, type CheckResult } from '../verification/runtime.j
 import type { Logger } from 'pino';
 import type { MeridianTurn } from './types.js';
 import { sanitizeOutbound, ProviderChainError } from '../safety/error-firewall.js';
+import { governToolSet, type ActionReceiptInput } from '../governance/action-policy.js';
 
 /**
  * Framework-enforced behavioral rules prepended to every system prompt.
@@ -143,6 +144,12 @@ export interface TurnContext {
    * their content is screened on recall instead of laundered into trust.
    */
   senderTrusted?: boolean;
+  actionGovernance?: {
+    agentId: string;
+    digestArgs(args: unknown): string;
+    consumeApproval?(toolName: string, argsDigest: string): boolean;
+    record(receipt: ActionReceiptInput): void;
+  };
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -258,6 +265,7 @@ export interface TurnResult {
     recallTokenCount: number;
     toolCalls: Array<{ name: string; stepType: string; ts: string }>;
     model?: string;
+    modelTraceIds: string[];
     /** Memories pulled from the model's view by the integrity screen. */
     quarantinedMemories: QuarantinedMemory[];
     /** Operator verification-check results for this turn. */
@@ -416,8 +424,23 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // update: Good, I can see..." hallucination class. onStepFinish still logs the
   // empties for the trace.
   const emptyByTool: Record<string, number> = {};
-  const turnTools = allowedTools
-    ? withEmptyResultBreaker(allowedTools, {
+  const governedTools = allowedTools && ctx.actionGovernance
+    ? governToolSet({
+        tools: allowedTools,
+        config: ctx.config,
+        context: {
+          agentId: ctx.actionGovernance.agentId,
+          sessionId: ctx.sessionId,
+          channel: ctx.channel,
+          senderTrusted: ctx.senderTrusted !== false,
+        },
+        digestArgs: ctx.actionGovernance.digestArgs,
+        consumeApproval: ctx.actionGovernance.consumeApproval,
+        record: ctx.actionGovernance.record,
+      })
+    : allowedTools;
+  const turnTools = governedTools
+    ? withEmptyResultBreaker(governedTools, {
         threshold: 2,
         onTrip: (name) => {
           emptyByTool[name] = (emptyByTool[name] ?? 0) + 1;
@@ -429,6 +452,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // the gateway/REPL after the turn completes for /why + /trace queries.
   const toolCallTrace: Array<{ name: string; stepType: string; ts: string }> = [];
   let providerUsed: string | undefined;
+  let modelTraceIds: string[] = [];
 
   // Deltas forwarded for the CURRENT provider attempt. If that attempt
   // dies mid-stream and a fallback takes over, the observer gets a reset
@@ -504,6 +528,14 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       }
       reply = out;
       providerUsed = provider.ref;
+      if (provider.provider === 'routexor') {
+        const steps = await stream.steps;
+        modelTraceIds = steps.flatMap((step) => {
+          const headers = step.response.headers ?? {};
+          const trace = Object.entries(headers).find(([name]) => name.toLowerCase() === 'x-routexor-trace-id')?.[1];
+          return trace ? [trace] : [];
+        });
+      }
       // Close the breaker circuit for this ref (mock routers may not have it).
       ctx.router.reportSuccess?.(provider.ref);
       break;
@@ -672,6 +704,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       recallTokenCount,
       toolCalls: toolCallTrace,
       model: providerUsed,
+      modelTraceIds,
       quarantinedMemories,
       verifications,
     },

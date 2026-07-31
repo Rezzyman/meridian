@@ -27,6 +27,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     'cli/main': 'src/cli/main.ts',
+    'scripts/run-governed-benchmark': 'scripts/run-governed-benchmark.ts',
     index: 'src/index.ts',
   },
   format: ['esm'],

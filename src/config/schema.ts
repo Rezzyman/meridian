@@ -311,6 +311,15 @@ export type ToolsConfig = z.infer<typeof ToolsConfigSchema>;
 export const TOOLS_CHAT_DEFAULT = CHAT_SAFE_DEFAULT;
 export const TOOLS_CLI_DEFAULT = CLI_SAFE_DEFAULT;
 
+export const GovernanceConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  denyTools: z.array(z.string()).default([]),
+  trustedOnlyTools: z.array(z.string()).default([]),
+  requireApprovalTools: z.array(z.string()).default([]),
+  maxToolCallsPerTurn: z.number().int().min(1).max(100).default(8),
+}).default({ enabled: true, denyTools: [], trustedOnlyTools: [], requireApprovalTools: [], maxToolCallsPerTurn: 8 });
+export type GovernanceConfig = z.infer<typeof GovernanceConfigSchema>;
+
 // ─── Delegation (sub-agents) ───────────────────────────────────────────────────
 // The `delegate` built-in runs a scoped sub-turn: constrained toolset, its
 // own output-token budget, its own (shorter) timeout, no memory encode by
@@ -423,6 +432,7 @@ export const AgentConfigSchema = z.object({
   pdf: PdfConfigSchema.default({}),
   proactive: ProactiveConfigSchema.optional(),
   tools: ToolsConfigSchema.optional(),
+  governance: GovernanceConfigSchema,
   delegation: DelegationConfigSchema.optional(),
   cortex: z.object({
     agentId: z.string(),
@@ -657,6 +667,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     timeoutSeconds: 120,
   },
   pdf: { maxPages: 50, maxBytesMb: 32 },
+  governance: { enabled: true, denyTools: [], trustedOnlyTools: [], requireApprovalTools: [], maxToolCallsPerTurn: 8 },
   cortex: {
     agentId: slug,
     recallTopK: 8,

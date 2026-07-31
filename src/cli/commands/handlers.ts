@@ -69,6 +69,12 @@ export async function dispatch(line: string, ctx: HandlerCtx): Promise<string | 
       return await renderWhy(ctx, arg);
     case 'trace':
       return await renderTrace(ctx, arg);
+    case 'receipts':
+      return renderReceipts(ctx, arg);
+    case 'approve':
+      return handleApprove(ctx, arg);
+    case 'approvals':
+      return renderApprovals(ctx);
     case 'auth':
       return handleAuth(ctx, arg);
     case 'automations':
@@ -292,6 +298,7 @@ async function renderTrace(ctx: HandlerCtx, arg: string): Promise<string> {
     `           artifacts: ${artCites}`,
     '',
     `  ${c.steel('tools')}   ${tools}`,
+    `  ${c.steel('model receipts')}   ${target.modelTraceIds?.length ? target.modelTraceIds.join(', ') : '(none)'}`,
     '',
     `  ${c.steel('reply')}   ${target.reply.slice(0, 240).replace(/\n/g, ' ')}${target.reply.length > 240 ? '…' : ''}`,
   ];
@@ -312,6 +319,39 @@ function handleAuth(ctx: HandlerCtx, arg: string): string {
   } catch (err) {
     return colors.err(`auth failed: ${(err as Error).message}`);
   }
+}
+
+function handleApprove(ctx: HandlerCtx, arg: string): string {
+  if (!ctx.store) return colors.warn('approval store not wired into this REPL');
+  const [toolName, minutesRaw] = arg.split(/\s+/);
+  if (!toolName) return 'usage: /approve <tool> [minutes]';
+  const minutes = minutesRaw ? Number(minutesRaw) : 5;
+  if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 60) return colors.warn('minutes must be between 1 and 60');
+  const grant = ctx.store.grantApproval(ctx.conversation.sessionId, toolName, minutes);
+  return colors.ok(`approved one use of ${toolName} for ${minutes} minute(s) · ${grant.grantId}`);
+}
+
+function renderApprovals(ctx: HandlerCtx): string {
+  if (!ctx.store) return colors.warn('approval store not wired into this REPL');
+  const grants = ctx.store.listApprovals(ctx.conversation.sessionId);
+  if (!grants.length) return colors.muted('no approval grants for this session');
+  const now = new Date().toISOString();
+  return [colors.cyan('Approval grants'), ...grants.slice(0, 20).map((g) => {
+    const state = g.remainingUses < 1 ? 'consumed' : g.expiresAt <= now ? 'expired' : 'armed';
+    return `  ${g.grantId}  ${g.toolName}  ${state}  expires ${g.expiresAt}`;
+  })].join('\n');
+}
+
+function renderReceipts(ctx: HandlerCtx, arg: string): string {
+  if (!ctx.store) return colors.warn('receipt store not wired into this REPL');
+  const requested = arg ? Number(arg) : 20;
+  const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 100) : 20;
+  const receipts = ctx.store.listActionReceipts(ctx.conversation.sessionId, limit);
+  if (!receipts.length) return colors.muted('no action receipts for this session');
+  return [colors.cyan(`Action receipts · ${ctx.conversation.sessionId}`), ...receipts.map((r) => {
+    const valid = ctx.store!.verifyActionReceipt(r) ? 'signed' : 'INVALID';
+    return `  ${r.receiptId}  ${r.decision}/${r.outcome ?? 'unknown'}  ${r.toolName}  ${r.rule}  ${r.durationMs ?? '?'}ms  ${valid}`;
+  })].join('\n');
 }
 
 async function renderAutomations(_ctx: HandlerCtx, _arg: string): Promise<string> {

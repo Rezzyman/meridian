@@ -14,6 +14,7 @@ export * from './skills/index.js';
 export * from './channels/index.js';
 export * from './verification/index.js';
 export * from './audit/index.js';
+export * from './governance/action-policy.js';
 export * from './dream/weaver.js';
 export * from './heartbeat/index.js';
 

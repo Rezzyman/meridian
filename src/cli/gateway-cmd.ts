@@ -42,6 +42,7 @@ import { mkdirSync } from 'node:fs';
 import type { ChannelKind } from '../agent/operator.js';
 import type { MeridianTurn } from '../agent/types.js';
 import type { ChannelAdapter } from '../channels/types.js';
+import { evaluateActionPolicy } from '../governance/action-policy.js';
 
 function readSystemBase(home: ReturnType<typeof ensureAgentHome>, agentName: string): string {
   const id = join(home.layer('IDENTITY'), 'AGENT.md');
@@ -329,13 +330,8 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // voice line is anonymous; without unlock, a caller could DM the operator,
   // pollute memory, or pull internal context. Operator unlocks by speaking
   // the configured passphrase early in the call.
-  const VOICE_TOOL_REQUIRES_UNLOCK = new Set([
-    'telegram_dm',
-    'cortex_recall',
-    'cortex_encode',
-    'cortex_dream',
-  ]);
   let vapi: VapiChannel | undefined;
+  const voiceToolCalls = new Map<string, number>();
   if (env.VAPI_API_KEY) {
     vapi = new VapiChannel({
       logger,
@@ -354,23 +350,51 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
         if (!VOICE_TOOL_ALLOW.has(name)) {
           throw new Error(`tool '${name}' is not whitelisted for voice`);
         }
-        if (VOICE_TOOL_REQUIRES_UNLOCK.has(name) && !voiceGuard.isUnlocked(ctx.callId)) {
+        const actionSession = ctx.callId ?? `phone:${ctx.phone ?? 'anonymous'}`;
+        const unlocked = voiceGuard.isUnlocked(ctx.callId);
+        const callIndex = (voiceToolCalls.get(actionSession) ?? 0) + 1;
+        voiceToolCalls.set(actionSession, callIndex);
+        const decision = evaluateActionPolicy(config, {
+          agentId: config.agent.slug, sessionId: `voice:${actionSession}`, channel: 'voice',
+          senderTrusted: unlocked, toolName: name, callIndex,
+        });
+        const receiptBase = {
+          agentId: config.agent.slug, sessionId: `voice:${actionSession}`, channel: 'voice' as const,
+          senderTrusted: unlocked, toolName: name, callIndex, ...decision,
+          receiptId: `act_${randomUUID()}`, ts: new Date().toISOString(),
+          argsDigest: store.digestActionArgs(args),
+        };
+        if (decision.decision === 'deny') {
+          store.recordActionReceipt({ ...receiptBase, outcome: 'denied', durationMs: 0 });
           // Soft-fail: return a structured response the model can speak naturally
           // ("I'm in public mode and can't do that without authorization").
           // Do NOT throw — throwing fires the error path on VAPI's side and
           // the model loses the ability to surface it to the caller smoothly.
           return {
-            error: 'voice_session_locked',
-            message: voiceGuard.isConfigured()
+            error: unlocked ? 'action_denied' : 'voice_session_locked',
+            message: !unlocked && voiceGuard.isConfigured()
               ? 'This call is in public mode. The caller must speak the passphrase to unlock privileged tools.'
-              : 'Voice passphrase not configured on this agent. Run `meridian voice passphrase` to set one.',
+              : !unlocked
+                ? 'Voice passphrase not configured on this agent. Run `meridian voice passphrase` to set one.'
+                : decision.reason,
           };
         }
         const t = (tools as Record<string, { execute?: (a: unknown) => Promise<unknown> }>)[name];
         if (!t?.execute) {
           throw new Error(`tool '${name}' not loaded`);
         }
-        return t.execute(args);
+        const started = Date.now();
+        try {
+          const result = await t.execute(args);
+          store.recordActionReceipt({ ...receiptBase, outcome: 'succeeded', durationMs: Date.now() - started });
+          return result;
+        } catch (error) {
+          store.recordActionReceipt({
+            ...receiptBase, outcome: 'failed', durationMs: Date.now() - started,
+            errorClass: error instanceof Error ? error.constructor.name : 'UnknownError',
+          });
+          throw error;
+        }
       },
     });
     await vapi.start(undefined, {

@@ -95,4 +95,44 @@ describe('SessionStore', () => {
     assert.equal(b.loadTrace('t1')?.reply, 'r');
     assert.deepEqual(b.listRecent().map((x) => x.id), ['s1']);
   });
+
+  it('writes, verifies, chains, and replays signed action receipts', () => {
+    const home = homeFor(tmp);
+    const store = new SessionStore(home);
+    const base = {
+      agentId: 'a', sessionId: 's1', channel: 'cli' as const, senderTrusted: true,
+      toolName: 'calculate', callIndex: 1, decision: 'allow' as const,
+      reason: 'allowed', rule: 'allow', ts: '2026-01-01T00:00:00Z',
+      argsDigest: store.digestActionArgs({ x: 1 }), outcome: 'succeeded' as const,
+    };
+    const first = store.recordActionReceipt({ ...base, receiptId: 'act_1' });
+    const second = store.recordActionReceipt({ ...base, receiptId: 'act_2', callIndex: 2, ts: '2026-01-01T00:00:01Z' });
+    assert.equal(store.verifyActionReceipt(first), true);
+    assert.equal(second.previousHash, first.hash);
+    assert.equal(store.verifyActionReceipt({ ...second, toolName: 'bash' }), false);
+
+    const replay = new SessionStore(home);
+    const loaded = replay.listActionReceipts('s1');
+    assert.deepEqual(loaded.map((r) => r.receiptId), ['act_2', 'act_1']);
+    assert.equal(loaded.every((r) => replay.verifyActionReceipt(r)), true);
+    assert.equal(replay.verifyActionChain(), true);
+  });
+
+  it('issues signed, expiring, session-scoped, one-use approval grants', () => {
+    const home = homeFor(tmp);
+    const store = new SessionStore(home);
+    const grant = store.grantApproval('s1', 'telegram_dm', 5, 'args-one');
+    assert.equal(store.verifyApproval(grant), true);
+    assert.equal(store.consumeApproval('other', 'telegram_dm', 'args-one'), false);
+    assert.equal(store.consumeApproval('s1', 'telegram_dm', 'wrong'), false);
+    assert.equal(store.consumeApproval('s1', 'telegram_dm', 'args-one'), true);
+    assert.equal(store.consumeApproval('s1', 'telegram_dm', 'args-one'), false);
+    const latest = store.listApprovals('s1')[0]!;
+    assert.equal(latest.remainingUses, 0);
+    assert.equal(store.verifyApproval(latest), true);
+
+    const replay = new SessionStore(home);
+    assert.equal(replay.consumeApproval('s1', 'telegram_dm', 'args-one'), false);
+    assert.equal(replay.verifyApproval(replay.listApprovals('s1')[0]!), true);
+  });
 });

@@ -33,9 +33,31 @@ By <a href="https://aterna.ai">ATERNA AI</a>. Create your legend.
   <a href="#see-it-in-90-seconds--zero-setup">90-second demo</a> ·
   <a href="#install">Install</a> ·
   <a href="#open-benchmarks--run-them-yourself">Benchmarks</a> ·
+  <a href="docs/governance-guarantee.md">Governance guarantee</a> ·
   <a href="docs/memory-poisoning.md">Threat model</a> ·
   <a href="ROADMAP.md">Roadmap</a>
 </p>
+
+---
+
+## Governed agents, with receipts
+
+Meridian is the compact agent OS for teams that need to prove what an agent was
+allowed to do—not merely trust a prompt. A deterministic action boundary binds
+tool execution to sender identity, operator denylists, scoped one-use approvals,
+and per-turn ceilings. Completed attempts produce HMAC-signed, hash-chained
+receipts. With Routexor, model calls add pre-provider context/token/spend checks,
+atomic budget reservations, loop quarantine, and a correlatable authorization
+receipt.
+
+```bash
+pnpm benchmark:governed
+```
+
+The precise enforcement boundary and honest limitations are in the
+[governance guarantee](docs/governance-guarantee.md). The no-secrets
+[Stormy golden agent](examples/golden/stormy/) shows the production profile for
+a high-stakes vertical agent.
 
 ---
 
@@ -329,8 +351,16 @@ writes nothing at all.
 
 ## Open benchmarks — run them yourself
 
-Two axes, both reproducible, both inviting you to run rivals through the same
-harness.
+Three axes, all reproducible, all inviting other harnesses to run the same cases.
+
+**Governed execution — [Governed Agent Benchmark v1](benchmarks/governed-agent-v1/):**
+tests identity boundaries, operator policy, scoped approvals, least privilege,
+loop containment, real enforcement, and receipt completeness. The Level 2 spec
+adds provider spend/context reservation and durable quarantine.
+
+```bash
+pnpm benchmark:governed
+```
 
 **Security — [MemPoisonBench](scripts/mempoison/)** (`scripts/mempoison/`):
 poisoning success **100% → 0%** across 35 vectors, **0 false positives** on 12
@@ -417,6 +447,8 @@ crashed → dream skipped → memory stale" failure mode.
 
 | Doc | What's inside |
 |---|---|
+| [Governance guarantee](docs/governance-guarantee.md) | Exact enforcement boundary, receipt properties, fail-closed behavior, and limitations |
+| [Governed deployment](docs/governed-deployment.md) | Independent install, production profile, canary and rollback gates |
 | [Skill authoring](docs/skill-authoring.md) | Add a real tool in ten minutes: manifest, `createTools(ctx)`, credentials, build, install, verify |
 | [Threat model & memory-poisoning defense](docs/memory-poisoning.md) | The attack, the two-tier defense, signed provenance, and the honest residual gaps |
 | [Harness comparison methodology](docs/harness-comparison-methodology.md) | How we compare to other harnesses fairly — published behavior only, no competitor code run |

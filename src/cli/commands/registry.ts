@@ -32,6 +32,8 @@ export const COMMAND_REGISTRY: readonly CommandDef[] = [
   { name: 'model', description: 'Switch model for this session', category: 'Configuration', argsHint: '[model]' },
   { name: 'provider', description: 'Show available providers', category: 'Configuration' },
   { name: 'auth', description: 'Authorize a passphrase-guarded skill for this session', category: 'Configuration', argsHint: '<skill> <passphrase>' },
+  { name: 'approve', description: 'Grant one expiring use of a governed tool', category: 'Configuration', argsHint: '<tool> [minutes]' },
+  { name: 'approvals', description: 'Show approval grants for this session', category: 'Configuration' },
 
   // Tools
   { name: 'tools', description: 'List enabled tools', category: 'Tools' },
@@ -46,6 +48,7 @@ export const COMMAND_REGISTRY: readonly CommandDef[] = [
   { name: 'decisions', description: 'Show logged decisions from the ledger', category: 'CORTEX' },
   { name: 'why', description: 'Show the memories that backed an agent claim', category: 'CORTEX', argsHint: '<claim>' },
   { name: 'trace', description: 'Show the full reasoning chain for a turn', category: 'CORTEX', argsHint: '<turn-id|last>' },
+  { name: 'receipts', description: 'Show signed action receipts for this session', category: 'CORTEX', argsHint: '[limit]' },
   { name: 'encode', description: 'Manually encode a memory with a label', category: 'CORTEX', argsHint: '<text>' },
   { name: 'dream', description: 'Trigger a dream cycle on demand', category: 'CORTEX' },
   { name: 'audit', description: 'Run a verification retrospective and write the report', category: 'CORTEX' },
