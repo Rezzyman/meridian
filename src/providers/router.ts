@@ -31,7 +31,7 @@ const routexorFetch: typeof globalThis.fetch = async (input, init) => {
   if (typeof init?.body !== 'string') return globalThis.fetch(input, init);
   try {
     const body = JSON.parse(init.body) as Record<string, unknown>;
-    if (typeof body.model === 'string' && body.model.startsWith('claude-') && body.temperature === 0) {
+    if (body.model === 'claude-sonnet-5' && body.temperature === 0) {
       delete body.temperature;
       return globalThis.fetch(input, { ...init, body: JSON.stringify(body) });
     }
