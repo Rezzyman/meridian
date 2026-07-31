@@ -104,3 +104,16 @@ cortex:
   valenceInference: true
   memoryLlmJudge: true
   provenanceTrust: signed
+
+operator:
+  id: winnstorm-operator
+  channels:
+    cli:
+      - stormy
+    telegram: []
+    slack: []
+    discord: []
+    matrix: []
+    voice: []
+    whatsapp: []
+    sms: []
