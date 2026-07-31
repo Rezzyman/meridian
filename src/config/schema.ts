@@ -70,6 +70,7 @@ export const AgentEnvSchema = z
 
   // CORTEX server URL (used by CortexBind)
   MERIDIAN_CORTEX_URL: z.string().url().optional(),
+  MERIDIAN_CORTEX_TOKEN: z.string().min(32).optional(),
 
   // Memory provider selection. "cortex" is the open-source default;
   // "quartz" lazy-loads @aterna/quartz and falls back to cortex on failure;
