@@ -10,8 +10,9 @@ Meridian separates autonomy into three layers:
 The durable ledger is stored at
 `AUTOMATIONS/.runtime/control-plane.json` inside each agent home. Writes are
 atomic and owner-only. A schedule occurrence has one deterministic run id.
-An active lease prevents overlap; an expired lease is recovered as a
-`dead_letter` rather than silently retried after an unknown side effect.
+An active lease prevents overlap. A process restart or expired lease recovers
+the interrupted run as a `dead_letter` rather than silently retrying after an
+unknown side effect.
 
 ## Automation policy
 

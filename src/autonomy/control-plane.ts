@@ -40,7 +40,7 @@ export interface AutonomyRun {
 
 interface JobState {
   nextScheduledAt?: string;
-  lease?: { runId: string; until: string };
+  lease?: { runId: string; until: string; ownerId?: string };
   lastNotification?: { digest: string; at: string };
   consecutiveFailures: number;
   runs: AutonomyRun[];
@@ -62,6 +62,7 @@ const MAX_RUNS_PER_JOB = 100;
 export class AutonomyControlPlane {
   readonly statePath: string;
   private readonly lockPath: string;
+  private readonly instanceId = `runtime_${randomUUID()}`;
 
   constructor(home: MeridianHome, statePath?: string) {
     this.statePath = statePath ?? join(home.layer('AUTOMATIONS'), '.runtime', 'control-plane.json');
@@ -93,7 +94,7 @@ export class AutonomyControlPlane {
         attempt: 1,
         outcome: 'running',
       };
-      current.lease = { runId: run.runId, until: run.leaseUntil };
+      current.lease = { runId: run.runId, until: run.leaseUntil, ownerId: this.instanceId };
       current.runs.push(run);
       this.trim(current);
       return { acquired: true, run: { ...run } };
@@ -142,7 +143,7 @@ export class AutonomyControlPlane {
     return this.mutate((state) => {
       const recovered: AutonomyRun[] = [];
       for (const current of Object.values(state.jobs)) {
-        if (current.lease && current.lease.until <= now.toISOString()) {
+        if (current.lease && (current.lease.ownerId !== this.instanceId || current.lease.until <= now.toISOString())) {
           const run = this.abandonExpiredRun(current, now);
           if (run) recovered.push({ ...run });
         }
@@ -182,7 +183,9 @@ export class AutonomyControlPlane {
     if (run?.outcome === 'running') {
       run.outcome = 'dead_letter';
       run.finishedAt = now.toISOString();
-      run.reason = 'lease expired before a terminal outcome was recorded';
+      run.reason = current.lease?.ownerId !== this.instanceId
+        ? 'runtime restarted before a terminal outcome was recorded'
+        : 'lease expired before a terminal outcome was recorded';
       current.consecutiveFailures++;
     }
     delete current.lease;

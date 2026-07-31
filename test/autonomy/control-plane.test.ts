@@ -67,6 +67,16 @@ describe('AutonomyControlPlane', () => {
     assert.match(recovered[0]?.reason ?? '', /lease expired/);
   });
 
+  it('dead-letters an in-flight run immediately when a new runtime takes ownership', () => {
+    const { home, plane } = fixture();
+    const at = new Date('2026-07-31T14:00:00.000Z');
+    plane.begin('brief', at, 15 * 60_000, at);
+    const restarted = new AutonomyControlPlane(home);
+    const recovered = restarted.recoverExpired(new Date(at.getTime() + 1_000));
+    assert.equal(recovered[0]?.outcome, 'dead_letter');
+    assert.match(recovered[0]?.reason ?? '', /runtime restarted/);
+  });
+
   it('suppresses identical notifications during cooldown and persists the decision', () => {
     const { home, plane } = fixture();
     const at = new Date('2026-07-31T14:00:00.000Z');
