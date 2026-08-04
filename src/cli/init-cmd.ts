@@ -152,7 +152,7 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
   console.log(colors.ok(`\nMeridian agent '${slug}' ready.`));
   console.log(colors.muted('Next steps:'));
   if (embedded) {
-    // Zero-config path: memory already works locally, only a model key is left.
+    // Embedded memory already works locally; ROUTEXOR is the one guided model path.
     console.log(colors.muted(`  1. Give it a model in ${home.envPath}:`));
     console.log(
       colors.muted('       • ROUTEXOR (default, BYOK, zero markup): sign up free at https://routexor.com,'),
@@ -161,9 +161,6 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
       colors.muted('         add your provider key (Anthropic, OpenAI, ...) in its dashboard, then'),
     );
     console.log(colors.muted('         create your ROUTEXOR key → ROUTEXOR_API_KEY'));
-    console.log(
-      colors.muted('       • or a local model, no key: install ollama then `ollama pull qwen2.5`'),
-    );
     console.log(colors.muted('  2. Run `meridian` to start chatting. Memory is local — no server needed.'));
     console.log(
       colors.muted('  3. (optional) `meridian onboard` for the extended interview; `meridian doctor` to validate.'),
@@ -175,9 +172,6 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
     );
     console.log(
       colors.muted('         provider key in its dashboard, create your ROUTEXOR key → ROUTEXOR_API_KEY'),
-    );
-    console.log(
-      colors.muted('       • or a direct provider key (ANTHROPIC/OPENAI/GROQ), or a local `ollama` model (no key)'),
     );
     console.log(colors.muted('     (this CORTEX-server agent also needs NEON_DATABASE_URL + VOYAGE_API_KEY)'));
     console.log(colors.muted('  2. Run `meridian doctor` to validate the wiring.'));

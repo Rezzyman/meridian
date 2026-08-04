@@ -165,8 +165,7 @@ export class ProviderRouter {
             'ROUTEXOR_API_KEY missing. Meridian routes models through ROUTEXOR by default ' +
               '(BYOK, zero markup): sign up at https://routexor.com, add your provider key ' +
               '(Anthropic, OpenAI, ...) in the dashboard, create a ROUTEXOR key, and set ' +
-              "ROUTEXOR_API_KEY in your agent's .env. Or switch your model ref to a direct " +
-              'provider (anthropic/openai/groq) or a local `ollama/...` model.',
+              "ROUTEXOR_API_KEY in your agent's .env.",
           );
         }
         const rx = createOpenAI({

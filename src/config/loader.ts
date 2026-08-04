@@ -80,8 +80,8 @@ export function collectSkillEnv(declaredKeys: Iterable<string>): Record<string, 
   return out;
 }
 
-/** Zero-config .env: embedded local memory, ollama by default — no external
- *  servers, no API keys required. The 60-second quickstart. */
+/** Embedded-memory .env: no memory server or database required. ROUTEXOR is
+ *  the single recommended model setup path. */
 export function embeddedEnvFileTemplate(slug: string): string {
   return `# Meridian agent env: ${slug} (zero-config / embedded memory)
 # No CORTEX server, no Neon, no Voyage. Memory persists locally in
@@ -99,13 +99,7 @@ MERIDIAN_MEMORY_PROVIDER=embedded
 #      BYOK means your provider key pays for the models; without this step,
 #      model calls fail.
 #   3. create your ROUTEXOR API key and paste it below
-# Prefer to go direct or fully local? A direct provider key, OR a local ollama
-# (no key — install https://ollama.com then \`ollama pull qwen2.5\`), also works.
 ROUTEXOR_API_KEY=
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-GROQ_API_KEY=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
 
 # Gateway
 MERIDIAN_GATEWAY_TOKEN=
@@ -126,17 +120,12 @@ NEON_DATABASE_URL=
 # Voyage AI embeddings (dedicated key per agent)
 VOYAGE_API_KEY=
 
-# ── Model routing (at least one required) ──
+# ── Model routing ──
 # Default router: ROUTEXOR (BYOK, zero markup). 1) sign up free at
 # https://routexor.com  2) add a provider key (Anthropic, OpenAI, ...) in the
 # dashboard: your provider key pays for the models  3) create your ROUTEXOR
 # API key and paste it here:
 ROUTEXOR_API_KEY=
-# Or go direct / local instead of (or alongside) ROUTEXOR:
-GROQ_API_KEY=          # free tier, fastest inference — https://console.groq.com
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-OLLAMA_BASE_URL=http://127.0.0.1:11434
 
 # VAPI voice channel (optional, set to enable voice)
 VAPI_API_KEY=
