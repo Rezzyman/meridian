@@ -32,7 +32,7 @@ test/
   skills/                  loader + dynamic tool registration
   secrets/                 vault encrypt/decrypt
   providers/               router resolution, chains, smart routing
-  verification/            check loading + helpers (contract tests; unwired in runtime today)
+  verification/            check loading + helpers (contract tests; wired into runTurn: block-severity withholds the reply)
   mcp/                     MCP client/server interop
   gateway/                 HTTP + SSE streaming endpoints
 ```

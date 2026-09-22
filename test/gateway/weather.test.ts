@@ -84,7 +84,7 @@ describe('Open-Meteo weather adapter', () => {
       city: 'Denver',
       latitude: 39.7392,
       longitude: -104.9903,
-      fetchImpl: (async (input: URL | RequestInfo) => {
+      fetchImpl: (async (input: Parameters<typeof fetch>[0]) => {
         requested = new URL(String(input));
         return new Response(
           JSON.stringify({

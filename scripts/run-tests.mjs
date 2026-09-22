@@ -33,7 +33,8 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-const result = spawnSync(process.execPath, ['--test', '--import', 'tsx', ...files], {
+const coverage = process.env.COVERAGE ? ['--experimental-test-coverage'] : [];
+const result = spawnSync(process.execPath, ['--test', ...coverage, '--import', 'tsx', ...files], {
   stdio: 'inherit',
 });
 process.exit(result.status ?? 1);

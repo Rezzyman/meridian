@@ -76,7 +76,7 @@ describe('deterministic action policy', () => {
       record: (receipt) => receipts.push(receipt),
     });
     const result = await (
-      tools.bash as { execute: (args: unknown) => Promise<{ error: string }> }
+      tools.bash as unknown as { execute: (args: unknown) => Promise<{ error: string }> }
     ).execute({ cmd: 'danger' });
     assert.equal(executions, 0);
     assert.equal(result.error, 'action_denied');
@@ -106,8 +106,9 @@ describe('deterministic action policy', () => {
       digestArgs: () => 'd',
       record: (r) => receipts.push(r),
     });
-    const execute = (tools.calculate as { execute: (args: unknown) => Promise<{ error?: string }> })
-      .execute;
+    const execute = (
+      tools.calculate as unknown as { execute: (args: unknown) => Promise<{ error?: string }> }
+    ).execute;
     await execute({});
     const second = await execute({});
     assert.equal(executions, 1);

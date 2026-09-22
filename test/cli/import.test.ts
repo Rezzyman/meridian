@@ -611,6 +611,7 @@ describe('planImport (hermes, real anatomy)', () => {
       // The generated files are real automation entries (note steps under AUTOMATIONS/).
       const step = plan.steps.find((s) => s.targetRel === brief.fileRel);
       assert.ok(step?.content?.startsWith('---\n'), 'frontmatter file generated');
+      assert.ok(step);
       assert.match(step.content ?? '', /schedule: 6 8 \* \* 1-5/);
       assert.match(step.content ?? '', /timezone: America\/Denver/);
       assert.match(step.content ?? '', /morning brief/i, 'prompt body preserved');

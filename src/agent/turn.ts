@@ -297,7 +297,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // and CORTEX server stalls can otherwise hang the entire turn for 3-5
   // minutes, blocking the channel from responding. If recall times out we
   // proceed without memory rather than freezing the operator.
-  const RECALL_TIMEOUT_MS = 8000;
+  const RECALL_TIMEOUT_MS = ctx.config.cortex.recallTimeoutMs;
   let recallSummary = '';
   let _recallCount = 0;
   let recallMemoryIds: number[] = [];
@@ -307,7 +307,10 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   let recallTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const r = await Promise.race([
-      ctx.cortex.recall(userInput, { tokenBudget: 1500, sensitivityFilter }),
+      ctx.cortex.recall(userInput, {
+        tokenBudget: ctx.config.cortex.recallTokenBudget,
+        sensitivityFilter,
+      }),
       new Promise<never>((_, reject) => {
         recallTimer = setTimeout(
           () => reject(new Error(`cortex recall timed out after ${RECALL_TIMEOUT_MS}ms`)),
@@ -673,7 +676,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // surfaced ("our system" for VAPI/OpenRouter/Anthropic/…, "our team" for
   // AJ/Rez/…), and replace wholesale if the draft leaked raw error/billing
   // text. Model-independent — does not depend on the model remembering the rule.
-  reply = sanitizeOutbound(reply);
+  reply = sanitizeOutbound(reply, { trusted: ctx.senderTrusted === true });
 
   // 4) CORTEX encode (post-turn) — fire-and-forget so the reply lands fast.
   // Voyage embed + synapse formation can take 3-10s; users shouldn't wait.

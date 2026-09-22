@@ -23,7 +23,7 @@ import { makeConfig, silentLogger } from '../helpers/fixtures.js';
 
 type GenerateOptions = Parameters<LanguageModelV1['doGenerate']>[0];
 
-const MODELS = makeConfig().models; // routexor/claude-4-haiku + [routexor/claude-sonnet-4.6, ollama/qwen2.5]
+const MODELS = makeConfig().models; // routexor/claude-haiku-4.5 + [routexor/claude-sonnet-5, ollama/qwen2.5]
 
 function vision(overrides: Record<string, unknown> = {}) {
   return VisionConfigSchema.parse(overrides);
@@ -85,7 +85,7 @@ describe('isVisionCapableRef', () => {
   it('accepts anthropic/openai across the board and claude/gpt on routexor', () => {
     assert.equal(isVisionCapableRef('anthropic/claude-sonnet-4.6'), true);
     assert.equal(isVisionCapableRef('openai/gpt-4o-mini'), true);
-    assert.equal(isVisionCapableRef('routexor/claude-4-haiku'), true);
+    assert.equal(isVisionCapableRef('routexor/claude-haiku-4.5'), true);
   });
   it('rejects text-only local/groq models but accepts multimodal families', () => {
     assert.equal(isVisionCapableRef('ollama/qwen2.5'), false);
@@ -98,33 +98,33 @@ describe('visionChain', () => {
   it('pins vision.model first, then vision-capable chain members', () => {
     const { router } = refRouter({
       'anthropic/claude-opus': answeringModel('x').model,
-      'routexor/claude-4-haiku': answeringModel('x').model,
-      'routexor/claude-sonnet-4.6': answeringModel('x').model,
+      'routexor/claude-haiku-4.5': answeringModel('x').model,
+      'routexor/claude-sonnet-5': answeringModel('x').model,
       'ollama/qwen2.5': answeringModel('x').model,
     });
     const chain = visionChain(router, MODELS, 'anthropic/claude-opus');
     assert.deepEqual(
       chain.map((c) => c.ref),
-      ['anthropic/claude-opus', 'routexor/claude-4-haiku', 'routexor/claude-sonnet-4.6'],
+      ['anthropic/claude-opus', 'routexor/claude-haiku-4.5', 'routexor/claude-sonnet-5'],
     );
   });
 
   it('skips refs whose provider key is missing', () => {
-    const { router } = refRouter({ 'routexor/claude-sonnet-4.6': answeringModel('x').model });
+    const { router } = refRouter({ 'routexor/claude-sonnet-5': answeringModel('x').model });
     const chain = visionChain(router, MODELS, undefined);
     assert.deepEqual(
       chain.map((c) => c.ref),
-      ['routexor/claude-sonnet-4.6'],
+      ['routexor/claude-sonnet-5'],
     );
   });
 
   it('never filters the chain to empty via the breaker', () => {
     const { router, open } = refRouter({
-      'routexor/claude-4-haiku': answeringModel('x').model,
-      'routexor/claude-sonnet-4.6': answeringModel('x').model,
+      'routexor/claude-haiku-4.5': answeringModel('x').model,
+      'routexor/claude-sonnet-5': answeringModel('x').model,
     });
-    open.add('routexor/claude-4-haiku');
-    open.add('routexor/claude-sonnet-4.6');
+    open.add('routexor/claude-haiku-4.5');
+    open.add('routexor/claude-sonnet-5');
     const chain = visionChain(router, MODELS, undefined);
     assert.equal(chain.length, 2); // failsafe: all-open returns unfiltered
   });
@@ -139,8 +139,8 @@ describe('analyzeImage', () => {
   it('happy path: sends prompt + image part, returns description and model ref', async () => {
     const primary = answeringModel('Roof shows hail bruising on the south slope.');
     const { router, successes } = refRouter({
-      'routexor/claude-4-haiku': primary.model,
-      'routexor/claude-sonnet-4.6': answeringModel('unused').model,
+      'routexor/claude-haiku-4.5': primary.model,
+      'routexor/claude-sonnet-5': answeringModel('unused').model,
     });
     const path = tmpImage();
     const r = await analyzeImage(path, {
@@ -151,8 +151,8 @@ describe('analyzeImage', () => {
       question: 'Is this claimable?',
     });
     assert.equal(r.description, 'Roof shows hail bruising on the south slope.');
-    assert.equal(r.model, 'routexor/claude-4-haiku');
-    assert.deepEqual(successes, ['routexor/claude-4-haiku']);
+    assert.equal(r.model, 'routexor/claude-haiku-4.5');
+    assert.deepEqual(successes, ['routexor/claude-haiku-4.5']);
 
     // The multimodal message: text part carries the operator prompt + the
     // question; an image part carries the bytes with the detected mime type.
@@ -172,8 +172,8 @@ describe('analyzeImage', () => {
 
   it('falls back to the next provider and reports the failure to the breaker', async () => {
     const { router, failures, successes } = refRouter({
-      'routexor/claude-4-haiku': throwingModel('402 payment required openrouter.ai'),
-      'routexor/claude-sonnet-4.6': answeringModel('fallback saw the image').model,
+      'routexor/claude-haiku-4.5': throwingModel('402 payment required openrouter.ai'),
+      'routexor/claude-sonnet-5': answeringModel('fallback saw the image').model,
     });
     const r = await analyzeImage(tmpImage(), {
       router,
@@ -182,15 +182,15 @@ describe('analyzeImage', () => {
       logger: silentLogger,
     });
     assert.equal(r.description, 'fallback saw the image');
-    assert.equal(r.model, 'routexor/claude-sonnet-4.6');
-    assert.deepEqual(failures, ['routexor/claude-4-haiku']);
-    assert.deepEqual(successes, ['routexor/claude-sonnet-4.6']);
+    assert.equal(r.model, 'routexor/claude-sonnet-5');
+    assert.deepEqual(failures, ['routexor/claude-haiku-4.5']);
+    assert.deepEqual(successes, ['routexor/claude-sonnet-5']);
   });
 
   it('sanitizes total failure: no provider detail leaks out', async () => {
     const { router, failures } = refRouter({
-      'routexor/claude-4-haiku': throwingModel('Error code: 402 https://openrouter.ai/credits'),
-      'routexor/claude-sonnet-4.6': throwingModel('ECONNREFUSED api.provider.example:443'),
+      'routexor/claude-haiku-4.5': throwingModel('Error code: 402 https://openrouter.ai/credits'),
+      'routexor/claude-sonnet-5': throwingModel('ECONNREFUSED api.provider.example:443'),
     });
     await assert.rejects(
       analyzeImage(tmpImage(), { router, models: MODELS, vision: vision(), logger: silentLogger }),
@@ -207,7 +207,7 @@ describe('analyzeImage', () => {
 
   it('rejects oversize images before any provider call', async () => {
     const { router } = refRouter({
-      'routexor/claude-4-haiku': answeringModel('never called').model,
+      'routexor/claude-haiku-4.5': answeringModel('never called').model,
     });
     const path = tmpImage(2048);
     await assert.rejects(
@@ -227,7 +227,7 @@ describe('analyzeImage', () => {
 
   it('refuses when vision is disabled and when the file is missing', async () => {
     const { router } = refRouter({
-      'routexor/claude-4-haiku': answeringModel('never called').model,
+      'routexor/claude-haiku-4.5': answeringModel('never called').model,
     });
     await assert.rejects(
       analyzeImage(tmpImage(), { router, models: MODELS, vision: vision({ enabled: false }) }),

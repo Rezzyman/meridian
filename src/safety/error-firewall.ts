@@ -159,9 +159,15 @@ export function redactInternalDisclosure(text: string): RedactResult {
  * channel: a leaky message is replaced wholesale; an otherwise-fine message has
  * internal names redacted.
  */
-export function sanitizeOutbound(text: string): string {
+export function sanitizeOutbound(text: string, opts?: { trusted?: boolean }): string {
   if (!text) return text;
   if (isLeaky(text)) return GENERIC_HICCUP_MESSAGE;
+  // Name redaction is a CLIENT protection. For the resolved operator (Telegram
+  // locked to the owner, signed CLI, trusted gateway) it rewrites the owner's
+  // own name and the tools they asked about into "our team" / "our system",
+  // which made Arlo look like he was lying about his own drafts (operator patch
+  // 2026-08-08, recovered during consolidation). Leak masking stays on for all.
+  if (opts?.trusted) return text;
   return redactInternalDisclosure(text).text;
 }
 

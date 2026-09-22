@@ -280,5 +280,6 @@ function envStub() {
     OLLAMA_BASE_URL: 'http://127.0.0.1:11434',
     MERIDIAN_GATEWAY_PORT: 18889,
     MERIDIAN_MEMORY_PROVIDER: 'cortex' as const,
+    ATERNA_LOOP_HARNESS: 'meridian' as const,
   };
 }

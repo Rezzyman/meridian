@@ -21,6 +21,7 @@ import { Conversation } from '../agent/conversation.js';
 import { DreamWeaver } from '../dream/weaver.js';
 import { buildToolSurface } from '../agent/tool-surface.js';
 import { createLogger } from '../logger/pino.js';
+import { installCrashHandlers } from '../gateway/crash-safety.js';
 import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
 import { SlackChannel } from '../channels/slack.js';
@@ -77,6 +78,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   const config = loadAgentConfig(home);
   const env = loadAgentEnv(home);
   const logger = createLogger({ home });
+  installCrashHandlers(logger, process, { agentId: slug });
 
   const cortex = bindCortex(env.CORTEX_AGENT_ID, env.MERIDIAN_CORTEX_URL);
   const router = new ProviderRouter(env);

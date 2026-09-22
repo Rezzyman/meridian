@@ -7,7 +7,7 @@
   <a href="https://github.com/Rezzyman/meridian/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Rezzyman/meridian/ci.yml?branch=main&style=for-the-badge" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen?style=for-the-badge" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/tests-587%20passing-brightgreen?style=for-the-badge" alt="587 tests passing">
+  <img src="https://img.shields.io/badge/tests-759%20passing-brightgreen?style=for-the-badge" alt="759 tests passing">
   <img src="https://img.shields.io/badge/MemPoisonBench-100%25%20%E2%86%92%200%25-8A2BE2?style=for-the-badge" alt="MemPoisonBench: 100% to 0%">
   <a href="#built-openly-with-an-ai-co-builder"><img src="https://img.shields.io/badge/built%20openly-with%20an%20AI-ff69b4?style=for-the-badge" alt="Built openly with an AI co-builder"></a>
 </p>
@@ -225,7 +225,7 @@ ROUTEXOR API key and set it as `ROUTEXOR_API_KEY` (`ROUTEXOR_BASE_URL` overrides
 the endpoint). **ROUTEXOR is the recommended and supported quick-start path for
 Meridian.** It gives every agent one stable model credential while preserving
 BYOK provider choice behind the ROUTEXOR dashboard. Model refs use
-`routexor/<model>`, for example `routexor/claude-4-haiku`.
+`routexor/<model>`, for example `routexor/claude-haiku-4.5`.
 
 ---
 
