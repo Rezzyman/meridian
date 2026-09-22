@@ -43,6 +43,7 @@ import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js
 import { runMcpAdd, runMcpList, runMcpRemove, runMcpServe, runMcpToggle } from './mcp-cmd.js';
 import { runDemo } from './demo-cmd.js';
 import { runImport } from './import-cmd.js';
+import { runLoopPair } from './loop-cmd.js';
 
 // Read the real version from package.json so `--version` never drifts from the
 // published release. `../../package.json` resolves the same from src/cli (tsx
@@ -245,6 +246,13 @@ program
   .action(async (opts: { port?: number; web?: boolean }) => {
     await runGateway(opts);
   });
+
+const loopCmd = program.command('loop').description('Pair the first-party Aterna Loop app');
+loopCmd
+  .command('pair')
+  .description('Create a one-use code for this agent')
+  .option('--ttl <minutes>', 'code lifetime (1–60 minutes)', (value) => Number(value), 10)
+  .action((opts: { ttl: number }) => runLoopPair(opts.ttl));
 
 // `meridian ingest <path>` — feed a file (or directory) into CORTEX.
 program

@@ -150,6 +150,16 @@ export interface TurnContext {
     consumeApproval?(toolName: string, argsDigest: string): boolean;
     record(receipt: ActionReceiptInput): void;
   };
+  /** Per-turn isolation imposed by a first-party client surface. This policy is
+   *  supplied by trusted gateway code, never by request JSON or the model. */
+  isolation?: {
+    /** Remove every built-in, skill, and MCP tool from the model-visible turn. */
+    disableTools?: boolean;
+    /** Do not encode the request or reply into durable agent memory. */
+    disableMemoryWrite?: boolean;
+    /** Framework-authored policy appended to the system prompt for this turn. */
+    systemPolicy?: string;
+  };
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -371,6 +381,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   const system = [
     RUNTIME_RULES,
     ctx.systemBase,
+    ctx.isolation?.systemPolicy ?? '',
     recallSummary ? `<cortex_recall>\n${recallSummary}\n</cortex_recall>` : '',
   ]
     .filter(Boolean)
@@ -405,7 +416,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // is in its set — independent of config.tools, which stays the operator
   // surface for builtins.
   const mcpAllowed = (name: string): boolean => ctx.mcpGate?.get(name)?.has(ctx.channel) === true;
-  const allowedTools: ToolSet | undefined = ctx.tools
+  const allowedTools: ToolSet | undefined = !ctx.isolation?.disableTools && ctx.tools
     ? Object.fromEntries(
         Object.entries(ctx.tools).filter(
           ([k]) =>
@@ -655,7 +666,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // their reply.
   const memoryId: number | undefined = undefined;
   const encodeOk = false;
-  if (ctx.config.cortex.encodeOnTurn) {
+  if (ctx.config.cortex.encodeOnTurn && !ctx.isolation?.disableMemoryWrite) {
     const valence = ctx.config.cortex.valenceInference
       ? inferValence(`${userInput}\n\nASSISTANT: ${reply}`, ctx.channel)
       : undefined;

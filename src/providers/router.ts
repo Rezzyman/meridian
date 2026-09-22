@@ -73,6 +73,28 @@ function hybridOllama(live: LanguageModel, sim: LanguageModel): LanguageModel {
   });
 }
 
+/**
+ * AI SDK 4 defaults an omitted temperature to zero before invoking a model.
+ * New Routexor Claude 5 endpoints reject the parameter entirely, so removing
+ * it at the model boundary is the only place that works without weakening the
+ * rest of Meridian's provider behavior.
+ */
+export function withoutTemperature(model: LanguageModel): LanguageModel {
+  return new Proxy(model, {
+    get(target, prop, receiver) {
+      if (prop === 'doGenerate') {
+        return (options: Parameters<LanguageModel['doGenerate']>[0]) =>
+          target.doGenerate({ ...options, temperature: undefined });
+      }
+      if (prop === 'doStream') {
+        return (options: Parameters<LanguageModel['doStream']>[0]) =>
+          target.doStream({ ...options, temperature: undefined });
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+}
+
 function parseRef(ref: string): { provider: ProviderName; modelId: string } {
   const slash = ref.indexOf('/');
   if (slash === -1) throw new Error(`invalid model ref: ${ref}`);
@@ -206,14 +228,18 @@ export class ProviderRouter {
           name: 'routexor',
           fetch: routexorFetch,
         });
-        const live = rx(modelId);
+        // Two protections stack here. ROUTEXOR's Claude 5 endpoints reject the
+        // `temperature` the AI SDK injects, so strip it at the model boundary.
+        // ROUTEXOR's Anthropic streaming path has intermittently dropped tool
+        // call deltas, so tool-bearing turns generate non-streaming and expose
+        // the result as a stream; ordinary conversation keeps true streaming.
+        const claude5 = /^claude-(?:haiku|sonnet|opus|fable)-5(?:$|[.-])/i.test(modelId);
+        const base = (): LanguageModel => (claude5 ? withoutTemperature(rx(modelId)) : rx(modelId));
+        const live = base();
         const simulated = wrapLanguageModel({
-          model: rx(modelId),
+          model: base(),
           middleware: simulateStreamingMiddleware(),
         });
-        // ROUTEXOR's Anthropic streaming path has intermittently dropped tool
-        // call deltas. Generate tool-bearing turns non-streaming and expose the
-        // result as a stream; keep true streaming for ordinary conversation.
         return hybridOllama(live, simulated);
       }
       case 'groq': {
