@@ -27,10 +27,27 @@ import type { ProactiveSentinel } from '../proactive/sentinel.js';
 import type { AutomationManager } from '../automations/manager.js';
 import { readWaitlist, recordWaitlist } from '../hosted/waitlist.js';
 import { sanitizeUserFacingError } from '../safety/error-firewall.js';
+import type { WeatherProvider } from './weather.js';
+import { parseDeviceLookMultipart } from './device-media.js';
+import type { AudioTranscriber, ImageDescriber } from './device-media.js';
+import { registerLoopRoute } from './loop-contract.js';
+import { registerLoopPairingRoute, type LoopPairingStore } from './loop-pairing.js';
+import { createMeridianLoopAgentAdapter, type LoopAgentAdapter } from './loop-agent-adapter.js';
 
 export interface GatewayOptions {
   port: number;
   token?: string;
+  /** Dedicated first-party Loop capability and ephemeral conversation factory.
+   *  The wearable client never receives `token`, and its submitted evidence
+   *  never joins the operator's persistent cross-channel session. */
+  loop?: {
+    token: string;
+    /** Stable runtime boundary used by OpenClaw, Hermes, or Meridian. */
+    agent?: LoopAgentAdapter;
+    /** @deprecated Existing embedded-Meridian configuration remains valid. */
+    conversation?: Conversation;
+    pairing?: { store: LoopPairingStore; publicBaseURL: string };
+  };
   logger: Logger;
   conversation: Conversation;
   vapi?: VapiChannel;
@@ -54,6 +71,12 @@ export interface GatewayOptions {
    *  gateway token — `token` here is a DEDICATED ingest credential. The route
    *  exists only when this is provided, and never without a token. */
   ingest?: { inboxDir: string; token: string };
+  /** Optional current-conditions adapter for the R1 lock screen. */
+  weather?: WeatherProvider;
+  /** Optional private speech-to-text adapter for hold-to-talk turns. */
+  transcribeAudio?: AudioTranscriber;
+  /** Optional local vision adapter for one-shot camera turns. */
+  describeImage?: ImageDescriber;
 }
 
 export async function startGateway(opts: GatewayOptions): Promise<FastifyInstance> {
@@ -74,6 +97,14 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       done(err as Error, undefined);
     }
   });
+  app.addContentTypeParser(
+    ['audio/wav', 'audio/x-wav', 'application/octet-stream'],
+    { parseAs: 'buffer' },
+    (_req, body, done) => done(null, body),
+  );
+  app.addContentTypeParser(/^multipart\/form-data/i, { parseAs: 'buffer' }, (_req, body, done) =>
+    done(null, body),
+  );
 
   // Twilio posts application/x-www-form-urlencoded; its signature is computed
   // over the URL + the raw params, so keep the raw body here too.
@@ -93,6 +124,52 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     ts: new Date().toISOString(),
   }));
 
+  // First-party Aterna AI Loop channel. The route imposes a stricter contract
+  // than generic chat: exact request shape, mandatory bearer auth, no tools,
+  // no durable memory write, and request-bound evidence identifiers.
+  const loopAgent =
+    opts.loop?.agent ??
+    createMeridianLoopAgentAdapter(opts.loop?.conversation ?? opts.conversation);
+  registerLoopRoute(app, {
+    token: opts.loop?.token,
+    authorizeToken: opts.loop?.pairing
+      ? (token) => opts.loop!.pairing!.store.authenticateDeviceToken(token)
+      : undefined,
+    logger: opts.logger,
+    agent: loopAgent,
+  });
+  if (opts.loop?.pairing) {
+    registerLoopPairingRoute(app, {
+      store: opts.loop.pairing.store,
+      publicBaseURL: opts.loop.pairing.publicBaseURL,
+      // The generic HTTP facade may deliberately omit agent identity. Pairing
+      // is a Loop capability, so bind the receipt to the selected adapter.
+      agentSlug: loopAgent.identity.slug,
+      agentDisplayName: loopAgent.identity.displayName,
+    });
+  }
+
+  app.get<{ Headers: { authorization?: string } }>('/v1/weather', async (req, reply) => {
+    if (opts.token) {
+      const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (got !== opts.token) {
+        reply.code(401);
+        return { error: 'unauthorized' };
+      }
+    }
+    if (!opts.weather) {
+      reply.code(503);
+      return { error: 'weather not configured' };
+    }
+    try {
+      return await opts.weather();
+    } catch (err) {
+      opts.logger.warn({ err }, 'weather provider failed');
+      reply.code(502);
+      return { error: 'weather unavailable' };
+    }
+  });
+
   // ── Web chat (opt-in) ──
   // Cached at boot: the file ships in the package and doesn't change at
   // runtime. Registered only when provided; the default gateway stays
@@ -102,7 +179,10 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
   // skeleton/web/README.md instead).
   if (opts.web) {
     const html = readFileSync(opts.web.htmlPath, 'utf8');
-    const serveChat = async (_req: unknown, reply: { header: (k: string, v: string) => unknown }) => {
+    const serveChat = async (
+      _req: unknown,
+      reply: { header: (k: string, v: string) => unknown },
+    ) => {
       reply.header('content-type', 'text/html; charset=utf-8');
       return html;
     };
@@ -213,7 +293,9 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
         return { error: 'filename and content required' };
       }
       // basename() + charset allowlist: an upload names a file, never a path.
-      const safeName = basename(filename).replace(/[^\w.\- ]+/g, '_').slice(0, 140);
+      const safeName = basename(filename)
+        .replace(/[^\w.\- ]+/g, '_')
+        .slice(0, 140);
       if (!safeName || safeName.startsWith('.')) {
         reply.code(400);
         return { error: 'invalid filename' };
@@ -256,6 +338,107 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       }
       const turn = await opts.conversation.send(input);
       return { reply: turn.content, turnId: turn.id, memoryId: turn.memoryId };
+    },
+  );
+
+  // Native Meridian device contract. Keep /chat stable for web/CLI clients while the
+  // child-safe Android shell gets a deliberately narrow, typed endpoint. Device identity,
+  // session and memory controls arrive in X-Meridian-* headers; the gateway's operator-keyed
+  // conversation facade remains the authority for recall and persistence.
+  app.post<{ Body: { text?: string }; Headers: { authorization?: string } }>(
+    '/v1/turns/text',
+    async (req, reply) => {
+      if (opts.token) {
+        const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+        if (got !== opts.token) {
+          reply.code(401);
+          return { error: 'unauthorized' };
+        }
+      }
+      const text = req.body?.text;
+      if (!text || typeof text !== 'string') {
+        reply.code(400);
+        return { error: 'text required' };
+      }
+      const turn = await opts.conversation.send(text);
+      return {
+        text: turn.content,
+        turnId: turn.id,
+        memoryId: turn.memoryId,
+      };
+    },
+  );
+
+  app.post<{ Body: Buffer; Headers: { authorization?: string; 'content-type'?: string } }>(
+    '/v1/turns/ptt',
+    async (req, reply) => {
+      if (opts.token) {
+        const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+        if (got !== opts.token) {
+          reply.code(401);
+          return { error: 'unauthorized' };
+        }
+      }
+      if (!opts.transcribeAudio) {
+        reply.code(503);
+        return { error: 'speech recognition not configured' };
+      }
+      if (!Buffer.isBuffer(req.body) || req.body.length < 44) {
+        reply.code(400);
+        return { error: 'audio required' };
+      }
+      try {
+        const transcript = await opts.transcribeAudio(
+          req.body,
+          req.headers['content-type']?.split(';')[0] ?? 'audio/wav',
+        );
+        const turn = await opts.conversation.send(transcript);
+        return {
+          text: turn.content,
+          transcript,
+          turnId: turn.id,
+          memoryId: turn.memoryId,
+        };
+      } catch (err) {
+        opts.logger.warn({ err }, 'R1 push-to-talk turn failed');
+        reply.code(502);
+        return { error: 'speech turn unavailable' };
+      }
+    },
+  );
+
+  app.post<{ Body: Buffer; Headers: { authorization?: string; 'content-type'?: string } }>(
+    '/v1/turns/look',
+    async (req, reply) => {
+      if (opts.token) {
+        const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+        if (got !== opts.token) {
+          reply.code(401);
+          return { error: 'unauthorized' };
+        }
+      }
+      if (!opts.describeImage) {
+        reply.code(503);
+        return { error: 'vision not configured' };
+      }
+      try {
+        const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(req.headers['content-type'] ?? '');
+        const parts = parseDeviceLookMultipart(req.body, boundary?.[1] ?? boundary?.[2] ?? '');
+        const observation = await opts.describeImage(parts.frame, parts.prompt);
+        const turn = await opts.conversation.send(
+          `${parts.prompt}\n\nVisual observation from the R1 camera:\n${observation}`,
+        );
+        return {
+          text: turn.content,
+          observation,
+          turnId: turn.id,
+          memoryId: turn.memoryId,
+        };
+      } catch (err) {
+        opts.logger.warn({ err }, 'R1 camera turn failed');
+        reply.code(502);
+        return { error: 'vision turn unavailable' };
+      }
     },
   );
 
@@ -387,38 +570,44 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
 
   // WhatsApp (Meta Cloud API). GET = webhook verification handshake; POST =
   // signed inbound messages → ack, then reply via the Graph API.
-  app.get<{ Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string } }>(
+  app.get<{
+    Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string };
+  }>('/whatsapp/webhook', async (req, reply) => {
+    if (!opts.whatsapp) {
+      reply.code(404);
+      return { error: 'whatsapp channel not configured' };
+    }
+    const q = req.query;
+    const challenge = opts.whatsapp.handleVerification(
+      q['hub.mode'],
+      q['hub.verify_token'],
+      q['hub.challenge'],
+    );
+    if (challenge === null) {
+      reply.code(403);
+      return { error: 'verification failed' };
+    }
+    reply.code(200).header('content-type', 'text/plain').send(challenge);
+    return reply;
+  });
+  app.post<{ Headers: { 'x-hub-signature-256'?: string } }>(
     '/whatsapp/webhook',
     async (req, reply) => {
       if (!opts.whatsapp) {
         reply.code(404);
         return { error: 'whatsapp channel not configured' };
       }
-      const q = req.query;
-      const challenge = opts.whatsapp.handleVerification(q['hub.mode'], q['hub.verify_token'], q['hub.challenge']);
-      if (challenge === null) {
-        reply.code(403);
-        return { error: 'verification failed' };
+      const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
+      if (!opts.whatsapp.verifySignature(rawBody, req.headers['x-hub-signature-256'])) {
+        reply.code(401);
+        return { error: 'invalid signature' };
       }
-      reply.code(200).header('content-type', 'text/plain').send(challenge);
-      return reply;
+      const result = opts.whatsapp.handleRequest(rawBody);
+      void result.done; // fire-and-forget the async turn + reply
+      reply.code(result.status);
+      return result.body;
     },
   );
-  app.post<{ Headers: { 'x-hub-signature-256'?: string } }>('/whatsapp/webhook', async (req, reply) => {
-    if (!opts.whatsapp) {
-      reply.code(404);
-      return { error: 'whatsapp channel not configured' };
-    }
-    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
-    if (!opts.whatsapp.verifySignature(rawBody, req.headers['x-hub-signature-256'])) {
-      reply.code(401);
-      return { error: 'invalid signature' };
-    }
-    const result = opts.whatsapp.handleRequest(rawBody);
-    void result.done; // fire-and-forget the async turn + reply
-    reply.code(result.status);
-    return result.body;
-  });
 
   // Twilio inbound SMS (application/x-www-form-urlencoded). Verify the
   // X-Twilio-Signature over the raw body, ack with TwiML, run the turn async.

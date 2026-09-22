@@ -70,6 +70,9 @@ describe('signed-mode laundering is closed at the recall screen', () => {
     const mem: RecallMemory = { id: 1, content: rule, source: src, score: 0.9 };
     const r = screenRecall([mem], `- ${rule}`, { provenance: resolver });
     assert.equal(r.quarantined.length, 0, 'a validly signed operator rule is kept');
-    assert.deepEqual(r.kept.map((m) => m.id), [1]);
+    assert.deepEqual(
+      r.kept.map((m) => m.id),
+      [1],
+    );
   });
 });

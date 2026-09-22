@@ -40,8 +40,7 @@ export async function runIngest(path: string): Promise<void> {
     vision: {
       enabled: config.vision.enabled,
       analyze: config.vision.enabled
-        ? (p: string) =>
-            analyzeImage(p, { router, models: config.models, vision: config.vision })
+        ? (p: string) => analyzeImage(p, { router, models: config.models, vision: config.vision })
         : undefined,
     },
     pdf: { maxPages: config.pdf.maxPages, maxBytesMb: config.pdf.maxBytesMb },
@@ -68,7 +67,11 @@ export async function runIngest(path: string): Promise<void> {
     process.exit(1);
   }
 
-  console.log(colors.cyan(`Ingesting ${targets.length} file${targets.length === 1 ? '' : 's'} into ${slug}'s CORTEX`));
+  console.log(
+    colors.cyan(
+      `Ingesting ${targets.length} file${targets.length === 1 ? '' : 's'} into ${slug}'s CORTEX`,
+    ),
+  );
   console.log('');
   for (const t of targets) {
     process.stdout.write(`  ${colors.muted('·')} ${t} ... `);
@@ -76,7 +79,10 @@ export async function runIngest(path: string): Promise<void> {
       const r = await ingestFile(memorySelection.provider, t, ingestOpts);
       const memCites =
         r.memoryIds.length > 3
-          ? `${r.memoryIds.slice(0, 3).map((i) => `#${i}`).join(', ')} +${r.memoryIds.length - 3}`
+          ? `${r.memoryIds
+              .slice(0, 3)
+              .map((i) => `#${i}`)
+              .join(', ')} +${r.memoryIds.length - 3}`
           : r.memoryIds.map((i) => `#${i}`).join(', ');
       console.log(
         colors.ok('ok') +

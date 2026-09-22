@@ -72,7 +72,9 @@ describe('loadMcpConnections', () => {
 
   it('schema violations throw (operator intent never silently dropped)', () => {
     assert.throws(() =>
-      loadMcpConnections(homeWith(JSON.stringify({ servers: [{ name: 'x', transport: 'stdio' }] }))),
+      loadMcpConnections(
+        homeWith(JSON.stringify({ servers: [{ name: 'x', transport: 'stdio' }] })),
+      ),
     );
   });
 

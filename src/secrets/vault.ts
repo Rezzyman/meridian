@@ -19,12 +19,7 @@
  *   - Upgrade path to user-supplied master + libsecret keeps this API stable
  */
 
-import {
-  randomBytes,
-  createCipheriv,
-  createDecipheriv,
-  scryptSync,
-} from 'node:crypto';
+import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -135,13 +130,7 @@ export class Vault {
       cipher.final(),
     ]);
     const tag = cipher.getAuthTag();
-    const buf = Buffer.concat([
-      Buffer.from([VAULT_VERSION]),
-      salt,
-      iv,
-      tag,
-      ciphertext,
-    ]);
+    const buf = Buffer.concat([Buffer.from([VAULT_VERSION]), salt, iv, tag, ciphertext]);
     mkdirSync(dirname(this.path), { recursive: true });
     writeFileSync(this.path, `${buf.toString('base64')}\n`, { mode: 0o600 });
     try {

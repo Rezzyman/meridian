@@ -62,7 +62,11 @@ async function post(base: string, body: unknown): Promise<Response> {
 describe('POST /waitlist', () => {
   it('records a valid signup and persists the normalized entry', async () => {
     const { base, dbPath } = await boot();
-    const r = await post(base, { email: 'You@Example.COM', plan: 'secure-memory', note: 'from HN' });
+    const r = await post(base, {
+      email: 'You@Example.COM',
+      plan: 'secure-memory',
+      note: 'from HN',
+    });
     assert.equal(r.status, 200);
     const body = (await r.json()) as { ok: boolean; email: string };
     assert.equal(body.ok, true);

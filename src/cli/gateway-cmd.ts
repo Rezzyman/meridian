@@ -30,18 +30,28 @@ import { MatrixChannel } from '../channels/matrix.js';
 import { SmsChannel } from '../channels/sms.js';
 import { VoiceSessionGuard } from '../voice/session-guard.js';
 import { startGateway } from '../gateway/server.js';
+import { openMeteoWeatherProvider } from '../gateway/weather.js';
+import { localOllamaImageDescriber, localWhisperTranscriber } from '../gateway/device-media.js';
+import { LoopPairingStore } from '../gateway/loop-pairing.js';
+import {
+  createAttestedHarnessLoopAgentAdapter,
+  createMeridianLoopAgentAdapter,
+  selectLoopAgentAdapter,
+  type LoopAgentAdapterRegistry,
+} from '../gateway/loop-agent-adapter.js';
 import { colors } from '../utils/truecolor.js';
 import { resolveOperator, operatorSessionId } from '../agent/operator.js';
 import { SessionStore } from '../session/store.js';
 import { ProactiveSentinel } from '../proactive/sentinel.js';
 import { AutomationManager } from '../automations/manager.js';
-import { armHeartbeat } from '../heartbeat/scheduler.js';
+import { armHeartbeat, createHeartbeatAssessor } from '../heartbeat/scheduler.js';
 import { watchInbox } from '../ingest/file-ingest.js';
 import { analyzeImage } from '../vision/analyze.js';
 import { mkdirSync } from 'node:fs';
 import type { ChannelKind } from '../agent/operator.js';
 import type { MeridianTurn } from '../agent/types.js';
 import type { ChannelAdapter } from '../channels/types.js';
+import { evaluateActionPolicy } from '../governance/action-policy.js';
 
 function readSystemBase(home: ReturnType<typeof ensureAgentHome>, agentName: string): string {
   const id = join(home.layer('IDENTITY'), 'AGENT.md');
@@ -84,7 +94,12 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       ),
     ]);
     if (bootHealth.status === 'ok') {
-      logger.info({ event: 'cortex.health', status: 'ok', url: cortex.baseUrl, msg: 'CORTEX backend reachable' });
+      logger.info({
+        event: 'cortex.health',
+        status: 'ok',
+        url: cortex.baseUrl,
+        msg: 'CORTEX backend reachable',
+      });
     } else {
       logger.warn({
         event: 'cortex.health',
@@ -121,7 +136,15 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
 
   // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
   // place shared with the REPL (src/agent/tool-surface.ts).
-  const surface = await buildToolSurface({ home, config, env, cortex, logger, router, memory: memorySelection.provider });
+  const surface = await buildToolSurface({
+    home,
+    config,
+    env,
+    cortex,
+    logger,
+    router,
+    memory: memorySelection.provider,
+  });
   const { tools, skillToolNames, skills, vault, verificationChecks, provenanceSigner } = surface;
 
   // Voice session guard — passphrase-gated unlock for the public voice line.
@@ -144,7 +167,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       skills,
       automations: loadAutomationDefs(home),
       builtinToolNames: surface.builtinToolNames,
-      mcpTools: surface.mcpStatus.flatMap((st) => st.tools.map((t) => ({ name: t, server: st.server }))),
+      mcpTools: surface.mcpStatus.flatMap((st) =>
+        st.tools.map((t) => ({ name: t, server: st.server })),
+      ),
       cortexStats: cortexStats ?? undefined,
     });
   } catch (err) {
@@ -186,8 +211,11 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     const convo = new Conversation({
       config,
       cortex: memorySelection.provider,
-      router, logger,
-      systemBase, channel, tools,
+      router,
+      logger,
+      systemBase,
+      channel,
+      tools,
       skillToolNames,
       mcpGate: surface.mcpGate,
       verificationChecks,
@@ -211,7 +239,10 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     return convo;
   }
 
-  function getSession(channel: ChannelKind, from: string): {
+  function getSession(
+    channel: ChannelKind,
+    from: string,
+  ): {
     convo: Conversation;
     sessionId: string;
     operatorLabel: string;
@@ -329,13 +360,8 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // voice line is anonymous; without unlock, a caller could DM the operator,
   // pollute memory, or pull internal context. Operator unlocks by speaking
   // the configured passphrase early in the call.
-  const VOICE_TOOL_REQUIRES_UNLOCK = new Set([
-    'telegram_dm',
-    'cortex_recall',
-    'cortex_encode',
-    'cortex_dream',
-  ]);
   let vapi: VapiChannel | undefined;
+  const voiceToolCalls = new Map<string, number>();
   if (env.VAPI_API_KEY) {
     vapi = new VapiChannel({
       logger,
@@ -345,32 +371,78 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       assistantId: env.VAPI_ASSISTANT_ID,
       cortex,
       voiceGuard,
-      telegramDM: telegram && env.TELEGRAM_DEFAULT_CHAT_ID
-        ? async (text: string) => {
-            await telegram!.send({ to: env.TELEGRAM_DEFAULT_CHAT_ID!, text });
-          }
-        : undefined,
+      telegramDM:
+        telegram && env.TELEGRAM_DEFAULT_CHAT_ID
+          ? async (text: string) => {
+              await telegram!.send({ to: env.TELEGRAM_DEFAULT_CHAT_ID!, text });
+            }
+          : undefined,
       executeTool: async (name, args, ctx) => {
         if (!VOICE_TOOL_ALLOW.has(name)) {
           throw new Error(`tool '${name}' is not whitelisted for voice`);
         }
-        if (VOICE_TOOL_REQUIRES_UNLOCK.has(name) && !voiceGuard.isUnlocked(ctx.callId)) {
+        const actionSession = ctx.callId ?? `phone:${ctx.phone ?? 'anonymous'}`;
+        const unlocked = voiceGuard.isUnlocked(ctx.callId);
+        const callIndex = (voiceToolCalls.get(actionSession) ?? 0) + 1;
+        voiceToolCalls.set(actionSession, callIndex);
+        const decision = evaluateActionPolicy(config, {
+          agentId: config.agent.slug,
+          sessionId: `voice:${actionSession}`,
+          channel: 'voice',
+          senderTrusted: unlocked,
+          toolName: name,
+          callIndex,
+        });
+        const receiptBase = {
+          agentId: config.agent.slug,
+          sessionId: `voice:${actionSession}`,
+          channel: 'voice' as const,
+          senderTrusted: unlocked,
+          toolName: name,
+          callIndex,
+          ...decision,
+          receiptId: `act_${randomUUID()}`,
+          ts: new Date().toISOString(),
+          argsDigest: store.digestActionArgs(args),
+        };
+        if (decision.decision === 'deny') {
+          store.recordActionReceipt({ ...receiptBase, outcome: 'denied', durationMs: 0 });
           // Soft-fail: return a structured response the model can speak naturally
           // ("I'm in public mode and can't do that without authorization").
           // Do NOT throw — throwing fires the error path on VAPI's side and
           // the model loses the ability to surface it to the caller smoothly.
           return {
-            error: 'voice_session_locked',
-            message: voiceGuard.isConfigured()
-              ? 'This call is in public mode. The caller must speak the passphrase to unlock privileged tools.'
-              : 'Voice passphrase not configured on this agent. Run `meridian voice passphrase` to set one.',
+            error: unlocked ? 'action_denied' : 'voice_session_locked',
+            message:
+              !unlocked && voiceGuard.isConfigured()
+                ? 'This call is in public mode. The caller must speak the passphrase to unlock privileged tools.'
+                : !unlocked
+                  ? 'Voice passphrase not configured on this agent. Run `meridian voice passphrase` to set one.'
+                  : decision.reason,
           };
         }
         const t = (tools as Record<string, { execute?: (a: unknown) => Promise<unknown> }>)[name];
         if (!t?.execute) {
           throw new Error(`tool '${name}' not loaded`);
         }
-        return t.execute(args);
+        const started = Date.now();
+        try {
+          const result = await t.execute(args);
+          store.recordActionReceipt({
+            ...receiptBase,
+            outcome: 'succeeded',
+            durationMs: Date.now() - started,
+          });
+          return result;
+        } catch (error) {
+          store.recordActionReceipt({
+            ...receiptBase,
+            outcome: 'failed',
+            durationMs: Date.now() - started,
+            errorClass: error instanceof Error ? error.constructor.name : 'UnknownError',
+          });
+          throw error;
+        }
       },
     });
     await vapi.start(undefined, {
@@ -429,7 +501,12 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
 
   // ── WhatsApp channel — Meta Cloud API webhook (signed), optional allowlist ──
   let whatsapp: WhatsappChannel | undefined;
-  if (env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN) {
+  if (
+    env.WHATSAPP_PHONE_NUMBER_ID &&
+    env.WHATSAPP_ACCESS_TOKEN &&
+    env.WHATSAPP_APP_SECRET &&
+    env.WHATSAPP_VERIFY_TOKEN
+  ) {
     whatsapp = new WhatsappChannel({
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
       accessToken: env.WHATSAPP_ACCESS_TOKEN,
@@ -517,6 +594,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     systemBase,
     channels: channelMap,
     tools,
+    store,
   });
   const autoDefs = automations.start();
   if (autoDefs.length > 0) {
@@ -527,33 +605,22 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   }
 
   // ── Heartbeat — periodic self-check turn, migrated from Hermes/OpenClaw ──
-  // Same lifecycle pattern as the sentinel + automations above: constructed
-  // only when config.heartbeat.enabled, started after the channels are up,
-  // stop() available alongside sentinel.stop()/automations.stop(). Each beat
-  // flows through the SAME operator-keyed turn() machinery as every channel
-  // (like the HTTP /chat facade below), so a beat is a real, session-persisted
-  // conversation turn — not a dangling timer. Interval (`every: '30m'`) and
-  // activeHours come from config.heartbeat; the scheduler translates the
-  // interval via intervalToCron and skips beats outside the active window.
-  const heartbeatConvoFacade = {
-    sessionId: 'gateway-heartbeat',
-    historyCount: 0,
-    send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) => {
-      const reply = await turn('gateway', 'heartbeat', text, sendOpts);
-      return {
-        id: `t_${Date.now().toString(36)}`,
-        sessionId: 'gateway-heartbeat',
-        role: 'assistant' as const,
-        content: reply,
-        channel: 'gateway' as const,
-        ts: new Date().toISOString(),
-      };
-    },
-  } as unknown as Conversation;
+  // Heartbeat is deliberately NOT a conversation turn: it has no tools,
+  // creates no synthetic unknown-operator session, and does not encode its
+  // own monitoring output into CORTEX. The control plane records the evidence
+  // and decision; only a novel, confident, actionable LIVE result is pushed.
   const heartbeat = armHeartbeat({
-    conversation: heartbeatConvoFacade,
+    home,
     heartbeat: config.heartbeat,
     logger,
+    assess: createHeartbeatAssessor({ config, cortex, router, systemBase, logger }),
+    onAck: async (text) => {
+      const tg = channelMap.get('telegram');
+      const target = config.operator?.channels.telegram[0];
+      if (!tg?.send || !target) return false;
+      await tg.send({ channel: 'telegram', to: target, text });
+      return true;
+    },
   });
   if (heartbeat) {
     console.log(
@@ -562,7 +629,6 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       ),
     );
   }
-
 
   // ── Inbox watcher — drop a file in MEMORY/inbox/ and the agent ingests it ──
   // Multimodal capability: PDFs, markdown, text, image stubs all flow into
@@ -589,6 +655,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // conversation as their voice + Telegram threads.
   const httpConvoFacade = {
     sessionId: 'gateway-http',
+    agentSlug: home.agentSlug,
     historyCount: 0,
     send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) => {
       const reply = await turn('gateway', 'http', text, sendOpts);
@@ -628,9 +695,83 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   const ingest = process.env.MERIDIAN_INGEST_TOKEN
     ? { inboxDir: inbox, token: process.env.MERIDIAN_INGEST_TOKEN }
     : undefined;
+  const weather =
+    env.MERIDIAN_DEVICE_CITY !== undefined &&
+    env.MERIDIAN_DEVICE_LATITUDE !== undefined &&
+    env.MERIDIAN_DEVICE_LONGITUDE !== undefined
+      ? openMeteoWeatherProvider({
+          city: env.MERIDIAN_DEVICE_CITY,
+          latitude: env.MERIDIAN_DEVICE_LATITUDE,
+          longitude: env.MERIDIAN_DEVICE_LONGITUDE,
+        })
+      : undefined;
+  // Loop is an interactive voice/mobile surface. Its public wire contract is
+  // independent of the selected agent harness. The embedded Meridian adapter
+  // keeps the previous behavior; production can select an attested OpenClaw
+  // or Hermes bridge without changing the phone app or rotating device tokens.
+  const loopConfig = {
+    ...config,
+    agent: { ...config.agent, gatewayTimeoutSec: 20 },
+    models: {
+      ...config.models,
+      fallbacks: [],
+      smartRouting: { ...config.models.smartRouting, enabled: false },
+    },
+  };
+  const loop = env.MERIDIAN_LOOP_TOKEN
+    ? (() => {
+        // A fresh, store-free conversation per request preserves the embedded
+        // Meridian option without adding Loop excerpts to persistent history.
+        const meridianConversation = {
+          sessionId: 'loop-ephemeral',
+          agentSlug: home.agentSlug,
+          historyCount: 0,
+          send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) =>
+            new Conversation({
+              config: loopConfig,
+              cortex: memorySelection.provider,
+              router,
+              logger,
+              systemBase,
+              channel: 'gateway',
+              verificationChecks,
+              provenanceSigner,
+              senderTrusted: true,
+            }).send(text, sendOpts),
+        } as Conversation;
+        const adapters: LoopAgentAdapterRegistry = {
+          meridian: createMeridianLoopAgentAdapter(meridianConversation, config.agent.name),
+        };
+        const externalHarness =
+          env.ATERNA_LOOP_HARNESS === 'openclaw' || env.ATERNA_LOOP_HARNESS === 'hermes'
+            ? env.ATERNA_LOOP_HARNESS
+            : undefined;
+        if (externalHarness && env.ATERNA_LOOP_HARNESS_URL && env.ATERNA_LOOP_HARNESS_TOKEN) {
+          adapters[externalHarness] = createAttestedHarnessLoopAgentAdapter({
+            harness: externalHarness,
+            identity: { slug: home.agentSlug, displayName: config.agent.name },
+            url: env.ATERNA_LOOP_HARNESS_URL,
+            token: env.ATERNA_LOOP_HARNESS_TOKEN,
+          });
+        }
+        return {
+          token: env.MERIDIAN_LOOP_TOKEN,
+          agent: selectLoopAgentAdapter(env.ATERNA_LOOP_HARNESS, adapters),
+          pairing: env.MERIDIAN_LOOP_BASE_URL
+            ? {
+                store: new LoopPairingStore(
+                  env.MERIDIAN_LOOP_STATE_PATH ?? join(home.agentRoot, 'loop-pairings.json'),
+                ),
+                publicBaseURL: env.MERIDIAN_LOOP_BASE_URL,
+              }
+            : undefined,
+        };
+      })()
+    : undefined;
   await startGateway({
     port,
     token: env.MERIDIAN_GATEWAY_TOKEN,
+    loop,
     logger,
     conversation: httpConvoFacade,
     vapi,
@@ -643,6 +784,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     waitlist,
     web,
     ingest,
+    weather,
+    transcribeAudio: localWhisperTranscriber(),
+    describeImage: localOllamaImageDescriber({ baseUrl: env.OLLAMA_BASE_URL }),
   });
 
   console.log(colors.ok(`Meridian gateway live on :${port} for agent ${slug}`));
@@ -655,12 +799,21 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   if (web) {
     console.log(colors.ok(`  web chat at http://127.0.0.1:${port}/ (same-origin autoconfig)`));
   }
-  console.log(colors.muted(`  channels: ${[
-    'cli (REPL)',
-    env.TELEGRAM_BOT_TOKEN ? 'telegram (gated)' : null,
-    vapi ? 'voice (VAPI webhook ready)' : null,
-    'http /chat',
-  ].filter(Boolean).join(', ')}`));
+  if (weather) {
+    console.log(colors.ok(`  R1 weather armed for ${env.MERIDIAN_DEVICE_CITY}`));
+  }
+  console.log(
+    colors.muted(
+      `  channels: ${[
+        'cli (REPL)',
+        env.TELEGRAM_BOT_TOKEN ? 'telegram (gated)' : null,
+        vapi ? 'voice (VAPI webhook ready)' : null,
+        'http /chat',
+      ]
+        .filter(Boolean)
+        .join(', ')}`,
+    ),
+  );
 
   // Block forever
   await new Promise(() => {});

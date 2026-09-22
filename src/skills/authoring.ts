@@ -75,12 +75,33 @@ const MALICE_PATTERNS: Array<{ id: string; re: RegExp }> = [
     re: /\b(?:operate|act|run|proceed|work)\b[^.!?\n]{0,24}\bwithout\b[^.!?\n]{0,24}\b(?:restriction|restrictions|limit|limits|oversight|supervision|guardrails?)\b/i,
   },
   // Forged authority header (system:/admin:/root: …).
-  { id: 'authority-spoof', re: /(?:^|\n)\s*(?:system|assistant|admin|root|developer|superuser)\s*[:=]/i },
+  {
+    id: 'authority-spoof',
+    re: /(?:^|\n)\s*(?:system|assistant|admin|root|developer|superuser)\s*[:=]/i,
+  },
   // Sensitive capability + bypass-of-control, either order.
-  { id: 'sensitive-bypass', re: new RegExp(`\\b${SENSITIVE_VERB}\\b[^.!?\\n]{0,70}\\bwithout\\b[^.!?\\n]{0,30}\\b${BYPASS_NOUN}\\b`, 'i') },
-  { id: 'sensitive-bypass', re: new RegExp(`\\bwithout\\b[^.!?\\n]{0,30}\\b${BYPASS_NOUN}\\b[^.!?\\n]{0,70}\\b${SENSITIVE_VERB}\\b`, 'i') },
+  {
+    id: 'sensitive-bypass',
+    re: new RegExp(
+      `\\b${SENSITIVE_VERB}\\b[^.!?\\n]{0,70}\\bwithout\\b[^.!?\\n]{0,30}\\b${BYPASS_NOUN}\\b`,
+      'i',
+    ),
+  },
+  {
+    id: 'sensitive-bypass',
+    re: new RegExp(
+      `\\bwithout\\b[^.!?\\n]{0,30}\\b${BYPASS_NOUN}\\b[^.!?\\n]{0,70}\\b${SENSITIVE_VERB}\\b`,
+      'i',
+    ),
+  },
   // "approve … to any caller / anyone who asks" (autonomy on a sensitive verb).
-  { id: 'sensitive-anyone', re: new RegExp(`\\b${SENSITIVE_VERB}\\b[^.!?\\n]{0,70}\\b(?:any|every|all)\\b[^.!?\\n]{0,20}\\b(?:caller|callers|request|requests|requester|number|user|users|person)\\b`, 'i') },
+  {
+    id: 'sensitive-anyone',
+    re: new RegExp(
+      `\\b${SENSITIVE_VERB}\\b[^.!?\\n]{0,70}\\b(?:any|every|all)\\b[^.!?\\n]{0,20}\\b(?:caller|callers|request|requests|requester|number|user|users|person)\\b`,
+      'i',
+    ),
+  },
   // Secret disclosure / exfiltration of credentials.
   {
     id: 'secret-disclosure',
@@ -104,7 +125,10 @@ const NEGATION_RE =
 function splitSentences(s: string): string[] {
   // Split on sentence-ending punctuation FOLLOWED BY whitespace (or newlines) so
   // we don't break apart emails/URLs/domains (e.g. archive@billing-mirror.io).
-  return s.split(/[.!?]+\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  return s
+    .split(/[.!?]+\s+|\n+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -150,12 +174,14 @@ export function screenSkillDraft(draft: SkillDraft): SkillScreenResult {
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'skill';
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48) || 'skill'
+  );
 }
 
 export interface RenderedSkill {

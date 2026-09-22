@@ -46,9 +46,7 @@ export const webTools = {
       'Response body is capped at 1 MB.',
     parameters: z.object({
       url: z.string().url(),
-      method: z
-        .enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'])
-        .default('GET'),
+      method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']).default('GET'),
       headers: HttpHeaders.optional(),
       body: z.string().optional(),
       timeoutMs: z.number().int().min(1).max(120_000).default(20_000),

@@ -93,6 +93,9 @@ describe('withEmptyResultBreaker', () => {
     const wrapped = withEmptyResultBreaker(set, { threshold: 2 });
     await run(wrapped, 'dead', 3); // trip the dead one
     const liveResults = await run(wrapped, 'live', 3);
-    assert.ok(liveResults.every((r) => (r as { ok?: number }).ok === 1), 'healthy tool unaffected');
+    assert.ok(
+      liveResults.every((r) => (r as { ok?: number }).ok === 1),
+      'healthy tool unaffected',
+    );
   });
 });

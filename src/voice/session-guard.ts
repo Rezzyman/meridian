@@ -60,7 +60,10 @@ export interface ScanResult {
 export class VoiceSessionGuard {
   private unlockedCalls = new Map<string, number>(); // callId → expiresAt ms
 
-  constructor(private vault: Vault, private logger: Logger) {}
+  constructor(
+    private vault: Vault,
+    private logger: Logger,
+  ) {}
 
   /** Has the operator configured a voice passphrase yet? */
   isConfigured(): boolean {
@@ -72,7 +75,9 @@ export class VoiceSessionGuard {
   setPassphrase(raw: string): void {
     const norm = normalisePhrase(raw);
     if (norm.length < 4) {
-      throw new Error('voice passphrase too short after normalisation (need ≥4 chars of letters/digits)');
+      throw new Error(
+        'voice passphrase too short after normalisation (need ≥4 chars of letters/digits)',
+      );
     }
     this.vault.set(VAULT_KEY, norm);
   }
@@ -88,7 +93,11 @@ export class VoiceSessionGuard {
    * passphrase is configured, this is a no-op (returns the transcript as-is
    * and never unlocks).
    */
-  scanAndUnlock(callId: string | undefined, transcript: string, windowMs = DEFAULT_WINDOW_MS): ScanResult {
+  scanAndUnlock(
+    callId: string | undefined,
+    transcript: string,
+    windowMs = DEFAULT_WINDOW_MS,
+  ): ScanResult {
     const phrase = this.vault.get<string>(VAULT_KEY);
     if (!phrase || !callId) return { stripped: transcript, unlocked: false, empty: false };
 
@@ -168,7 +177,7 @@ function stripPhraseFromTranscript(transcript: string, phrase: string): string {
         let afterStart = wordIdx[end] + 1;
         while (afterStart < parts.length && /^[.,!?;:\s]+$/.test(parts[afterStart])) afterStart++;
         const after = parts.slice(afterStart).join('');
-        return (`${before} ${after}`).replace(/\s+/g, ' ').trim();
+        return `${before} ${after}`.replace(/\s+/g, ' ').trim();
       }
     }
   }

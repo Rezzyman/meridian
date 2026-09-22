@@ -14,10 +14,19 @@
  * semantics fall out of replay order.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import type { MeridianHome } from '../config/home.js';
 import type { MeridianSession, MeridianTurn } from '../agent/types.js';
+import type { ActionReceiptInput } from '../governance/action-policy.js';
 
 interface SessionRow {
   id: string;
@@ -34,6 +43,8 @@ type LogRecord =
   | { t: 'touch'; id: string; lastTurnAt: string }
   | { t: 'turn'; sessionId: string; idx: number; turn: MeridianTurn }
   | { t: 'trace'; trace: TurnTrace }
+  | { t: 'action'; receipt: ActionReceipt }
+  | { t: 'approval'; grant: ApprovalGrant }
   | { t: 'audit'; ts: string; kind: string; detail: unknown };
 
 export class SessionStore {
@@ -41,10 +52,20 @@ export class SessionStore {
   private readonly sessions = new Map<string, SessionRow>();
   private readonly turns = new Map<string, Map<string, { idx: number; turn: MeridianTurn }>>();
   private readonly traces = new Map<string, TurnTrace>();
+  private readonly actions = new Map<string, ActionReceipt>();
+  private readonly approvals = new Map<string, ApprovalGrant>();
+  private readonly actionKey: Buffer;
+  private lastActionHash = 'GENESIS';
 
   constructor(home: MeridianHome) {
     this.logPath = home.stateDb.replace(/\.db$/, '.jsonl');
     mkdirSync(dirname(this.logPath), { recursive: true });
+    const keyPath = `${this.logPath}.action-key`;
+    if (!existsSync(keyPath)) {
+      writeFileSync(keyPath, randomBytes(32), { mode: 0o600 });
+      chmodSync(keyPath, 0o600);
+    }
+    this.actionKey = readFileSync(keyPath);
     this.replay();
   }
 
@@ -81,6 +102,13 @@ export class SessionStore {
         }
         case 'trace':
           this.traces.set(rec.trace.turnId, rec.trace);
+          break;
+        case 'action':
+          this.actions.set(rec.receipt.receiptId, rec.receipt);
+          this.lastActionHash = rec.receipt.hash;
+          break;
+        case 'approval':
+          this.approvals.set(rec.grant.grantId, rec.grant);
           break;
         // 'audit' is write-only (never queried); nothing to index.
       }
@@ -163,6 +191,114 @@ export class SessionStore {
     this.write({ t: 'audit', ts: new Date().toISOString(), kind, detail });
   }
 
+  digestActionArgs(args: unknown): string {
+    return createHash('sha256')
+      .update(JSON.stringify(args ?? null))
+      .digest('hex');
+  }
+
+  recordActionReceipt(input: ActionReceiptInput): ActionReceipt {
+    const unsigned = { ...input, previousHash: this.lastActionHash };
+    const hash = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
+    const receipt: ActionReceipt = { ...unsigned, hash };
+    this.actions.set(receipt.receiptId, receipt);
+    this.lastActionHash = hash;
+    this.write({ t: 'action', receipt });
+    return receipt;
+  }
+
+  listActionReceipts(sessionId?: string, limit = 100): ActionReceipt[] {
+    return [...this.actions.values()]
+      .filter((r) => !sessionId || r.sessionId === sessionId)
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, limit);
+  }
+
+  verifyActionReceipt(receipt: ActionReceipt): boolean {
+    const { hash, ...unsigned } = receipt;
+    const expected = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
+    return expected === hash;
+  }
+
+  verifyActionChain(): boolean {
+    let previous = 'GENESIS';
+    for (const receipt of this.actions.values()) {
+      if (receipt.previousHash !== previous || !this.verifyActionReceipt(receipt)) return false;
+      previous = receipt.hash;
+    }
+    return true;
+  }
+
+  grantApproval(
+    sessionId: string,
+    toolName: string,
+    ttlMinutes = 5,
+    argsDigest?: string,
+  ): ApprovalGrant {
+    const now = Date.now();
+    const unsigned = {
+      grantId: `appr_${randomBytes(12).toString('hex')}`,
+      sessionId,
+      toolName,
+      argsDigest,
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + ttlMinutes * 60_000).toISOString(),
+      remainingUses: 1,
+    };
+    const signature = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
+    const grant: ApprovalGrant = { ...unsigned, signature };
+    this.approvals.set(grant.grantId, grant);
+    this.write({ t: 'approval', grant });
+    return grant;
+  }
+
+  consumeApproval(sessionId: string, toolName: string, argsDigest: string): boolean {
+    const now = new Date().toISOString();
+    for (const grant of [...this.approvals.values()].reverse()) {
+      if (
+        grant.sessionId !== sessionId ||
+        grant.toolName !== toolName ||
+        grant.remainingUses < 1 ||
+        grant.expiresAt <= now
+      )
+        continue;
+      if (grant.argsDigest && grant.argsDigest !== argsDigest) continue;
+      const { signature: _oldSignature, ...unsigned } = grant;
+      const consumed = this.signApproval({ ...unsigned, remainingUses: 0 });
+      this.approvals.set(consumed.grantId, consumed);
+      this.write({ t: 'approval', grant: consumed });
+      return true;
+    }
+    return false;
+  }
+
+  listApprovals(sessionId?: string): ApprovalGrant[] {
+    return [...this.approvals.values()]
+      .filter((g) => !sessionId || g.sessionId === sessionId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  verifyApproval(grant: ApprovalGrant): boolean {
+    const { signature, ...unsigned } = grant;
+    return (
+      createHmac('sha256', this.actionKey).update(JSON.stringify(unsigned)).digest('hex') ===
+      signature
+    );
+  }
+
+  private signApproval(unsigned: Omit<ApprovalGrant, 'signature'>): ApprovalGrant {
+    const signature = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
+    return { ...unsigned, signature };
+  }
+
   // ─── Reasoning trace persistence ──
   recordTrace(trace: TurnTrace): void {
     this.traces.set(trace.turnId, trace);
@@ -186,12 +322,28 @@ export class SessionStore {
   }
 }
 
+export interface ActionReceipt extends ActionReceiptInput {
+  previousHash: string;
+  hash: string;
+}
+export interface ApprovalGrant {
+  grantId: string;
+  sessionId: string;
+  toolName: string;
+  argsDigest?: string;
+  createdAt: string;
+  expiresAt: string;
+  remainingUses: number;
+  signature: string;
+}
+
 // ─── Trace types ────────────────────────────────────────────────────────────────
 export interface TurnTrace {
   turnId: string;
   sessionId: string;
   channel: string;
   model?: string;
+  modelTraceIds?: string[];
   recallQuery?: string;
   recallMemoryIds?: number[];
   recallArtifactIds?: number[];

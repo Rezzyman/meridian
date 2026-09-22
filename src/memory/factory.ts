@@ -70,7 +70,8 @@ export async function createMemoryProvider(
   }
 
   if (!opts.router) {
-    const reason = 'MERIDIAN_MEMORY_PROVIDER=quartz requires a ProviderRouter; falling back to cortex';
+    const reason =
+      'MERIDIAN_MEMORY_PROVIDER=quartz requires a ProviderRouter; falling back to cortex';
     log('warn', reason);
     return { provider: cortex, selected: 'cortex', fallbackReason: reason };
   }
@@ -107,10 +108,7 @@ interface LoadQuartzInput {
  */
 async function loadQuartzPipeline(input: LoadQuartzInput): Promise<QuartzLib> {
   const mod = (await import('@aterna/quartz')) as {
-    QuartzMemoryProvider?: new (
-      backend: unknown,
-      opts?: Record<string, unknown>,
-    ) => unknown;
+    QuartzMemoryProvider?: new (backend: unknown, opts?: Record<string, unknown>) => unknown;
   };
 
   if (!mod.QuartzMemoryProvider) {

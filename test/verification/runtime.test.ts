@@ -144,10 +144,7 @@ test('loadChecks: file without frontmatter is skipped', () => {
 
 test('loadChecks: invalid YAML in frontmatter is skipped without throwing', () => {
   const { home, verificationDir } = makeHomeWithDir();
-  writeFileSync(
-    join(verificationDir, 'broken.checks.md'),
-    '---\nchecks: [unclosed\n---\nbody\n',
-  );
+  writeFileSync(join(verificationDir, 'broken.checks.md'), '---\nchecks: [unclosed\n---\nbody\n');
   assert.deepEqual(loadChecks(home), []);
 });
 

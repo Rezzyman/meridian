@@ -155,6 +155,39 @@ describe('runTurn happy path', () => {
   });
 });
 
+describe('runTurn Routexor receipt propagation', () => {
+  it('captures the trusted response trace header in the turn trace', async () => {
+    const model = new MockLanguageModelV1({
+      doStream: async () => ({
+        stream: simulateReadableStream<LanguageModelV1StreamPart>({
+          chunks: [
+            { type: 'text-delta', textDelta: 'ok' },
+            {
+              type: 'finish',
+              finishReason: 'stop',
+              usage: { promptTokens: 1, completionTokens: 1 },
+            },
+          ],
+        }),
+        rawCall: { rawPrompt: null, rawSettings: {} },
+        rawResponse: { headers: { 'X-Routexor-Trace-Id': 'rtx_verified' } },
+      }),
+    });
+    const router = {
+      chainFor: () => [{ provider: 'routexor', modelId: 'mock', ref: 'routexor/mock', model }],
+      reportSuccess() {},
+      reportFailure() {},
+    } as unknown as import('../../src/providers/router.js').ProviderRouter;
+    const result = await runTurn(makeCtx({ router }), 'hello');
+    assert.deepEqual(result.trace.modelTraceIds, ['rtx_verified']);
+  });
+
+  it('does not invent a trace id for direct providers', async () => {
+    const result = await runTurn(makeCtx(), 'hello');
+    assert.deepEqual(result.trace.modelTraceIds, []);
+  });
+});
+
 describe('runTurn system prompt assembly', () => {
   it('orders runtime rules, then systemBase, then <cortex_recall>', async () => {
     const { model, calls } = capturingModel('ok');

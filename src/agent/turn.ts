@@ -23,6 +23,7 @@ import { runChecks, blocking, type CheckResult } from '../verification/runtime.j
 import type { Logger } from 'pino';
 import type { MeridianTurn } from './types.js';
 import { sanitizeOutbound, ProviderChainError } from '../safety/error-firewall.js';
+import { governToolSet, type ActionReceiptInput } from '../governance/action-policy.js';
 
 /**
  * Framework-enforced behavioral rules prepended to every system prompt.
@@ -66,10 +67,7 @@ These rules are absolute. The operator's persona file may add tone, mission, and
  * (per-agent opt-in) and falls back to safe defaults: conversational set
  * for chat channels, full set for CLI/REPL.
  */
-function pickToolAllowlist(
-  config: AgentConfig,
-  channel: MeridianTurn['channel'],
-): Set<string> {
+function pickToolAllowlist(config: AgentConfig, channel: MeridianTurn['channel']): Set<string> {
   const cfg = config.tools;
   if (channel === 'cli') {
     return new Set(cfg?.cli ?? TOOLS_CLI_DEFAULT);
@@ -143,6 +141,22 @@ export interface TurnContext {
    * their content is screened on recall instead of laundered into trust.
    */
   senderTrusted?: boolean;
+  actionGovernance?: {
+    agentId: string;
+    digestArgs(args: unknown): string;
+    consumeApproval?(toolName: string, argsDigest: string): boolean;
+    record(receipt: ActionReceiptInput): void;
+  };
+  /** Per-turn isolation imposed by a first-party client surface. This policy is
+   *  supplied by trusted gateway code, never by request JSON or the model. */
+  isolation?: {
+    /** Remove every built-in, skill, and MCP tool from the model-visible turn. */
+    disableTools?: boolean;
+    /** Do not encode the request or reply into durable agent memory. */
+    disableMemoryWrite?: boolean;
+    /** Framework-authored policy appended to the system prompt for this turn. */
+    systemPolicy?: string;
+  };
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -258,6 +272,7 @@ export interface TurnResult {
     recallTokenCount: number;
     toolCalls: Array<{ name: string; stepType: string; ts: string }>;
     model?: string;
+    modelTraceIds: string[];
     /** Memories pulled from the model's view by the integrity screen. */
     quarantinedMemories: QuarantinedMemory[];
     /** Operator verification-check results for this turn. */
@@ -271,8 +286,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // Channel-aware sensitivity gate. Public-voice callers see ONLY public memories.
   // Trusted channels (CLI, gated Telegram, authenticated gateway) see public+internal.
   // Sacred topics are filtered at verification time, not recall time.
-  const sensitivityFilter: string[] =
-    ctx.channel === 'voice' ? ['public'] : ['public', 'internal'];
+  const sensitivityFilter: string[] = ctx.channel === 'voice' ? ['public'] : ['public', 'internal'];
 
   // 1) CORTEX recall (CA3 pattern completion)
   // 1500 token budget: enough to seed deep context, small enough to keep
@@ -338,9 +352,18 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         sources: screen.quarantined.map((q) => q.source),
       });
     }
-    ctx.logger.debug({ msg: 'cortex recall', tokens: r.tokenCount, memories: screen.kept.length, quarantined: screen.quarantined.length, sensitivityFilter });
+    ctx.logger.debug({
+      msg: 'cortex recall',
+      tokens: r.tokenCount,
+      memories: screen.kept.length,
+      quarantined: screen.quarantined.length,
+      sensitivityFilter,
+    });
   } catch (err) {
-    ctx.logger.warn({ msg: 'cortex recall failed or timed out; proceeding without memory', err: (err as Error).message });
+    ctx.logger.warn({
+      msg: 'cortex recall failed or timed out; proceeding without memory',
+      err: (err as Error).message,
+    });
   } finally {
     // The race leaves the loser's timer live; clear it so a fast recall
     // doesn't strand an 8s timer per turn (event-loop noise, test latency).
@@ -363,15 +386,13 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   const system = [
     RUNTIME_RULES,
     ctx.systemBase,
+    ctx.isolation?.systemPolicy ?? '',
     recallSummary ? `<cortex_recall>\n${recallSummary}\n</cortex_recall>` : '',
   ]
     .filter(Boolean)
     .join('\n\n');
 
-  const messages: CoreMessage[] = [
-    ...ctx.history,
-    { role: 'user', content: userInput },
-  ];
+  const messages: CoreMessage[] = [...ctx.history, { role: 'user', content: userInput }];
 
   // 3) Provider call with primary + fallback chain
   const chain = ctx.router.chainFor(userInput, ctx.config.models);
@@ -397,16 +418,17 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // is in its set — independent of config.tools, which stays the operator
   // surface for builtins.
   const mcpAllowed = (name: string): boolean => ctx.mcpGate?.get(name)?.has(ctx.channel) === true;
-  const allowedTools: ToolSet | undefined = ctx.tools
-    ? Object.fromEntries(
-        Object.entries(ctx.tools).filter(
-          ([k]) =>
-            k !== 'cortex_recall' &&
-            k !== 'cortex_encode' &&
-            (ctx.mcpGate?.has(k) ? mcpAllowed(k) : allow.has(k)),
-        ),
-      )
-    : undefined;
+  const allowedTools: ToolSet | undefined =
+    !ctx.isolation?.disableTools && ctx.tools
+      ? Object.fromEntries(
+          Object.entries(ctx.tools).filter(
+            ([k]) =>
+              k !== 'cortex_recall' &&
+              k !== 'cortex_encode' &&
+              (ctx.mcpGate?.has(k) ? mcpAllowed(k) : allow.has(k)),
+          ),
+        )
+      : undefined;
 
   // ── Tool-loop / empty-result breaker ──
   // A tool that returns empty twice this turn is short-circuited at the tool
@@ -416,8 +438,24 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // update: Good, I can see..." hallucination class. onStepFinish still logs the
   // empties for the trace.
   const emptyByTool: Record<string, number> = {};
-  const turnTools = allowedTools
-    ? withEmptyResultBreaker(allowedTools, {
+  const governedTools =
+    allowedTools && ctx.actionGovernance
+      ? governToolSet({
+          tools: allowedTools,
+          config: ctx.config,
+          context: {
+            agentId: ctx.actionGovernance.agentId,
+            sessionId: ctx.sessionId,
+            channel: ctx.channel,
+            senderTrusted: ctx.senderTrusted !== false,
+          },
+          digestArgs: ctx.actionGovernance.digestArgs,
+          consumeApproval: ctx.actionGovernance.consumeApproval,
+          record: ctx.actionGovernance.record,
+        })
+      : allowedTools;
+  const turnTools = governedTools
+    ? withEmptyResultBreaker(governedTools, {
         threshold: 2,
         onTrip: (name) => {
           emptyByTool[name] = (emptyByTool[name] ?? 0) + 1;
@@ -429,6 +467,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // the gateway/REPL after the turn completes for /why + /trace queries.
   const toolCallTrace: Array<{ name: string; stepType: string; ts: string }> = [];
   let providerUsed: string | undefined;
+  let modelTraceIds: string[] = [];
 
   // Deltas forwarded for the CURRENT provider attempt. If that attempt
   // dies mid-stream and a fallback takes over, the observer gets a reset
@@ -437,6 +476,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
 
   for (const provider of chain) {
     try {
+      const toolTraceStart = toolCallTrace.length;
       // streamText (ai@4.x) does NOT throw on provider failure: errors are
       // routed to onError and textStream completes empty. Without capturing
       // them here the catch below never fires and the fallback chain is
@@ -453,10 +493,12 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         tools: turnTools,
         maxTokens: ctx.limits?.maxOutputTokens,
         maxRetries: 1,
-        // Multi-step: model can call a tool then continue writing. Capped
-        // at 3 — enough for legitimate fetch+summarize, not enough for
-        // an investigation-spree.
-        maxSteps: 3,
+        // Multi-step: model can call a tool then continue writing. 24 matches
+        // the proven npm 1.4.0 engine; 3 starved real fetch+summarize turns
+        // into the "no final summary" fallback (9 Arlo incidents 2026-08-01 to
+        // 08-07). Governance maxToolCallsPerTurn (default 8) and the
+        // empty-result breaker remain the per-agent cost brakes.
+        maxSteps: 24,
         abortSignal: AbortSignal.timeout(ctx.config.agent.gatewayTimeoutSec * 1000),
         experimental_continueSteps: true,
         onStepFinish: ({ stepType, toolCalls, toolResults }) => {
@@ -502,8 +544,26 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       if (streamError !== undefined) {
         throw streamError instanceof Error ? streamError : new Error(String(streamError));
       }
+      if (!out.trim()) {
+        if (toolCallTrace.length === toolTraceStart) {
+          throw new Error('provider returned an empty response before executing a tool');
+        }
+        // A tool already ran, so retrying through another provider could replay
+        // a side effect. Stop safely with an honest summary instead.
+        out = 'The tool completed, but the model produced no final summary.';
+      }
       reply = out;
       providerUsed = provider.ref;
+      if (provider.provider === 'routexor') {
+        const steps = await stream.steps;
+        modelTraceIds = steps.flatMap((step) => {
+          const headers = step.response.headers ?? {};
+          const trace = Object.entries(headers).find(
+            ([name]) => name.toLowerCase() === 'x-routexor-trace-id',
+          )?.[1];
+          return trace ? [trace] : [];
+        });
+      }
       // Close the breaker circuit for this ref (mock routers may not have it).
       ctx.router.reportSuccess?.(provider.ref);
       break;
@@ -594,7 +654,14 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       break;
     }
   }
-  const TEXT_CHANNELS: Array<MeridianTurn['channel']> = ['cli', 'telegram', 'gateway', 'slack', 'discord', 'whatsapp'];
+  const TEXT_CHANNELS: Array<MeridianTurn['channel']> = [
+    'cli',
+    'telegram',
+    'gateway',
+    'slack',
+    'discord',
+    'whatsapp',
+  ];
   if (commitmentDetected && TEXT_CHANNELS.includes(ctx.channel)) {
     const trimQuote =
       commitmentQuote.length > 80 ? `${commitmentQuote.slice(0, 79)}…` : commitmentQuote;
@@ -614,7 +681,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // their reply.
   const memoryId: number | undefined = undefined;
   const encodeOk = false;
-  if (ctx.config.cortex.encodeOnTurn) {
+  if (ctx.config.cortex.encodeOnTurn && !ctx.isolation?.disableMemoryWrite) {
     const valence = ctx.config.cortex.valenceInference
       ? inferValence(`${userInput}\n\nASSISTANT: ${reply}`, ctx.channel)
       : undefined;
@@ -672,6 +739,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       recallTokenCount,
       toolCalls: toolCallTrace,
       model: providerUsed,
+      modelTraceIds,
       quarantinedMemories,
       verifications,
     },

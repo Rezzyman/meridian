@@ -51,8 +51,18 @@ export function loadAgentEnv(home: MeridianHome): AgentEnv {
     TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER,
     TWILIO_WEBHOOK_URL: process.env.TWILIO_WEBHOOK_URL,
     MERIDIAN_GATEWAY_TOKEN: process.env.MERIDIAN_GATEWAY_TOKEN,
+    MERIDIAN_LOOP_TOKEN: process.env.MERIDIAN_LOOP_TOKEN,
+    MERIDIAN_LOOP_BASE_URL: process.env.MERIDIAN_LOOP_BASE_URL,
+    MERIDIAN_LOOP_STATE_PATH: process.env.MERIDIAN_LOOP_STATE_PATH,
+    ATERNA_LOOP_HARNESS: process.env.ATERNA_LOOP_HARNESS,
+    ATERNA_LOOP_HARNESS_URL: process.env.ATERNA_LOOP_HARNESS_URL,
+    ATERNA_LOOP_HARNESS_TOKEN: process.env.ATERNA_LOOP_HARNESS_TOKEN,
     MERIDIAN_GATEWAY_PORT: process.env.MERIDIAN_GATEWAY_PORT,
+    MERIDIAN_DEVICE_CITY: process.env.MERIDIAN_DEVICE_CITY,
+    MERIDIAN_DEVICE_LATITUDE: process.env.MERIDIAN_DEVICE_LATITUDE,
+    MERIDIAN_DEVICE_LONGITUDE: process.env.MERIDIAN_DEVICE_LONGITUDE,
     MERIDIAN_CORTEX_URL: process.env.MERIDIAN_CORTEX_URL,
+    MERIDIAN_CORTEX_TOKEN: process.env.MERIDIAN_CORTEX_TOKEN,
     MERIDIAN_MEMORY_PROVIDER: process.env.MERIDIAN_MEMORY_PROVIDER,
     NGROK_AUTHTOKEN: process.env.NGROK_AUTHTOKEN,
   };
@@ -72,7 +82,9 @@ export function loadAgentEnv(home: MeridianHome): AgentEnv {
  * regression and LIMITLESS_API_KEY). Skill manifests are now the source of
  * truth; this helper closes the loop at construction.
  */
-export function collectSkillEnv(declaredKeys: Iterable<string>): Record<string, string | undefined> {
+export function collectSkillEnv(
+  declaredKeys: Iterable<string>,
+): Record<string, string | undefined> {
   const out: Record<string, string | undefined> = {};
   for (const k of declaredKeys) {
     out[k] = process.env[k];
@@ -80,8 +92,8 @@ export function collectSkillEnv(declaredKeys: Iterable<string>): Record<string, 
   return out;
 }
 
-/** Zero-config .env: embedded local memory, ollama by default — no external
- *  servers, no API keys required. The 60-second quickstart. */
+/** Embedded-memory .env: no memory server or database required. ROUTEXOR is
+ *  the single recommended model setup path. */
 export function embeddedEnvFileTemplate(slug: string): string {
   return `# Meridian agent env: ${slug} (zero-config / embedded memory)
 # No CORTEX server, no Neon, no Voyage. Memory persists locally in
@@ -99,16 +111,17 @@ MERIDIAN_MEMORY_PROVIDER=embedded
 #      BYOK means your provider key pays for the models; without this step,
 #      model calls fail.
 #   3. create your ROUTEXOR API key and paste it below
-# Prefer to go direct or fully local? A direct provider key, OR a local ollama
-# (no key — install https://ollama.com then \`ollama pull qwen2.5\`), also works.
 ROUTEXOR_API_KEY=
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-GROQ_API_KEY=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
 
 # Gateway
 MERIDIAN_GATEWAY_TOKEN=
+MERIDIAN_LOOP_TOKEN=
+MERIDIAN_LOOP_BASE_URL=
+MERIDIAN_LOOP_STATE_PATH=
+# The phone contract stays unchanged; only this server-side selector moves.
+ATERNA_LOOP_HARNESS=meridian
+ATERNA_LOOP_HARNESS_URL=
+ATERNA_LOOP_HARNESS_TOKEN=
 MERIDIAN_GATEWAY_PORT=18889
 `;
 }
@@ -126,17 +139,12 @@ NEON_DATABASE_URL=
 # Voyage AI embeddings (dedicated key per agent)
 VOYAGE_API_KEY=
 
-# ── Model routing (at least one required) ──
+# ── Model routing ──
 # Default router: ROUTEXOR (BYOK, zero markup). 1) sign up free at
 # https://routexor.com  2) add a provider key (Anthropic, OpenAI, ...) in the
 # dashboard: your provider key pays for the models  3) create your ROUTEXOR
 # API key and paste it here:
 ROUTEXOR_API_KEY=
-# Or go direct / local instead of (or alongside) ROUTEXOR:
-GROQ_API_KEY=          # free tier, fastest inference — https://console.groq.com
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-OLLAMA_BASE_URL=http://127.0.0.1:11434
 
 # VAPI voice channel (optional, set to enable voice)
 VAPI_API_KEY=
@@ -153,6 +161,13 @@ TELEGRAM_DEFAULT_CHAT_ID=
 
 # Gateway
 MERIDIAN_GATEWAY_TOKEN=
+MERIDIAN_LOOP_TOKEN=
+MERIDIAN_LOOP_BASE_URL=
+MERIDIAN_LOOP_STATE_PATH=
+# The phone contract stays unchanged; only this server-side selector moves.
+ATERNA_LOOP_HARNESS=meridian
+ATERNA_LOOP_HARNESS_URL=
+ATERNA_LOOP_HARNESS_TOKEN=
 MERIDIAN_GATEWAY_PORT=18889
 `;
 }
@@ -167,7 +182,10 @@ export function readEnvFile(path: string): Record<string, string> {
     const eq = trimmed.indexOf('=');
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+    const value = trimmed
+      .slice(eq + 1)
+      .trim()
+      .replace(/^["']|["']$/g, '');
     if (key && value) out[key] = value;
   }
   return out;

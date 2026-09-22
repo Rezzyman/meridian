@@ -27,7 +27,9 @@ export async function pickAgentInteractive(envOverride?: string): Promise<string
   // unambiguous; otherwise exit with actionable guidance instead of hanging.
   if (process.stdin.isTTY !== true) {
     if (agents.length === 1) return agents[0]!.slug;
-    console.log(colors.err('Multiple agents and non-interactive stdin — cannot prompt for a choice.'));
+    console.log(
+      colors.err('Multiple agents and non-interactive stdin — cannot prompt for a choice.'),
+    );
     console.log(colors.muted('Pass --agent <slug> or set MERIDIAN_AGENT to pick one.'));
     process.exit(1);
   }
@@ -46,8 +48,7 @@ export async function pickAgentInteractive(envOverride?: string): Promise<string
   console.log('');
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const ask = (q: string): Promise<string> =>
-    new Promise((res) => rl.question(q, (a) => res(a)));
+  const ask = (q: string): Promise<string> => new Promise((res) => rl.question(q, (a) => res(a)));
 
   while (true) {
     const ans = (await ask(`${colors.cyan('❯')} pick [1-${agents.length}] or slug: `)).trim();

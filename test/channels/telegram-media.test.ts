@@ -18,7 +18,15 @@ import {
 } from '../../src/channels/telegram.js';
 import type { InboundMessage } from '../../src/channels/types.js';
 
-const silent = { info() {}, warn() {}, error() {}, debug() {}, child() { return silent; } } as unknown as Logger;
+const silent = {
+  info() {},
+  warn() {},
+  error() {},
+  debug() {},
+  child() {
+    return silent;
+  },
+} as unknown as Logger;
 
 const PNG_BYTES = Buffer.from('89504e470d0a1a0a-fake-image-bytes');
 
@@ -29,15 +37,19 @@ interface Harness {
   downloads: string[];
 }
 
-function makeChannel(opts: {
-  vision?: TelegramVisionDeps | 'default';
-  maxMediaBytes?: number;
-  defaultChatId?: string | null;
-  allowedChatIds?: string[];
-  mediaDir?: string | null;
-} = {}): Harness {
+function makeChannel(
+  opts: {
+    vision?: TelegramVisionDeps | 'default';
+    maxMediaBytes?: number;
+    defaultChatId?: string | null;
+    allowedChatIds?: string[];
+    mediaDir?: string | null;
+  } = {},
+): Harness {
   const mediaDir =
-    opts.mediaDir === null ? undefined : (opts.mediaDir ?? mkdtempSync(join(tmpdir(), 'meridian-tg-')));
+    opts.mediaDir === null
+      ? undefined
+      : (opts.mediaDir ?? mkdtempSync(join(tmpdir(), 'meridian-tg-')));
   const inbound: InboundMessage[] = [];
   const downloads: string[] = [];
   const vision: TelegramVisionDeps | undefined =
@@ -65,12 +77,14 @@ function makeChannel(opts: {
   return { channel, inbound, mediaDir: mediaDir ?? '', downloads };
 }
 
-function photoCtx(overrides: Partial<{
-  chatId: string;
-  caption: string;
-  fileSize: number;
-  replies: string[];
-}> = {}): { ctx: TelegramMediaContext; replies: string[] } {
+function photoCtx(
+  overrides: Partial<{
+    chatId: string;
+    caption: string;
+    fileSize: number;
+    replies: string[];
+  }> = {},
+): { ctx: TelegramMediaContext; replies: string[] } {
   const replies = overrides.replies ?? [];
   const ctx: TelegramMediaContext = {
     chat: { id: overrides.chatId ?? '42' },
@@ -199,7 +213,11 @@ describe('telegram media — caps and non-images', () => {
         caption: 'roof scan',
         document: { file_id: 'd1', file_name: 'roof.png', mime_type: 'image/png', file_size: 64 },
       },
-      getFile: async () => ({ file_unique_id: 'u9', file_size: 64, file_path: 'documents/roof.png' }),
+      getFile: async () => ({
+        file_unique_id: 'u9',
+        file_size: 64,
+        file_path: 'documents/roof.png',
+      }),
       reply: async (t: string) => {
         replies.push(t);
       },

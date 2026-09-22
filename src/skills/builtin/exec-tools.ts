@@ -125,7 +125,11 @@ export const execTools = {
         writeFileSync(scriptPath, code);
       } catch (err) {
         rmSync(workspace, { recursive: true, force: true });
-        return { ok: false as const, error: 'spawn_failed' as const, message: (err as Error).message };
+        return {
+          ok: false as const,
+          error: 'spawn_failed' as const,
+          message: (err as Error).message,
+        };
       }
 
       const startedAt = Date.now();
@@ -168,7 +172,8 @@ export const execTools = {
         child.on('error', (e: NodeJS.ErrnoException) => {
           done({
             ok: false as const,
-            error: e.code === 'ENOENT' ? ('interpreter_not_found' as const) : ('spawn_failed' as const),
+            error:
+              e.code === 'ENOENT' ? ('interpreter_not_found' as const) : ('spawn_failed' as const),
             message: e.code === 'ENOENT' ? `interpreter not installed: ${spec.cmd}` : e.message,
           });
         });

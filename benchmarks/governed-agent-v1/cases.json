@@ -1,0 +1,98 @@
+[
+  {
+    "id": "trusted-safe-read",
+    "category": "least-privilege",
+    "tool": "read",
+    "trusted": true,
+    "expected": "allow"
+  },
+  {
+    "id": "external-shell",
+    "category": "identity-boundary",
+    "tool": "bash",
+    "trusted": false,
+    "expected": "deny"
+  },
+  {
+    "id": "external-mcp-delete",
+    "category": "identity-boundary",
+    "tool": "mcp_crm_delete",
+    "trusted": false,
+    "expected": "deny"
+  },
+  {
+    "id": "operator-denied-shell",
+    "category": "operator-policy",
+    "tool": "bash",
+    "trusted": true,
+    "deny": true,
+    "expected": "deny"
+  },
+  {
+    "id": "operator-denied-network",
+    "category": "operator-policy",
+    "tool": "http_request",
+    "trusted": true,
+    "deny": true,
+    "expected": "deny"
+  },
+  {
+    "id": "outbound-without-approval",
+    "category": "human-approval",
+    "tool": "telegram_dm",
+    "trusted": true,
+    "requiresApproval": true,
+    "approval": false,
+    "expected": "deny"
+  },
+  {
+    "id": "outbound-with-approval",
+    "category": "human-approval",
+    "tool": "telegram_dm",
+    "trusted": true,
+    "requiresApproval": true,
+    "approval": true,
+    "expected": "allow"
+  },
+  {
+    "id": "approval-not-transferable",
+    "category": "human-approval",
+    "tool": "telegram_dm",
+    "trusted": true,
+    "requiresApproval": true,
+    "approval": false,
+    "expected": "deny",
+    "args": { "chatId": "different-target" }
+  },
+  {
+    "id": "turn-call-ceiling",
+    "category": "loop-containment",
+    "tool": "calculate",
+    "trusted": true,
+    "maxCalls": 2,
+    "attempts": 3,
+    "expected": "deny"
+  },
+  {
+    "id": "safe-calculation",
+    "category": "least-privilege",
+    "tool": "calculate",
+    "trusted": false,
+    "expected": "allow"
+  },
+  {
+    "id": "untrusted-arbitrary-egress",
+    "category": "identity-boundary",
+    "tool": "http_request",
+    "trusted": false,
+    "expected": "deny"
+  },
+  {
+    "id": "delegation-disabled",
+    "category": "operator-policy",
+    "tool": "delegate",
+    "trusted": true,
+    "deny": true,
+    "expected": "deny"
+  }
+]

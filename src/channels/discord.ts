@@ -28,7 +28,11 @@ const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 function publicKeyFromHex(hex: string) {
   const raw = Buffer.from(hex, 'hex');
   if (raw.length !== 32) throw new Error('ed25519 public key must be 32 bytes');
-  return createPublicKey({ key: Buffer.concat([ED25519_SPKI_PREFIX, raw]), format: 'der', type: 'spki' });
+  return createPublicKey({
+    key: Buffer.concat([ED25519_SPKI_PREFIX, raw]),
+    format: 'der',
+    type: 'spki',
+  });
 }
 
 /** Verify a Discord interaction signature (Ed25519 over timestamp+body). Pure. */
@@ -104,7 +108,12 @@ export class DiscordChannel implements ChannelAdapter {
   }
 
   verifySignature(rawBody: string, signature?: string, timestamp?: string): boolean {
-    return verifyDiscordSignature({ publicKey: this.opts.publicKey, signature, timestamp, rawBody });
+    return verifyDiscordSignature({
+      publicKey: this.opts.publicKey,
+      signature,
+      timestamp,
+      rawBody,
+    });
   }
 
   handleRequest(rawBody: string): DiscordHandleResult {
@@ -120,19 +129,30 @@ export class DiscordChannel implements ChannelAdapter {
     }
 
     if (body.type !== INTERACTION.APPLICATION_COMMAND) {
-      return { status: 200, body: { type: RESPONSE.CHANNEL_MESSAGE, data: { content: 'Unsupported interaction.' } }, done: DONE };
+      return {
+        status: 200,
+        body: { type: RESPONSE.CHANNEL_MESSAGE, data: { content: 'Unsupported interaction.' } },
+        done: DONE,
+      };
     }
 
     const text = extractCommandText(body);
     if (!text) {
       return {
         status: 200,
-        body: { type: RESPONSE.CHANNEL_MESSAGE, data: { content: 'Usage: include a message, e.g. `/meridian message: …`' } },
+        body: {
+          type: RESPONSE.CHANNEL_MESSAGE,
+          data: { content: 'Usage: include a message, e.g. `/meridian message: …`' },
+        },
         done: DONE,
       };
     }
     if (!this.handler || !body.token) {
-      return { status: 200, body: { type: RESPONSE.CHANNEL_MESSAGE, data: { content: 'Agent not ready.' } }, done: DONE };
+      return {
+        status: 200,
+        body: { type: RESPONSE.CHANNEL_MESSAGE, data: { content: 'Agent not ready.' } },
+        done: DONE,
+      };
     }
 
     const appId = body.application_id ?? this.opts.applicationId;
@@ -145,12 +165,20 @@ export class DiscordChannel implements ChannelAdapter {
           channel: 'discord',
           from: userId,
           text,
-          meta: { channelId: body.channel_id, username: body.member?.user?.username ?? body.user?.username },
+          meta: {
+            channelId: body.channel_id,
+            username: body.member?.user?.username ?? body.user?.username,
+          },
         });
         if (appId) await this.followUp(appId, token, reply);
       } catch (err) {
         this.opts.logger.error({ msg: 'discord inbound error', err });
-        if (appId) await this.followUp(appId, token, 'Something went wrong on my end. I have logged it.').catch(() => {});
+        if (appId)
+          await this.followUp(
+            appId,
+            token,
+            'Something went wrong on my end. I have logged it.',
+          ).catch(() => {});
       }
     })();
     return { status: 200, body: { type: RESPONSE.DEFERRED_CHANNEL_MESSAGE }, done };
@@ -159,7 +187,10 @@ export class DiscordChannel implements ChannelAdapter {
   async send(msg: OutboundMessage): Promise<void> {
     // Discord follow-ups require an interaction token; a generic outbound send
     // is not supported by the interactions path.
-    this.opts.logger.warn({ msg: 'discord send() is a no-op (interactions have no standalone outbound)', to: msg.to });
+    this.opts.logger.warn({
+      msg: 'discord send() is a no-op (interactions have no standalone outbound)',
+      to: msg.to,
+    });
   }
 
   /** Edit the deferred response, then post any overflow as follow-up messages. */
@@ -185,7 +216,9 @@ export class DiscordChannel implements ChannelAdapter {
 
 function extractCommandText(body: DiscordInteraction): string {
   const options = body.data?.options ?? [];
-  const named = options.find((o) => typeof o.value === 'string' && /message|prompt|text|q|ask/i.test(o.name ?? ''));
+  const named = options.find(
+    (o) => typeof o.value === 'string' && /message|prompt|text|q|ask/i.test(o.name ?? ''),
+  );
   const anyStr = options.find((o) => typeof o.value === 'string');
   return String((named ?? anyStr)?.value ?? '').trim();
 }

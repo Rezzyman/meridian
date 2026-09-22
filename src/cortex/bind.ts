@@ -23,6 +23,8 @@ const DEFAULT_BASE = process.env.MERIDIAN_CORTEX_URL ?? 'http://127.0.0.1:3100';
 export interface CortexBindOptions {
   agentId: string;
   baseUrl?: string;
+  /** Shared service credential for the private Meridian → CORTEX boundary. */
+  serviceToken?: string;
   fetchImpl?: typeof fetch;
   /**
    * Per-request wall-clock ceiling in ms. A CORTEX host that accepts the TCP
@@ -41,12 +43,14 @@ export class CortexBind implements MemoryProvider {
   readonly baseUrl: string;
   private fetchImpl: typeof fetch;
   private timeoutMs: number;
+  private serviceToken?: string;
 
   constructor(opts: CortexBindOptions) {
     this.agentId = opts.agentId;
     this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE).replace(/\/$/, '');
     this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.serviceToken = opts.serviceToken ?? process.env.MERIDIAN_CORTEX_TOKEN;
   }
 
   /** A caller-supplied signal wins; otherwise fall back to the instance timeout. */
@@ -60,7 +64,11 @@ export class CortexBind implements MemoryProvider {
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...init,
       signal: this.timeoutSignal(init),
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.serviceToken ? { Authorization: `Bearer ${this.serviceToken}` } : {}),
+        ...(init?.headers ?? {}),
+      },
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
@@ -102,9 +110,7 @@ export class CortexBind implements MemoryProvider {
   }
 
   // ─── List recent cognitive artifacts (reflector clusters, dream insights) ────
-  async listArtifacts(
-    opts: { sinceHours?: number; limit?: number } = {},
-  ): Promise<{
+  async listArtifacts(opts: { sinceHours?: number; limit?: number } = {}): Promise<{
     agentId: string;
     sinceHours: number;
     cutoff: string;
@@ -118,6 +124,7 @@ export class CortexBind implements MemoryProvider {
     });
     const res = await this.fetchImpl(`${this.baseUrl}/api/v1/artifacts?${params.toString()}`, {
       signal: this.timeoutSignal(),
+      headers: this.serviceToken ? { Authorization: `Bearer ${this.serviceToken}` } : undefined,
     });
     if (!res.ok) {
       throw new Error(`CORTEX /artifacts ${res.status}`);
@@ -220,6 +227,6 @@ export class CortexBind implements MemoryProvider {
   }
 }
 
-export function bindCortex(agentId: string, baseUrl?: string): CortexBind {
-  return new CortexBind({ agentId, baseUrl });
+export function bindCortex(agentId: string, baseUrl?: string, serviceToken?: string): CortexBind {
+  return new CortexBind({ agentId, baseUrl, serviceToken });
 }

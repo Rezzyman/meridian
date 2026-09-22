@@ -13,11 +13,13 @@ import type { MeridianHome } from '../../config/home.js';
 import type { SkillRegistry } from '../../skills/types.js';
 import type { SessionStore } from '../../session/store.js';
 import type { PassphraseGuard } from '../../skills/runtime.js';
+import type { AgentConfig } from '../../config/schema.js';
 import { commandsByCategory, findCommand } from './registry.js';
 import { runAudit, writeReport } from '../../audit/retrospective.js';
 
 export interface HandlerCtx {
   home: MeridianHome;
+  config: AgentConfig;
   conversation: Conversation;
   cortex: MemoryProvider;
   dream: DreamWeaver;
@@ -69,6 +71,12 @@ export async function dispatch(line: string, ctx: HandlerCtx): Promise<string | 
       return await renderWhy(ctx, arg);
     case 'trace':
       return await renderTrace(ctx, arg);
+    case 'receipts':
+      return renderReceipts(ctx, arg);
+    case 'approve':
+      return handleApprove(ctx, arg);
+    case 'approvals':
+      return renderApprovals(ctx);
     case 'auth':
       return handleAuth(ctx, arg);
     case 'automations':
@@ -96,7 +104,9 @@ function renderHelp(): string {
   for (const [category, cmds] of Object.entries(commandsByCategory())) {
     lines.push(`\n  ${colors.muted(`── ${category} ──`)}`);
     for (const c of cmds) {
-      const aliases = c.aliases?.length ? colors.muted(` (${c.aliases.map((a) => `/${a}`).join(', ')})`) : '';
+      const aliases = c.aliases?.length
+        ? colors.muted(` (${c.aliases.map((a) => `/${a}`).join(', ')})`)
+        : '';
       const hint = c.argsHint ? colors.muted(` ${c.argsHint}`) : '';
       lines.push(`    ${colors.cyan(`/${c.name}`)}${hint}${aliases} — ${c.description}`);
     }
@@ -148,11 +158,8 @@ async function renderCortex(ctx: HandlerCtx): Promise<string> {
   // Dream weaver = the in-process scheduler. If it hasn't fired in this
   // process, fall back to CORTEX's last_dream_at rather than saying "never"
   // (CORTEX has likely run dream cycles via its own reflector / online observer).
-  const lastFired =
-    dreamState.lastFiredAt?.toISOString() ?? stats?.lastDreamAt ?? 'never';
-  lines.push(
-    `  dream weaver: ${dreamState.running ? 'running' : 'idle'} (last: ${lastFired})`,
-  );
+  const lastFired = dreamState.lastFiredAt?.toISOString() ?? stats?.lastDreamAt ?? 'never';
+  lines.push(`  dream weaver: ${dreamState.running ? 'running' : 'idle'} (last: ${lastFired})`);
   return lines.join('\n');
 }
 
@@ -212,10 +219,14 @@ async function renderMemoryDigest(ctx: HandlerCtx, topic: string): Promise<strin
     return bMax - aMax;
   });
   for (const [src, ms] of ordered.slice(0, 8)) {
-    lines.push(`  ${colors.steel(src)}  ${colors.muted(`(${ms.length} hit${ms.length === 1 ? '' : 's'})`)}`);
+    lines.push(
+      `  ${colors.steel(src)}  ${colors.muted(`(${ms.length} hit${ms.length === 1 ? '' : 's'})`)}`,
+    );
     for (const m of ms.slice(0, 3)) {
       const preview = m.content.slice(0, 220).replace(/\s+/g, ' ').trim();
-      lines.push(`    ${colors.muted(`#${m.id} ·`)} ${preview}${m.content.length > 220 ? '…' : ''}`);
+      lines.push(
+        `    ${colors.muted(`#${m.id} ·`)} ${preview}${m.content.length > 220 ? '…' : ''}`,
+      );
     }
     lines.push('');
   }
@@ -267,23 +278,31 @@ async function renderTrace(ctx: HandlerCtx, arg: string): Promise<string> {
   const target =
     !arg || arg === 'last'
       ? traces[0]!
-      : traces.find((t) => t.turnId === arg || t.turnId.startsWith(arg)) ?? null;
+      : (traces.find((t) => t.turnId === arg || t.turnId.startsWith(arg)) ?? null);
   if (!target) {
     return colors.muted(`no trace found for "${arg}". try /trace last or /trace <turn-id>`);
   }
   const c = colors;
   const memCites = target.recallMemoryIds?.length
-    ? target.recallMemoryIds.slice(0, 12).map((id) => `#${id}`).join(', ')
+    ? target.recallMemoryIds
+        .slice(0, 12)
+        .map((id) => `#${id}`)
+        .join(', ')
     : '(none)';
   const artCites = target.recallArtifactIds?.length
-    ? target.recallArtifactIds.slice(0, 6).map((id) => `#${id}`).join(', ')
+    ? target.recallArtifactIds
+        .slice(0, 6)
+        .map((id) => `#${id}`)
+        .join(', ')
     : '(none)';
   const tools = target.toolCalls?.length
     ? target.toolCalls.map((t) => `${t.stepType}:${t.name}`).join(' → ')
     : '(no tool calls)';
   const lines = [
     c.cyan(`Trace · turn ${target.turnId}`),
-    c.muted(`  ${target.ts}  ·  ${target.channel}  ·  ${target.durationMs ?? '?'}ms  ·  ${target.model ?? 'unknown model'}`),
+    c.muted(
+      `  ${target.ts}  ·  ${target.channel}  ·  ${target.durationMs ?? '?'}ms  ·  ${target.model ?? 'unknown model'}`,
+    ),
     '',
     `  ${c.steel('user')}    ${target.userInput.slice(0, 200)}${target.userInput.length > 200 ? '…' : ''}`,
     '',
@@ -292,6 +311,7 @@ async function renderTrace(ctx: HandlerCtx, arg: string): Promise<string> {
     `           artifacts: ${artCites}`,
     '',
     `  ${c.steel('tools')}   ${tools}`,
+    `  ${c.steel('model receipts')}   ${target.modelTraceIds?.length ? target.modelTraceIds.join(', ') : '(none)'}`,
     '',
     `  ${c.steel('reply')}   ${target.reply.slice(0, 240).replace(/\n/g, ' ')}${target.reply.length > 240 ? '…' : ''}`,
   ];
@@ -314,6 +334,52 @@ function handleAuth(ctx: HandlerCtx, arg: string): string {
   }
 }
 
+function handleApprove(ctx: HandlerCtx, arg: string): string {
+  if (!ctx.store) return colors.warn('approval store not wired into this REPL');
+  const [toolName, minutesRaw] = arg.split(/\s+/);
+  if (!toolName) return 'usage: /approve <tool> [minutes]';
+  const minutes = minutesRaw ? Number(minutesRaw) : 5;
+  if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 60)
+    return colors.warn('minutes must be between 1 and 60');
+  const automationScope = toolName.startsWith('automation:');
+  if (automationScope && !ctx.config.operator?.id)
+    return colors.warn('cannot approve an automation without operator.id in config');
+  const sessionId = automationScope ? `op:${ctx.config.operator!.id}` : ctx.conversation.sessionId;
+  const grant = ctx.store.grantApproval(sessionId, toolName, minutes);
+  return colors.ok(`approved one use of ${toolName} for ${minutes} minute(s) · ${grant.grantId}`);
+}
+
+function renderApprovals(ctx: HandlerCtx): string {
+  if (!ctx.store) return colors.warn('approval store not wired into this REPL');
+  const sessionIds = new Set([ctx.conversation.sessionId]);
+  if (ctx.config.operator?.id) sessionIds.add(`op:${ctx.config.operator.id}`);
+  const grants = ctx.store.listApprovals().filter((grant) => sessionIds.has(grant.sessionId));
+  if (!grants.length) return colors.muted('no approval grants for this session');
+  const now = new Date().toISOString();
+  return [
+    colors.cyan('Approval grants'),
+    ...grants.slice(0, 20).map((g) => {
+      const state = g.remainingUses < 1 ? 'consumed' : g.expiresAt <= now ? 'expired' : 'armed';
+      return `  ${g.grantId}  ${g.toolName}  ${state}  expires ${g.expiresAt}`;
+    }),
+  ].join('\n');
+}
+
+function renderReceipts(ctx: HandlerCtx, arg: string): string {
+  if (!ctx.store) return colors.warn('receipt store not wired into this REPL');
+  const requested = arg ? Number(arg) : 20;
+  const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 100) : 20;
+  const receipts = ctx.store.listActionReceipts(ctx.conversation.sessionId, limit);
+  if (!receipts.length) return colors.muted('no action receipts for this session');
+  return [
+    colors.cyan(`Action receipts · ${ctx.conversation.sessionId}`),
+    ...receipts.map((r) => {
+      const valid = ctx.store!.verifyActionReceipt(r) ? 'signed' : 'INVALID';
+      return `  ${r.receiptId}  ${r.decision}/${r.outcome ?? 'unknown'}  ${r.toolName}  ${r.rule}  ${r.durationMs ?? '?'}ms  ${valid}`;
+    }),
+  ].join('\n');
+}
+
 async function renderAutomations(_ctx: HandlerCtx, _arg: string): Promise<string> {
   const { loadAutomationDefs } = await import('../../automations/manager.js');
   const defs = loadAutomationDefs(_ctx.home);
@@ -333,11 +399,7 @@ async function renderAutomations(_ctx: HandlerCtx, _arg: string): Promise<string
   return lines.join('\n');
 }
 
-async function renderLedgerFile(
-  ctx: HandlerCtx,
-  filename: string,
-  label: string,
-): Promise<string> {
+async function renderLedgerFile(ctx: HandlerCtx, filename: string, label: string): Promise<string> {
   const { readFileSync, existsSync } = await import('node:fs');
   const path = join(ctx.home.layer('MEMORY'), 'decision-logs', filename);
   if (!existsSync(path)) {

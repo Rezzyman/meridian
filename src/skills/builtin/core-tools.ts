@@ -11,14 +11,18 @@ import { screenUrl } from '../../tools/ssrf.js';
 
 export const coreTools = {
   bash: tool({
-    description: 'Execute a shell command in the agent workspace. Use for read-only inspection by default.',
+    description:
+      'Execute a shell command in the agent workspace. Use for read-only inspection by default.',
     parameters: z.object({
       command: z.string(),
       timeoutMs: z.number().int().default(30000),
     }),
     execute: async ({ command, timeoutMs }) => {
       try {
-        const out = execSync(command, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }).toString();
+        const out = execSync(command, {
+          timeout: timeoutMs,
+          maxBuffer: 4 * 1024 * 1024,
+        }).toString();
         return { ok: true, stdout: out };
       } catch (err) {
         const e = err as { stdout?: Buffer; stderr?: Buffer; status?: number; message: string };
@@ -40,7 +44,8 @@ export const coreTools = {
     },
   }),
   write: tool({
-    description: 'Write content to a file (overwrites). Path must already be absolute or relative to cwd.',
+    description:
+      'Write content to a file (overwrites). Path must already be absolute or relative to cwd.',
     parameters: z.object({ path: z.string(), content: z.string() }),
     execute: async ({ path, content }) => {
       writeFileSync(path, content);

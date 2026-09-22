@@ -36,11 +36,7 @@ interface OnboardAnswers {
   workingNotes: string;
 }
 
-async function ask(
-  rl: readline.Interface,
-  prompt: string,
-  defaultValue?: string,
-): Promise<string> {
+async function ask(rl: readline.Interface, prompt: string, defaultValue?: string): Promise<string> {
   const tag = defaultValue ? colors.muted(` [${defaultValue}]`) : '';
   const ans = (await rl.question(`${colors.cyan('?')} ${prompt}${tag} `)).trim();
   return ans || defaultValue || '';
@@ -61,7 +57,9 @@ async function askMulti(rl: readline.Interface, prompt: string, hint: string): P
 async function askStakeholders(
   rl: readline.Interface,
 ): Promise<Array<{ name: string; relationship: string }>> {
-  console.log(`${colors.cyan('?')} Who are the most important people in your life I should know about?`);
+  console.log(
+    `${colors.cyan('?')} Who are the most important people in your life I should know about?`,
+  );
   console.log(colors.muted('  Format: "Name — relationship". One per line. Blank to finish.'));
   console.log(colors.muted('  Example: Stormy Knight — co-founder'));
   const list: Array<{ name: string; relationship: string }> = [];
@@ -76,7 +74,10 @@ async function askStakeholders(
   return list;
 }
 
-async function runInterview(slug: string, defaults: { operatorName?: string }): Promise<OnboardAnswers> {
+async function runInterview(
+  slug: string,
+  defaults: { operatorName?: string },
+): Promise<OnboardAnswers> {
   const rl = readline.createInterface({ input, output });
 
   console.log('');
@@ -116,7 +117,14 @@ async function runInterview(slug: string, defaults: { operatorName?: string }): 
   };
 }
 
-type LayerName = 'IDENTITY' | 'CONTEXT' | 'SKILLS' | 'MEMORY' | 'CONNECTIONS' | 'VERIFICATION' | 'AUTOMATIONS';
+type LayerName =
+  | 'IDENTITY'
+  | 'CONTEXT'
+  | 'SKILLS'
+  | 'MEMORY'
+  | 'CONNECTIONS'
+  | 'VERIFICATION'
+  | 'AUTOMATIONS';
 
 function ensureLayer(home: ReturnType<typeof ensureAgentHome>, layer: LayerName): string {
   const dir = home.layer(layer);
@@ -155,10 +163,7 @@ all flow through this.
   return path;
 }
 
-function writeStakeholdersMd(
-  home: ReturnType<typeof ensureAgentHome>,
-  a: OnboardAnswers,
-): string {
+function writeStakeholdersMd(home: ReturnType<typeof ensureAgentHome>, a: OnboardAnswers): string {
   const path = join(ensureLayer(home, 'CONTEXT'), 'stakeholders.md');
   const lines = a.stakeholders.length
     ? a.stakeholders.map((s) => `- **${s.name}** — ${s.relationship}`).join('\n')
@@ -175,10 +180,7 @@ ${lines}
   return path;
 }
 
-function writePrinciplesMd(
-  home: ReturnType<typeof ensureAgentHome>,
-  a: OnboardAnswers,
-): string {
+function writePrinciplesMd(home: ReturnType<typeof ensureAgentHome>, a: OnboardAnswers): string {
   const path = join(ensureLayer(home, 'CONTEXT'), 'principles.md');
   const body = `# Operating principles
 
@@ -195,16 +197,10 @@ ${
   return path;
 }
 
-function applySacredToConfig(
-  home: ReturnType<typeof ensureAgentHome>,
-  a: OnboardAnswers,
-): void {
+function applySacredToConfig(home: ReturnType<typeof ensureAgentHome>, a: OnboardAnswers): void {
   if (a.sacredTopics.length === 0) return;
   if (!existsSync(home.configPath)) return;
-  const cfg = (parseYaml(readFileSync(home.configPath, 'utf8')) ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const cfg = (parseYaml(readFileSync(home.configPath, 'utf8')) ?? {}) as Record<string, unknown>;
   const operator = (cfg.operator as Record<string, unknown> | undefined) ?? {};
   operator.sensitivity = { sacredTopics: a.sacredTopics };
   cfg.operator = operator;
@@ -218,10 +214,7 @@ export async function runOnboard(): Promise<void> {
   // Pull operator name from existing config (init-guided populates it).
   let operatorName: string | undefined;
   if (existsSync(home.configPath)) {
-    const cfg = (parseYaml(readFileSync(home.configPath, 'utf8')) ?? {}) as Record<
-      string,
-      unknown
-    >;
+    const cfg = (parseYaml(readFileSync(home.configPath, 'utf8')) ?? {}) as Record<string, unknown>;
     const op = cfg.operator as { name?: string } | undefined;
     operatorName = op?.name;
   }
@@ -241,8 +234,14 @@ export async function runOnboard(): Promise<void> {
   console.log(colors.muted(`  stakeholders: ${stakeholdersPath}`));
   console.log(colors.muted(`  principles:  ${principlesPath}`));
   if (answers.sacredTopics.length) {
-    console.log(colors.muted(`  sacred topics:  ${answers.sacredTopics.length} recorded under operator.sensitivity in config.yaml`));
+    console.log(
+      colors.muted(
+        `  sacred topics:  ${answers.sacredTopics.length} recorded under operator.sensitivity in config.yaml`,
+      ),
+    );
   }
   console.log('');
-  console.log(colors.muted('Restart the gateway (or REPL) so the new context files load on the next turn.'));
+  console.log(
+    colors.muted('Restart the gateway (or REPL) so the new context files load on the next turn.'),
+  );
 }

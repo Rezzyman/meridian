@@ -90,7 +90,10 @@ export function makeModelJudge(deps: MakeModelJudgeDeps): MemoryJudge {
     } catch (err) {
       // Judge failure must FAIL SAFE: if we can't get a verdict, flag every
       // untrusted candidate rather than let a possible directive through.
-      deps.logger?.warn({ msg: 'memory judge failed; failing safe (flag all)', err: (err as Error).message });
+      deps.logger?.warn({
+        msg: 'memory judge failed; failing safe (flag all)',
+        err: (err as Error).message,
+      });
       return candidates.map((m) => ({
         id: m.id,
         isDirective: true,
@@ -149,7 +152,9 @@ export async function screenRecallDeep(
   let safeContext = kept.map((m) => `- ${m.content}`).join('\n');
   if (base.clusters.length > 0 && !safeContext.includes('coordinated manipulation')) {
     // base.safeContext already carried the caution; preserve it.
-    const caution = base.safeContext.slice(base.safeContext.indexOf('\n\n[memory-integrity caution'));
+    const caution = base.safeContext.slice(
+      base.safeContext.indexOf('\n\n[memory-integrity caution'),
+    );
     if (caution.startsWith('\n\n[memory-integrity')) safeContext += caution;
   }
   return { safeContext, kept, quarantined, clusters: base.clusters };

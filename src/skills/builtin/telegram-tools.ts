@@ -21,10 +21,10 @@ export function telegramTools(env: AgentEnv) {
   return {
     telegram_dm: tool({
       description:
-        "Send a Telegram direct message to the operator. Use this to reach the operator " +
-        "from any channel (e.g. mid-voice-call when the call needs human handoff, or to " +
-        "push a one-line summary after an automation). The message goes to the trusted " +
-        "chat id configured at gateway boot.",
+        'Send a Telegram direct message to the operator. Use this to reach the operator ' +
+        'from any channel (e.g. mid-voice-call when the call needs human handoff, or to ' +
+        'push a one-line summary after an automation). The message goes to the trusted ' +
+        'chat id configured at gateway boot.',
       parameters: z.object({
         text: z.string().describe('The message body. Plain text. Keep under 4000 chars.'),
         chatId: z.string().optional().describe('Override the default chat id. Rarely needed.'),

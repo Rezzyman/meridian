@@ -9,12 +9,26 @@ import { generateKeyPairSync, sign as edSign } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Logger } from 'pino';
 import type { FetchLike } from '../../src/channels/slack.js';
-import { DiscordChannel, splitForDiscord, verifyDiscordSignature } from '../../src/channels/discord.js';
+import {
+  DiscordChannel,
+  splitForDiscord,
+  verifyDiscordSignature,
+} from '../../src/channels/discord.js';
 
-const silent = { info() {}, warn() {}, error() {}, debug() {}, child() { return silent; } } as unknown as Logger;
+const silent = {
+  info() {},
+  warn() {},
+  error() {},
+  debug() {},
+  child() {
+    return silent;
+  },
+} as unknown as Logger;
 
 const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-const PUB_HEX = Buffer.from(publicKey.export({ type: 'spki', format: 'der' })).subarray(12).toString('hex');
+const PUB_HEX = Buffer.from(publicKey.export({ type: 'spki', format: 'der' }))
+  .subarray(12)
+  .toString('hex');
 function signReq(ts: string, body: string): string {
   return Buffer.from(edSign(null, Buffer.from(ts + body), privateKey)).toString('hex');
 }
@@ -24,26 +38,75 @@ describe('verifyDiscordSignature', () => {
   const ts = '1700000000';
 
   it('accepts a correctly signed request', () => {
-    assert.equal(verifyDiscordSignature({ publicKey: PUB_HEX, signature: signReq(ts, body), timestamp: ts, rawBody: body }), true);
+    assert.equal(
+      verifyDiscordSignature({
+        publicKey: PUB_HEX,
+        signature: signReq(ts, body),
+        timestamp: ts,
+        rawBody: body,
+      }),
+      true,
+    );
   });
   it('rejects a tampered body', () => {
-    assert.equal(verifyDiscordSignature({ publicKey: PUB_HEX, signature: signReq(ts, body), timestamp: ts, rawBody: `${body} ` }), false);
+    assert.equal(
+      verifyDiscordSignature({
+        publicKey: PUB_HEX,
+        signature: signReq(ts, body),
+        timestamp: ts,
+        rawBody: `${body} `,
+      }),
+      false,
+    );
   });
   it('rejects a foreign key', () => {
     const other = generateKeyPairSync('ed25519');
-    const otherHex = Buffer.from(other.publicKey.export({ type: 'spki', format: 'der' })).subarray(12).toString('hex');
-    assert.equal(verifyDiscordSignature({ publicKey: otherHex, signature: signReq(ts, body), timestamp: ts, rawBody: body }), false);
+    const otherHex = Buffer.from(other.publicKey.export({ type: 'spki', format: 'der' }))
+      .subarray(12)
+      .toString('hex');
+    assert.equal(
+      verifyDiscordSignature({
+        publicKey: otherHex,
+        signature: signReq(ts, body),
+        timestamp: ts,
+        rawBody: body,
+      }),
+      false,
+    );
   });
   it('rejects missing parts / bad hex', () => {
-    assert.equal(verifyDiscordSignature({ publicKey: PUB_HEX, signature: undefined, timestamp: ts, rawBody: body }), false);
-    assert.equal(verifyDiscordSignature({ publicKey: 'zz', signature: signReq(ts, body), timestamp: ts, rawBody: body }), false);
+    assert.equal(
+      verifyDiscordSignature({
+        publicKey: PUB_HEX,
+        signature: undefined,
+        timestamp: ts,
+        rawBody: body,
+      }),
+      false,
+    );
+    assert.equal(
+      verifyDiscordSignature({
+        publicKey: 'zz',
+        signature: signReq(ts, body),
+        timestamp: ts,
+        rawBody: body,
+      }),
+      false,
+    );
   });
 });
 
-function mockFetch(): { fetchImpl: FetchLike; calls: Array<{ url: string; method: string; body: unknown }> } {
+function mockFetch(): {
+  fetchImpl: FetchLike;
+  calls: Array<{ url: string; method: string; body: unknown }>;
+} {
   const calls: Array<{ url: string; method: string; body: unknown }> = [];
   const fetchImpl: FetchLike = async (url, init) => {
-    calls.push({ url, method: String(init.method), body: JSON.parse((init.body as string) ?? '{}') });
+    calls.push({
+      url,
+      method: String(init.method),
+      body: JSON.parse((init.body as string) ?? '{}'),
+    });
     return { ok: true, status: 200, json: async () => ({}) };
   };
   return { fetchImpl, calls };
@@ -52,7 +115,12 @@ function mockFetch(): { fetchImpl: FetchLike; calls: Array<{ url: string; method
 function makeChannel() {
   const { fetchImpl, calls } = mockFetch();
   const seen: string[] = [];
-  const ch = new DiscordChannel({ publicKey: PUB_HEX, applicationId: 'app-default', logger: silent, fetchImpl });
+  const ch = new DiscordChannel({
+    publicKey: PUB_HEX,
+    applicationId: 'app-default',
+    logger: silent,
+    fetchImpl,
+  });
   ch.start(undefined, {
     onInbound: async (m) => {
       seen.push(`${m.from}:${m.text}`);
@@ -92,7 +160,14 @@ describe('DiscordChannel.handleRequest', () => {
 
   it('prompts for usage when the command has no text', async () => {
     const { ch, seen } = makeChannel();
-    const r = ch.handleRequest(JSON.stringify({ type: 2, token: 't', application_id: 'a', data: { name: 'x', options: [] } }));
+    const r = ch.handleRequest(
+      JSON.stringify({
+        type: 2,
+        token: 't',
+        application_id: 'a',
+        data: { name: 'x', options: [] },
+      }),
+    );
     assert.equal((r.body as { type: number }).type, 4);
     await r.done;
     assert.deepEqual(seen, []);

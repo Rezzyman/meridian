@@ -28,7 +28,11 @@ export interface BundledTools {
   gog: {
     run: (opts: GogRunOptions) => Promise<GogRunResult>;
     runJson: <T = unknown>(opts: GogRunOptions) => Promise<T>;
-    listAccounts: (client: string) => Promise<Array<{ email: string; client: string; scopes: string; expires?: string; type: string }>>;
+    listAccounts: (
+      client: string,
+    ) => Promise<
+      Array<{ email: string; client: string; scopes: string; expires?: string; type: string }>
+    >;
   };
 }
 

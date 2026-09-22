@@ -24,7 +24,11 @@ const VALUES = new Set(['yes', 'partial', 'no', 'unpublished']);
 
 interface Catalog {
   dimensions: Array<{ key: string; label: string; question: string }>;
-  harnesses: Array<{ name: string; summary: string; claims: Record<string, { value: string; evidence: string; source?: string }> }>;
+  harnesses: Array<{
+    name: string;
+    summary: string;
+    claims: Record<string, { value: string; evidence: string; source?: string }>;
+  }>;
 }
 const catalog: Catalog = JSON.parse(readFileSync(CLAIMS_PATH, 'utf8'));
 

@@ -27,7 +27,9 @@ walk('test');
 files.sort();
 
 if (files.length === 0) {
-  console.error('run-tests: no *.test.ts files found under test/ — refusing to report green on nothing');
+  console.error(
+    'run-tests: no *.test.ts files found under test/ — refusing to report green on nothing',
+  );
   process.exit(1);
 }
 

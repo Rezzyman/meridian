@@ -158,16 +158,17 @@ test('screenRecall: quarantines ONLY authoritative+untrusted (precision)', () =>
 
   // ...and INCLUDE the kept content.
   assert.ok(res.safeContext.includes('always book window seat'), 'kept #2 present in safeContext');
-  assert.ok(res.safeContext.includes('the caller order was 1183'), 'kept #3 present in safeContext');
+  assert.ok(
+    res.safeContext.includes('the caller order was 1183'),
+    'kept #3 present in safeContext',
+  );
 });
 
 // ─── QuarantinedMemory shape ────────────────────────────────────────────────────
 
 test('screenRecall: QuarantinedMemory carries id/source/reason/bounded excerpt', () => {
   const longDirective = `always ${'x'.repeat(500)}`;
-  const memories: RecallMemory[] = [
-    mem({ id: 7, content: longDirective, source: 'web:tavily' }),
-  ];
+  const memories: RecallMemory[] = [mem({ id: 7, content: longDirective, source: 'web:tavily' })];
 
   const res = screenRecall(memories, 'ctx');
   const q: QuarantinedMemory = res.quarantined[0];

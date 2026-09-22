@@ -27,7 +27,12 @@ const userMsg: MatrixSyncResponse = {
       '!room:server': {
         timeline: {
           events: [
-            { type: 'm.room.message', sender: '@alice:server', event_id: '$1', content: { msgtype: 'm.text', body: 'hello bot' } },
+            {
+              type: 'm.room.message',
+              sender: '@alice:server',
+              event_id: '$1',
+              content: { msgtype: 'm.text', body: 'hello bot' },
+            },
           ],
         },
       },
@@ -38,37 +43,92 @@ const userMsg: MatrixSyncResponse = {
 describe('parseSyncMessages', () => {
   it('extracts m.text messages from joined rooms', () => {
     const msgs = parseSyncMessages(userMsg, SELF, new Set());
-    assert.deepEqual(msgs, [{ roomId: '!room:server', eventId: '$1', sender: '@alice:server', text: 'hello bot' }]);
+    assert.deepEqual(msgs, [
+      { roomId: '!room:server', eventId: '$1', sender: '@alice:server', text: 'hello bot' },
+    ]);
   });
 
   it('ignores the bot’s own messages', () => {
     const own = syncWith({
-      rooms: { join: { '!r:s': { timeline: { events: [
-        { type: 'm.room.message', sender: SELF, event_id: '$x', content: { msgtype: 'm.text', body: 'I am the bot' } },
-      ] } } } },
+      rooms: {
+        join: {
+          '!r:s': {
+            timeline: {
+              events: [
+                {
+                  type: 'm.room.message',
+                  sender: SELF,
+                  event_id: '$x',
+                  content: { msgtype: 'm.text', body: 'I am the bot' },
+                },
+              ],
+            },
+          },
+        },
+      },
     });
     assert.deepEqual(parseSyncMessages(own, SELF, new Set()), []);
   });
 
   it('ignores non-text message types (images, notices)', () => {
     const nonText = syncWith({
-      rooms: { join: { '!r:s': { timeline: { events: [
-        { type: 'm.room.message', sender: '@a:s', event_id: '$i', content: { msgtype: 'm.image', body: 'pic.png' } },
-        { type: 'm.room.member', sender: '@a:s', event_id: '$j', content: {} },
-      ] } } } },
+      rooms: {
+        join: {
+          '!r:s': {
+            timeline: {
+              events: [
+                {
+                  type: 'm.room.message',
+                  sender: '@a:s',
+                  event_id: '$i',
+                  content: { msgtype: 'm.image', body: 'pic.png' },
+                },
+                { type: 'm.room.member', sender: '@a:s', event_id: '$j', content: {} },
+              ],
+            },
+          },
+        },
+      },
     });
     assert.deepEqual(parseSyncMessages(nonText, SELF, new Set()), []);
   });
 
   it('honors a room allowlist', () => {
     const two = syncWith({
-      rooms: { join: {
-        '!allowed:s': { timeline: { events: [{ type: 'm.room.message', sender: '@a:s', event_id: '$1', content: { msgtype: 'm.text', body: 'in' } }] } },
-        '!other:s': { timeline: { events: [{ type: 'm.room.message', sender: '@a:s', event_id: '$2', content: { msgtype: 'm.text', body: 'out' } }] } },
-      } },
+      rooms: {
+        join: {
+          '!allowed:s': {
+            timeline: {
+              events: [
+                {
+                  type: 'm.room.message',
+                  sender: '@a:s',
+                  event_id: '$1',
+                  content: { msgtype: 'm.text', body: 'in' },
+                },
+              ],
+            },
+          },
+          '!other:s': {
+            timeline: {
+              events: [
+                {
+                  type: 'm.room.message',
+                  sender: '@a:s',
+                  event_id: '$2',
+                  content: { msgtype: 'm.text', body: 'out' },
+                },
+              ],
+            },
+          },
+        },
+      },
     });
     const msgs = parseSyncMessages(two, SELF, new Set(['!allowed:s']));
-    assert.deepEqual(msgs.map((m) => m.text), ['in']);
+    assert.deepEqual(
+      msgs.map((m) => m.text),
+      ['in'],
+    );
   });
 
   it('returns [] for an empty sync', () => {

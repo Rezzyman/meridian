@@ -48,7 +48,10 @@ describe('sqlite-lite', () => {
       assert.equal(mem.rows[0][0], 1, 'INTEGER PRIMARY KEY backfilled from the rowid');
       assert.match(String(mem.rows[0][1]), /flat whites/);
       const long = String(mem.rows[2][1]);
-      assert.ok(long.startsWith('LONGMEMSTART') && long.endsWith('LONGMEMEND'), 'overflow chain reassembled');
+      assert.ok(
+        long.startsWith('LONGMEMSTART') && long.endsWith('LONGMEMEND'),
+        'overflow chain reassembled',
+      );
       assert.ok(long.length > 4096, 'row really spans pages');
       const ses = db.read('sessions', 500);
       assert.equal(ses.rows.length, 3);

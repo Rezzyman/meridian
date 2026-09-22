@@ -305,7 +305,9 @@ export class TelegramChannel implements ChannelAdapter {
   }
 
   /** Refreshing typing indicator; returns a stop function. */
-  private startTyping(ctx: { replyWithChatAction(action: 'typing'): Promise<unknown> }): () => void {
+  private startTyping(ctx: {
+    replyWithChatAction(action: 'typing'): Promise<unknown>;
+  }): () => void {
     void ctx.replyWithChatAction('typing').catch(() => {});
     let alive = true;
     const heartbeat = setInterval(() => {

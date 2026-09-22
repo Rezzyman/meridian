@@ -82,7 +82,11 @@ function operatorChannelList(
 }
 
 /** Does `from` match one of the operator's registered ids for this channel? */
-function channelMatches(channel: ChannelKind, registered: readonly string[], from: string): boolean {
+function channelMatches(
+  channel: ChannelKind,
+  registered: readonly string[],
+  from: string,
+): boolean {
   if (channel === 'cli') return isCliMatch(registered, from);
   if (PHONE_CHANNELS.has(channel)) {
     const fromNorm = normPhone(from);

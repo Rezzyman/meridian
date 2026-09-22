@@ -28,7 +28,11 @@ export async function runVoicePassphrase(opts: { clear?: boolean }): Promise<voi
 
   if (opts.clear) {
     guard.clearPassphrase();
-    console.log(colors.ok('voice passphrase cleared. Privileged voice tools are now unreachable on this agent.'));
+    console.log(
+      colors.ok(
+        'voice passphrase cleared. Privileged voice tools are now unreachable on this agent.',
+      ),
+    );
     return;
   }
 
@@ -58,9 +62,7 @@ export async function runVoicePassphrase(opts: { clear?: boolean }): Promise<voi
     guard.setPassphrase(phrase1);
     console.log(colors.ok(`  voice passphrase set (normalised: "${norm}")`));
     console.log(
-      colors.muted(
-        '  Restart the gateway for the new phrase to take effect on live calls.',
-      ),
+      colors.muted('  Restart the gateway for the new phrase to take effect on live calls.'),
     );
   } finally {
     rl.close();
@@ -76,7 +78,9 @@ export function runVoiceStatus(): void {
   console.log(colors.cyan(`Voice · agent ${slug}`));
   console.log(`  passphrase set: ${guard.isConfigured() ? colors.ok('yes') : colors.warn('no')}`);
   if (!guard.isConfigured()) {
-    console.log(colors.muted('  privileged voice tools (telegram_dm, cortex_*) are unreachable until set'));
+    console.log(
+      colors.muted('  privileged voice tools (telegram_dm, cortex_*) are unreachable until set'),
+    );
     console.log(colors.muted('  run `meridian voice passphrase` to configure'));
   }
 }
@@ -104,11 +108,13 @@ export async function runVoiceCall(opts: {
   const env = loadAgentEnv(home);
 
   if (!env.VAPI_API_KEY) {
-    console.log(colors.err('VAPI_API_KEY not set in this agent\'s .env'));
+    console.log(colors.err("VAPI_API_KEY not set in this agent's .env"));
     process.exit(1);
   }
   if (!env.MERIDIAN_GATEWAY_TOKEN) {
-    console.log(colors.err('MERIDIAN_GATEWAY_TOKEN not set; gateway HTTP endpoints would be unauthorized'));
+    console.log(
+      colors.err('MERIDIAN_GATEWAY_TOKEN not set; gateway HTTP endpoints would be unauthorized'),
+    );
     process.exit(1);
   }
   const port = env.MERIDIAN_GATEWAY_PORT ?? 18889;

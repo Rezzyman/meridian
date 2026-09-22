@@ -35,10 +35,11 @@ describe('createMeridianMcpServer', () => {
   it('default surface is read-only: recall + stats + health, no encode', async () => {
     const { client } = await connectedClient({});
     const tools = await client.listTools();
-    assert.deepEqual(
-      tools.tools.map((t) => t.name).sort(),
-      ['memory_health', 'memory_recall', 'memory_stats'],
-    );
+    assert.deepEqual(tools.tools.map((t) => t.name).sort(), [
+      'memory_health',
+      'memory_recall',
+      'memory_stats',
+    ]);
     await client.close();
   });
 

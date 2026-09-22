@@ -7,7 +7,7 @@
  * Vercel AI SDK does that. We just route.
  */
 
-import type { LanguageModel } from 'ai';
+import { simulateStreamingMiddleware, wrapLanguageModel, type LanguageModel } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGroq } from '@ai-sdk/groq';
@@ -23,6 +23,41 @@ export interface ResolvedProvider {
   model: LanguageModel;
 }
 
+/** ROUTEXOR exposes an OpenAI-compatible endpoint, but current Anthropic
+ * reasoning models reject the OpenAI SDK's implicit `temperature: 0` field.
+ * Strip only that implicit value for Claude models; preserve every explicit
+ * non-zero setting and every non-Claude request. */
+const routexorFetch: typeof globalThis.fetch = async (input, init) => {
+  if (typeof init?.body !== 'string') return globalThis.fetch(input, init);
+  try {
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    if (body.model === 'claude-sonnet-5' && body.temperature === 0) {
+      delete body.temperature;
+    }
+    if (
+      typeof body.model === 'string' &&
+      body.model.startsWith('gpt-') &&
+      Array.isArray(body.tools)
+    ) {
+      const stripFormats = (value: unknown): void => {
+        if (!value || typeof value !== 'object') return;
+        if (Array.isArray(value)) {
+          for (const item of value) stripFormats(item);
+          return;
+        }
+        const record = value as Record<string, unknown>;
+        delete record.format;
+        for (const child of Object.values(record)) stripFormats(child);
+      };
+      stripFormats(body.tools);
+    }
+    return globalThis.fetch(input, { ...init, body: JSON.stringify(body) });
+  } catch {
+    // Non-JSON bodies pass through unchanged.
+  }
+  return globalThis.fetch(input, init);
+};
+
 /** Route ollama doStream calls by payload: tools → simulated streaming
  *  (tool calls parse), no tools → true streaming (live tokens). See the
  *  ollama case in ProviderRouter.build for the full rationale. */
@@ -36,6 +71,28 @@ function hybridOllama(live: LanguageModel, sim: LanguageModel): LanguageModel {
             mode?.type === 'regular' && Array.isArray(mode.tools) && mode.tools.length > 0;
           return (hasTools ? sim : live).doStream(options);
         };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+}
+
+/**
+ * AI SDK 4 defaults an omitted temperature to zero before invoking a model.
+ * New Routexor Claude 5 endpoints reject the parameter entirely, so removing
+ * it at the model boundary is the only place that works without weakening the
+ * rest of Meridian's provider behavior.
+ */
+export function withoutTemperature(model: LanguageModel): LanguageModel {
+  return new Proxy(model, {
+    get(target, prop, receiver) {
+      if (prop === 'doGenerate') {
+        return (options: Parameters<LanguageModel['doGenerate']>[0]) =>
+          target.doGenerate({ ...options, temperature: undefined });
+      }
+      if (prop === 'doStream') {
+        return (options: Parameters<LanguageModel['doStream']>[0]) =>
+          target.doStream({ ...options, temperature: undefined });
       }
       return Reflect.get(target, prop, receiver);
     },
@@ -165,16 +222,28 @@ export class ProviderRouter {
             'ROUTEXOR_API_KEY missing. Meridian routes models through ROUTEXOR by default ' +
               '(BYOK, zero markup): sign up at https://routexor.com, add your provider key ' +
               '(Anthropic, OpenAI, ...) in the dashboard, create a ROUTEXOR key, and set ' +
-              "ROUTEXOR_API_KEY in your agent's .env. Or switch your model ref to a direct " +
-              'provider (anthropic/openai/groq) or a local `ollama/...` model.',
+              "ROUTEXOR_API_KEY in your agent's .env.",
           );
         }
         const rx = createOpenAI({
           apiKey: this.env.ROUTEXOR_API_KEY || 'meridian-keyless',
           baseURL: this.env.ROUTEXOR_BASE_URL ?? 'https://api.routexor.com/v1',
           name: 'routexor',
+          fetch: routexorFetch,
         });
-        return rx(modelId);
+        // Two protections stack here. ROUTEXOR's Claude 5 endpoints reject the
+        // `temperature` the AI SDK injects, so strip it at the model boundary.
+        // ROUTEXOR's Anthropic streaming path has intermittently dropped tool
+        // call deltas, so tool-bearing turns generate non-streaming and expose
+        // the result as a stream; ordinary conversation keeps true streaming.
+        const claude5 = /^claude-(?:haiku|sonnet|opus|fable)-5(?:$|[.-])/i.test(modelId);
+        const base = (): LanguageModel => (claude5 ? withoutTemperature(rx(modelId)) : rx(modelId));
+        const live = base();
+        const simulated = wrapLanguageModel({
+          model: base(),
+          middleware: simulateStreamingMiddleware(),
+        });
+        return hybridOllama(live, simulated);
       }
       case 'groq': {
         if (!this.env.GROQ_API_KEY) {

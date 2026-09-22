@@ -13,6 +13,7 @@ interface RecordedCall {
   url: string;
   method: string;
   body: Record<string, unknown> | undefined;
+  headers: Headers;
 }
 
 type RouteHandler = (call: RecordedCall) => Response;
@@ -27,7 +28,7 @@ function fakeFetch(routes: Record<string, RouteHandler>) {
       typeof init?.body === 'string'
         ? (JSON.parse(init.body) as Record<string, unknown>)
         : undefined;
-    const call: RecordedCall = { url, method, body };
+    const call: RecordedCall = { url, method, body, headers: new Headers(init?.headers) };
     calls.push(call);
     const key = `${method} ${new URL(url).pathname}`;
     const route = routes[key];
@@ -49,6 +50,26 @@ function bindWith(routes: Record<string, RouteHandler>, agentId = 'iso-a') {
   const bind = new CortexBind({ agentId, baseUrl: 'http://cortex.test', fetchImpl: impl });
   return { bind, calls };
 }
+
+test('authenticates every CORTEX request with the scoped service token', async () => {
+  const { impl, calls } = fakeFetch({
+    'POST /api/v1/recall': () => jsonResponse(recallPayload),
+    'GET /api/v1/artifacts': () =>
+      jsonResponse({ agentId: 'iso-a', sinceHours: 48, cutoff: '', count: 0, artifacts: [] }),
+  });
+  const bind = new CortexBind({
+    agentId: 'iso-a',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+    serviceToken: 'scoped-secret',
+  });
+
+  await bind.recall('authorization check');
+  await bind.listArtifacts();
+
+  assert.equal(calls[0].headers.get('authorization'), 'Bearer scoped-secret');
+  assert.equal(calls[1].headers.get('authorization'), 'Bearer scoped-secret');
+});
 
 const recallPayload = {
   context: 'ctx-block',
@@ -143,8 +164,16 @@ test('two binds with different agentIds send their own agentId in every body', a
   const { impl, calls } = fakeFetch({
     'POST /api/v1/recall': () => jsonResponse(recallPayload),
   });
-  const bindA = new CortexBind({ agentId: 'iso-a', baseUrl: 'http://cortex.test', fetchImpl: impl });
-  const bindB = new CortexBind({ agentId: 'iso-b', baseUrl: 'http://cortex.test', fetchImpl: impl });
+  const bindA = new CortexBind({
+    agentId: 'iso-a',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+  });
+  const bindB = new CortexBind({
+    agentId: 'iso-b',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+  });
 
   await bindA.recall('shared query');
   await bindB.recall('shared query');

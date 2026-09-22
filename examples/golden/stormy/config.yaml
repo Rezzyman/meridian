@@ -1,0 +1,119 @@
+agent:
+  slug: stormy
+  name: Stormy
+  role: evidence-grade roofing intelligence analyst
+  maxTurns: 40
+  gatewayTimeoutSec: 900
+  reasoningEffort: high
+
+models:
+  primary: routexor/claude-sonnet-4.6
+  fallbacks:
+    - routexor/claude-haiku-4.5
+  smartRouting:
+    enabled: true
+    maxSimpleChars: 160
+    maxSimpleWords: 25
+    cheapModel: routexor/claude-haiku-4.5
+
+# External channels stay disabled in the distributable profile. Deployment must
+# add explicit operator/sender allowlists before enabling any of them.
+channels:
+  cli:
+    enabled: true
+  telegram:
+    enabled: false
+    allowedChatIds: []
+  gateway:
+    enabled: false
+
+heartbeat:
+  enabled: false
+  every: 2h
+  activeHours:
+    start: "07:00"
+    end: "19:00"
+  model: routexor/claude-haiku-4.5
+  target: last
+  ackMaxChars: 300
+
+dream:
+  enabled: false
+  schedule: "0 2 * * *"
+  mode: consolidate-only
+  inProcess: true
+
+vision:
+  enabled: true
+  prompt: >-
+    Analyze roofing imagery as evidence, not certainty. Separate direct
+    observations, reasonable inferences, and conclusions. State confidence and
+    image limitations. Never infer causation, code compliance, coverage, or
+    repair scope from imagery alone. Identify what additional evidence is needed.
+  maxBytes: 26214400
+  timeoutSeconds: 120
+
+pdf:
+  maxPages: 50
+  maxBytesMb: 32
+
+proactive:
+  enabled: false
+
+tools:
+  chat:
+    - image_analyze
+    - calculate
+    - current_time
+    - extract_text
+  cli:
+    - image_analyze
+    - calculate
+    - current_time
+    - extract_text
+    - read
+
+governance:
+  enabled: true
+  denyTools:
+    - bash
+    - write
+    - edit_file
+    - run_code
+    - http_request
+    - delegate
+  trustedOnlyTools:
+    - read
+  requireApprovalTools:
+    - telegram_dm
+    - cortex_dream
+  maxToolCallsPerTurn: 6
+
+delegation:
+  enabled: false
+  maxDepth: 1
+  maxOutputTokens: 2000
+  timeoutSec: 90
+  childTools: []
+  encodeSubTurns: false
+
+cortex:
+  agentId: stormy
+  recallTopK: 6
+  encodeOnTurn: true
+  valenceInference: true
+  memoryLlmJudge: true
+  provenanceTrust: signed
+
+operator:
+  id: winnstorm-operator
+  channels:
+    cli:
+      - stormy
+    telegram: []
+    slack: []
+    discord: []
+    matrix: []
+    voice: []
+    whatsapp: []
+    sms: []

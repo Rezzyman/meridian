@@ -5,7 +5,16 @@
  * symlinks shared CONTEXT/MEMORY/CONNECTIONS dirs.
  */
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
@@ -34,10 +43,7 @@ export interface InitOptions {
  * The server path is chosen only when the operator asks for it (`--cortex`) or
  * already has CORTEX creds in the environment. `--embedded` still forces it.
  */
-export function resolveEmbedded(
-  opts: InitOptions,
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function resolveEmbedded(opts: InitOptions, env: NodeJS.ProcessEnv = process.env): boolean {
   if (opts.embedded) return true;
   if (opts.cortex) return false;
   const hasCortexCreds = !!(env.NEON_DATABASE_URL && env.VOYAGE_API_KEY);
@@ -94,7 +100,11 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
 
   // Apply template if specified (accept both snake_case and kebab-case)
   if (opts.template) {
-    const candidates = [opts.template, opts.template.replace(/_/g, '-'), opts.template.replace(/-/g, '_')];
+    const candidates = [
+      opts.template,
+      opts.template.replace(/_/g, '-'),
+      opts.template.replace(/-/g, '_'),
+    ];
     const found = candidates.find((c) => existsSync(join(TEMPLATES_ROOT, c)));
     if (found) {
       copyDirRecursive(join(TEMPLATES_ROOT, found), home.agentRoot, true);
@@ -145,43 +155,57 @@ export async function initAgent(slug: string, opts: InitOptions): Promise<void> 
     await runGuidedInit(slug, home);
   } else if (opts.guided !== false && !interactive) {
     console.log(
-      colors.muted('  (non-interactive stdin — skipped guided intake; run `meridian onboard` later)'),
+      colors.muted(
+        '  (non-interactive stdin — skipped guided intake; run `meridian onboard` later)',
+      ),
     );
   }
 
   console.log(colors.ok(`\nMeridian agent '${slug}' ready.`));
   console.log(colors.muted('Next steps:'));
   if (embedded) {
-    // Zero-config path: memory already works locally, only a model key is left.
+    // Embedded memory already works locally; ROUTEXOR is the one guided model path.
     console.log(colors.muted(`  1. Give it a model in ${home.envPath}:`));
     console.log(
-      colors.muted('       • ROUTEXOR (default, BYOK, zero markup): sign up free at https://routexor.com,'),
+      colors.muted(
+        '       • ROUTEXOR (default, BYOK, zero markup): sign up free at https://routexor.com,',
+      ),
     );
     console.log(
-      colors.muted('         add your provider key (Anthropic, OpenAI, ...) in its dashboard, then'),
+      colors.muted(
+        '         add your provider key (Anthropic, OpenAI, ...) in its dashboard, then',
+      ),
     );
     console.log(colors.muted('         create your ROUTEXOR key → ROUTEXOR_API_KEY'));
     console.log(
-      colors.muted('       • or a local model, no key: install ollama then `ollama pull qwen2.5`'),
+      colors.muted('  2. Run `meridian` to start chatting. Memory is local — no server needed.'),
     );
-    console.log(colors.muted('  2. Run `meridian` to start chatting. Memory is local — no server needed.'));
     console.log(
-      colors.muted('  3. (optional) `meridian onboard` for the extended interview; `meridian doctor` to validate.'),
+      colors.muted(
+        '  3. (optional) `meridian onboard` for the extended interview; `meridian doctor` to validate.',
+      ),
     );
   } else {
     console.log(colors.muted(`  1. Add a model key to ${home.envPath}:`));
     console.log(
-      colors.muted('       • ROUTEXOR (default, BYOK, zero markup): sign up at https://routexor.com, add your'),
+      colors.muted(
+        '       • ROUTEXOR (default, BYOK, zero markup): sign up at https://routexor.com, add your',
+      ),
     );
     console.log(
-      colors.muted('         provider key in its dashboard, create your ROUTEXOR key → ROUTEXOR_API_KEY'),
+      colors.muted(
+        '         provider key in its dashboard, create your ROUTEXOR key → ROUTEXOR_API_KEY',
+      ),
     );
     console.log(
-      colors.muted('       • or a direct provider key (ANTHROPIC/OPENAI/GROQ), or a local `ollama` model (no key)'),
+      colors.muted('     (this CORTEX-server agent also needs NEON_DATABASE_URL + VOYAGE_API_KEY)'),
     );
-    console.log(colors.muted('     (this CORTEX-server agent also needs NEON_DATABASE_URL + VOYAGE_API_KEY)'));
     console.log(colors.muted('  2. Run `meridian doctor` to validate the wiring.'));
-    console.log(colors.muted('  3. Run `meridian onboard` for the extended interview (mission, stakeholders, principles).'));
+    console.log(
+      colors.muted(
+        '  3. Run `meridian onboard` for the extended interview (mission, stakeholders, principles).',
+      ),
+    );
     console.log(colors.muted('  4. Run `meridian` to start chatting.'));
   }
 }

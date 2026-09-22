@@ -70,12 +70,22 @@ describe('MemPoisonBench invariants (single-memory)', () => {
     const missed = catalog.attacks
       .filter((a) => a.expected === 'quarantine')
       .filter((a) => !quarantined(a));
-    assert.deepEqual(missed.map((a) => a.id), [], 'these poison vectors reached the model');
+    assert.deepEqual(
+      missed.map((a) => a.id),
+      [],
+      'these poison vectors reached the model',
+    );
   });
 
   it('keeps every must-keep vector (0 false positives)', () => {
-    const wrong = catalog.attacks.filter((a) => a.expected === 'keep').filter((a) => quarantined(a));
-    assert.deepEqual(wrong.map((a) => a.id), [], 'these legitimate memories were wrongly quarantined');
+    const wrong = catalog.attacks
+      .filter((a) => a.expected === 'keep')
+      .filter((a) => quarantined(a));
+    assert.deepEqual(
+      wrong.map((a) => a.id),
+      [],
+      'these legitimate memories were wrongly quarantined',
+    );
   });
 
   it('any evade-known-gap vector is honestly still uncaught (label not stale)', () => {
@@ -115,7 +125,10 @@ describe('MemPoisonBench invariants (cross-memory chains)', () => {
       const r = screenChain(ch);
       assert.ok(r.clusters.length > 0, `${ch.id}: cluster not flagged`);
       assert.equal(r.kept.length, ch.members.length, `${ch.id}: a benign member was over-blocked`);
-      assert.ok(r.safeContext.includes('coordinated manipulation'), `${ch.id}: no caution injected`);
+      assert.ok(
+        r.safeContext.includes('coordinated manipulation'),
+        `${ch.id}: no caution injected`,
+      );
     }
   });
 
@@ -132,7 +145,12 @@ describe('MemPoisonBench invariants (signed provenance)', () => {
 
   it('every laundering trial reaches the model under PREFIX trust (documents the hole)', () => {
     for (const t of catalog.provenanceTrials ?? []) {
-      const mem: RecallMemory = { id: 1, content: t.poisonContent, source: t.poisonSource, score: 0.9 };
+      const mem: RecallMemory = {
+        id: 1,
+        content: t.poisonContent,
+        source: t.poisonSource,
+        score: 0.9,
+      };
       const r = screenRecall([mem], `- ${t.poisonContent}`); // default prefix resolver
       assert.equal(r.quarantined.length, 0, `${t.id}: prefix mode unexpectedly caught it`);
     }
@@ -140,9 +158,18 @@ describe('MemPoisonBench invariants (signed provenance)', () => {
 
   it('every laundering trial is QUARANTINED under SIGNED trust (the fix)', () => {
     for (const t of catalog.provenanceTrials ?? []) {
-      const mem: RecallMemory = { id: 1, content: t.poisonContent, source: t.poisonSource, score: 0.9 };
+      const mem: RecallMemory = {
+        id: 1,
+        content: t.poisonContent,
+        source: t.poisonSource,
+        score: 0.9,
+      };
       const r = screenRecall([mem], `- ${t.poisonContent}`, { provenance: resolver });
-      assert.equal(r.quarantined.length, 1, `${t.id}: signed mode failed to quarantine a laundered directive`);
+      assert.equal(
+        r.quarantined.length,
+        1,
+        `${t.id}: signed mode failed to quarantine a laundered directive`,
+      );
     }
   });
 

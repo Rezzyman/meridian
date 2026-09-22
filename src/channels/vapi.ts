@@ -54,7 +54,10 @@ export interface VapiWebhookEvent {
     endedAt?: string;
   };
   transcript?: string;
-  artifact?: { transcript?: string; messages?: Array<{ role: string; message?: string; content?: string }> };
+  artifact?: {
+    transcript?: string;
+    messages?: Array<{ role: string; message?: string; content?: string }>;
+  };
   message?: { role: string; content: string };
   endedReason?: string;
   summary?: string;
@@ -86,20 +89,22 @@ export class VapiChannel implements ChannelAdapter {
   private executeTool?: VapiToolExecutor;
   private voiceGuard?: VoiceSessionGuard;
 
-  constructor(private opts: {
-    logger: Logger;
-    webhookSecret?: string;
-    cortex?: MemoryProvider;
-    telegramDM?: (text: string) => Promise<void>;
-    executeTool?: VapiToolExecutor;
-    voiceGuard?: VoiceSessionGuard;
-    /** VAPI API key for outbound calls. Required when placeOutboundCall() is used. */
-    vapiApiKey?: string;
-    /** Default phoneNumberId for outbound calls. Optional override per call. */
-    phoneNumberId?: string;
-    /** Default assistantId for outbound calls. Optional override per call. */
-    assistantId?: string;
-  }) {
+  constructor(
+    private opts: {
+      logger: Logger;
+      webhookSecret?: string;
+      cortex?: MemoryProvider;
+      telegramDM?: (text: string) => Promise<void>;
+      executeTool?: VapiToolExecutor;
+      voiceGuard?: VoiceSessionGuard;
+      /** VAPI API key for outbound calls. Required when placeOutboundCall() is used. */
+      vapiApiKey?: string;
+      /** Default phoneNumberId for outbound calls. Optional override per call. */
+      phoneNumberId?: string;
+      /** Default assistantId for outbound calls. Optional override per call. */
+      assistantId?: string;
+    },
+  ) {
     this.cortex = opts.cortex;
     this.telegramDM = opts.telegramDM;
     this.executeTool = opts.executeTool;
@@ -137,8 +142,14 @@ export class VapiChannel implements ChannelAdapter {
     }
     const phoneNumberId = opts.phoneNumberId ?? this.opts.phoneNumberId;
     const assistantId = opts.assistantId ?? this.opts.assistantId;
-    if (!phoneNumberId) throw new Error('phoneNumberId required for outbound call (set VAPI_PHONE_NUMBER_ID in env or pass per-call).');
-    if (!assistantId) throw new Error('assistantId required for outbound call (set VAPI_ASSISTANT_ID in env or pass per-call).');
+    if (!phoneNumberId)
+      throw new Error(
+        'phoneNumberId required for outbound call (set VAPI_PHONE_NUMBER_ID in env or pass per-call).',
+      );
+    if (!assistantId)
+      throw new Error(
+        'assistantId required for outbound call (set VAPI_ASSISTANT_ID in env or pass per-call).',
+      );
 
     const body: Record<string, unknown> = {
       phoneNumberId,
@@ -155,9 +166,7 @@ export class VapiChannel implements ChannelAdapter {
     if (opts.firstMessage || opts.customerName) {
       body.assistantOverrides = {
         ...(opts.firstMessage ? { firstMessage: opts.firstMessage } : {}),
-        ...(opts.customerName
-          ? { variableValues: { customerName: opts.customerName } }
-          : {}),
+        ...(opts.customerName ? { variableValues: { customerName: opts.customerName } } : {}),
       };
     }
     if (opts.metadata) body.metadata = opts.metadata;
@@ -176,7 +185,8 @@ export class VapiChannel implements ChannelAdapter {
       throw new Error(`VAPI outbound call failed (${res.status}): ${errText.slice(0, 300)}`);
     }
     const json = (await res.json()) as { id?: string; status?: string };
-    if (!json.id) throw new Error(`VAPI returned no call id; payload: ${JSON.stringify(json).slice(0, 200)}`);
+    if (!json.id)
+      throw new Error(`VAPI returned no call id; payload: ${JSON.stringify(json).slice(0, 200)}`);
     this.opts.logger.info({
       msg: 'vapi outbound call placed',
       callId: json.id,
@@ -285,7 +295,12 @@ export class VapiChannel implements ChannelAdapter {
       try {
         const result = await this.executeTool(name, args, { callId, phone });
         const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-        this.opts.logger.info({ msg: 'vapi tool ok (legacy)', name, callId, chars: resultStr.length });
+        this.opts.logger.info({
+          msg: 'vapi tool ok (legacy)',
+          name,
+          callId,
+          chars: resultStr.length,
+        });
         return { result: resultStr };
       } catch (err) {
         const msg = (err as Error).message;
@@ -303,7 +318,11 @@ export class VapiChannel implements ChannelAdapter {
       let args: Record<string, unknown> = {};
       const rawArgs = tc.function?.arguments;
       if (typeof rawArgs === 'string') {
-        try { args = JSON.parse(rawArgs); } catch { args = {}; }
+        try {
+          args = JSON.parse(rawArgs);
+        } catch {
+          args = {};
+        }
       } else if (rawArgs && typeof rawArgs === 'object') {
         args = rawArgs as Record<string, unknown>;
       }
@@ -359,7 +378,9 @@ export class VapiChannel implements ChannelAdapter {
       typeof event.durationSeconds === 'number' ? `duration_s: ${event.durationSeconds}` : '',
       event.endedReason ? `ended_reason: ${event.endedReason}` : '',
       event.recordingUrl ? `recording: ${event.recordingUrl}` : '',
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
     const content = `${header}\n\n${fullTranscript}`;
     try {
       const result = await this.cortex.encode(content, {
@@ -379,15 +400,18 @@ export class VapiChannel implements ChannelAdapter {
       // Optional: nudge the operator on Telegram with a one-line summary.
       if (this.telegramDM && event.summary?.trim()) {
         const oneLiner = event.summary.split('\n')[0].slice(0, 280);
-        await this.telegramDM(`Call from ${phone} ended (${event.endedReason ?? 'normal'}):\n${oneLiner}`)
-          .catch((err) => this.opts.logger.warn({ msg: 'telegram dm failed', err }));
+        await this.telegramDM(
+          `Call from ${phone} ended (${event.endedReason ?? 'normal'}):\n${oneLiner}`,
+        ).catch((err) => this.opts.logger.warn({ msg: 'telegram dm failed', err }));
       }
     } catch (err) {
       this.opts.logger.error({ msg: 'vapi end-of-call rollup encode failed', err, callId });
     }
   }
 
-  private stitchMessages(messages?: Array<{ role: string; message?: string; content?: string }>): string {
+  private stitchMessages(
+    messages?: Array<{ role: string; message?: string; content?: string }>,
+  ): string {
     if (!messages?.length) return '';
     return messages
       .map((m) => {

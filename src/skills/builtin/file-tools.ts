@@ -113,7 +113,11 @@ export const fileTools = {
           const st = statSync(join(path, name));
           entries.push({
             name,
-            type: st.isFile() ? ('file' as const) : st.isDirectory() ? ('dir' as const) : ('other' as const),
+            type: st.isFile()
+              ? ('file' as const)
+              : st.isDirectory()
+                ? ('dir' as const)
+                : ('other' as const),
             size: st.size,
             mtimeMs: st.mtimeMs,
           });

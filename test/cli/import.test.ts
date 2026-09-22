@@ -63,7 +63,10 @@ function fixtureOpenclawHome(): string {
   mkdirSync(join(root, 'skills', 'demo-skill'), { recursive: true });
   writeFileSync(join(root, 'skills', 'demo-skill', 'SKILL.md'), '# demo skill\nDoes a thing.');
   writeFileSync(join(root, '.env'), `OPENAI_API_KEY=${SECRET}\nTELEGRAM_BOT_TOKEN=${BOT_TOKEN}\n`);
-  writeFileSync(join(root, 'settings.json'), JSON.stringify({ telegram_token: BOT_TOKEN, theme: 'dark' }));
+  writeFileSync(
+    join(root, 'settings.json'),
+    JSON.stringify({ telegram_token: BOT_TOKEN, theme: 'dark' }),
+  );
   return root;
 }
 
@@ -83,9 +86,16 @@ function fixtureOpenclawRealHome(): string {
         defaults: {
           model: {
             primary: 'openai/gpt-5.4',
-            fallbacks: ['openai/gpt-5.4-mini', 'openrouter/anthropic/claude-sonnet-4.6', 'openrouter/mistral/large'],
+            fallbacks: [
+              'openai/gpt-5.4-mini',
+              'openrouter/anthropic/claude-sonnet-4.6',
+              'openrouter/mistral/large',
+            ],
           },
-          pdfModel: { primary: 'openai/gpt-5.4', fallbacks: ['openrouter/anthropic/claude-sonnet-4.6'] },
+          pdfModel: {
+            primary: 'openai/gpt-5.4',
+            fallbacks: ['openrouter/anthropic/claude-sonnet-4.6'],
+          },
           pdfMaxPages: 50,
           pdfMaxBytesMb: 32,
         },
@@ -261,7 +271,10 @@ function fixtureHermesHome(): string {
     }),
   );
   mkdirSync(join(root, 'skills', 'demo-skill', 'sub-skill'), { recursive: true });
-  writeFileSync(join(root, 'skills', 'demo-skill', 'DESCRIPTION.md'), '# demo skill\nDoes a thing.');
+  writeFileSync(
+    join(root, 'skills', 'demo-skill', 'DESCRIPTION.md'),
+    '# demo skill\nDoes a thing.',
+  );
   writeFileSync(join(root, 'skills', 'demo-skill', 'sub-skill', 'SKILL.md'), '# sub skill');
   // Planted skill-level secret: must never be COPIED into the new home.
   writeFileSync(join(root, 'skills', 'demo-skill', '.env'), `SKILL_SECRET=${SECRET}\n`);
@@ -302,7 +315,13 @@ function fixtureHermesHome(): string {
             refresh_token: SECRET,
             expires_at_ms: 1782957644638,
           },
-          { id: 'a2', label: 'API backup', auth_type: 'api_key', priority: 1, access_token: SECRET },
+          {
+            id: 'a2',
+            label: 'API backup',
+            auth_type: 'api_key',
+            priority: 1,
+            access_token: SECRET,
+          },
         ],
       },
       updated_at: 'x',
@@ -315,7 +334,8 @@ function fixtureHermesHome(): string {
     join(root, 'secrets', 'service-account.json'),
     JSON.stringify({
       type: 'service_account',
-      private_key: '-----BEGIN PRIVATE KEY-----\nFAKEFIXTUREKEYMATERIAL\n-----END PRIVATE KEY-----\n',
+      private_key:
+        '-----BEGIN PRIVATE KEY-----\nFAKEFIXTUREKEYMATERIAL\n-----END PRIVATE KEY-----\n',
     }),
   );
   // Raw session transcripts (NOT copied unless --sessions).
@@ -324,7 +344,10 @@ function fixtureHermesHome(): string {
     join(root, 'sessions', '20260501_082603_fixture.jsonl'),
     '{"role":"user","content":"hello"}\n{"role":"assistant","content":"hi"}\n',
   );
-  writeFileSync(join(root, 'sessions', '20260502_090000_fixture.jsonl'), '{"role":"user","content":"again"}\n');
+  writeFileSync(
+    join(root, 'sessions', '20260502_090000_fixture.jsonl'),
+    '{"role":"user","content":"again"}\n',
+  );
   // Runtime debris inside sessions/ — raw request dumps can embed credentials
   // and must stay home even under --sessions.
   writeFileSync(
@@ -375,7 +398,10 @@ describe('planImport (pure)', () => {
       assert.ok(targets.includes('IDENTITY/USER.md'), 'user → USER.md');
       assert.ok(targets.includes('MEMORY/imported/MEMORY.md'), 'memory → MEMORY/imported');
       assert.ok(targets.includes('CONTEXT/imported-instructions.md'), 'AGENTS.md → CONTEXT');
-      assert.ok(targets.some((t) => t.startsWith('SKILLS/imported/')), 'skills dir mapped');
+      assert.ok(
+        targets.some((t) => t.startsWith('SKILLS/imported/')),
+        'skills dir mapped',
+      );
       assert.equal(plan.operatorName, 'Rez Juarez');
       // A legacy home has no openclaw.json — everything else must be present.
       assert.deepEqual(
@@ -395,13 +421,18 @@ describe('planImport (pure)', () => {
       const envFinding = plan.secrets.find((s) => s.file === '.env');
       assert.ok(envFinding, '.env flagged');
       assert.deepEqual(envFinding.keys.sort(), ['OPENAI_API_KEY', 'TELEGRAM_BOT_TOKEN']);
-      assert.ok(plan.secrets.some((s) => s.file === 'settings.json'), 'config with a secret value flagged');
+      assert.ok(
+        plan.secrets.some((s) => s.file === 'settings.json'),
+        'config with a secret value flagged',
+      );
       // The plan never carries secret VALUES.
       const serialized = JSON.stringify(plan);
       assert.ok(!serialized.includes(SECRET), 'no API key value in the plan');
       assert.ok(!serialized.includes(BOT_TOKEN), 'no bot token value in the plan');
       // Secrets are NOT copy steps.
-      assert.ok(!plan.steps.some((s) => /\.env|settings\.json/.test(s.sourceAbs.split('/').pop() ?? '')));
+      assert.ok(
+        !plan.steps.some((s) => /\.env|settings\.json/.test(s.sourceAbs.split('/').pop() ?? '')),
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -431,7 +462,11 @@ describe('applyImport (overlay)', () => {
       const agentMd = readFileSync(join(agentRoot, 'IDENTITY', 'AGENT.md'), 'utf8');
       assert.match(agentMd, /Imported from openclaw/);
       assert.match(agentMd, /You are Aria/);
-      assert.ok(statSync(join(agentRoot, 'SKILLS', 'imported', 'skills', 'demo-skill', 'SKILL.md')).isFile());
+      assert.ok(
+        statSync(
+          join(agentRoot, 'SKILLS', 'imported', 'skills', 'demo-skill', 'SKILL.md'),
+        ).isFile(),
+      );
       // No secret value anywhere in the imported tree.
       for (const f of walkFiles(agentRoot)) {
         const c = readFileSync(f, 'utf8');
@@ -455,10 +490,19 @@ describe('planImport (hermes, real anatomy)', () => {
       assert.ok(persona, 'SOUL.md → AGENT.md');
       assert.equal(persona.transform, 'strip-live-state', 'persona carries the live-state strip');
       const user = byTarget.get('IDENTITY/USER.md');
-      assert.ok(user && /memories[\\/]USER\.md$/.test(user.sourceAbs), 'user comes from memories/USER.md');
+      assert.ok(
+        user && /memories[\\/]USER\.md$/.test(user.sourceAbs),
+        'user comes from memories/USER.md',
+      );
       // Real homes have NO MEMORY.md — memory extraction happens from state.db.
-      assert.ok(!byTarget.has('MEMORY/imported/MEMORY.md'), 'no MEMORY.md step for the real anatomy');
-      assert.ok(plan.notFound.some((l) => /MEMORY\.md/.test(l)), 'the absent MEMORY.md is logged');
+      assert.ok(
+        !byTarget.has('MEMORY/imported/MEMORY.md'),
+        'no MEMORY.md step for the real anatomy',
+      );
+      assert.ok(
+        plan.notFound.some((l) => /MEMORY\.md/.test(l)),
+        'the absent MEMORY.md is logged',
+      );
       for (const t of [
         'CONTEXT/imported-hermes-config.yaml',
         'CONTEXT/imported-hermes-cron.json',
@@ -473,13 +517,21 @@ describe('planImport (hermes, real anatomy)', () => {
       assert.match(note.content ?? '', /current-time/, 'note lists the plugin');
       const skills = plan.steps.find((s) => s.kind === 'dir');
       assert.ok(skills, 'skills dir planned');
-      assert.deepEqual(skills.excludes, ['.hub', '.bundled_manifest'], 'registries excluded from the copy');
+      assert.deepEqual(
+        skills.excludes,
+        ['.hub', '.bundled_manifest'],
+        'registries excluded from the copy',
+      );
       // Runtime junk is never copied from the source.
       assert.ok(
         !plan.steps.some((s) => /state\.db|sessions|gateway_state/.test(s.sourceAbs)),
         'state.db / sessions / gateway_state are not copy steps',
       );
-      assert.equal(plan.operatorName, 'Randy Fixture', 'USER.md filename token stripped from the heading');
+      assert.equal(
+        plan.operatorName,
+        'Randy Fixture',
+        'USER.md filename token stripped from the heading',
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -495,7 +547,9 @@ describe('planImport (hermes, real anatomy)', () => {
         'groq/llama-4-scout',
       ]);
       assert.ok(
-        plan.warnings.some((w) => /openrouter\/anthropic\/claude-haiku-4\.5 → routexor\/claude-haiku-4\.5/.test(w)),
+        plan.warnings.some((w) =>
+          /openrouter\/anthropic\/claude-haiku-4\.5 → routexor\/claude-haiku-4\.5/.test(w),
+        ),
         'openrouter→routexor remap warned for review',
       );
       assert.ok(
@@ -519,7 +573,9 @@ describe('planImport (hermes, real anatomy)', () => {
       const plan = planImport('hermes', root);
       assert.equal(plan.configPatch.telegramEnabled, true);
       assert.equal(plan.configPatch.telegramDefaultChatId, '-1003915055148');
-      const doc = plan.steps.find((s) => s.targetRel.replace(/\\/g, '/') === 'CONNECTIONS/imported-channels.md');
+      const doc = plan.steps.find(
+        (s) => s.targetRel.replace(/\\/g, '/') === 'CONNECTIONS/imported-channels.md',
+      );
       assert.ok(doc && doc.kind === 'note', 'channel doc planned');
       assert.match(doc.content ?? '', /8421274536.*Rez.*dm/, 'DM binding enumerated');
       assert.match(doc.content ?? '', /-100999.*OPS ROOM.*group/, 'group binding enumerated');
@@ -537,7 +593,11 @@ describe('planImport (hermes, real anatomy)', () => {
       assert.ok(brief, 'enabled job imported');
       assert.equal(brief.enabled, true);
       assert.equal(brief.schedule, '6 8 * * 1-5');
-      assert.equal(brief.timezone, 'America/Denver', 'hermes cron fires in the agent LOCAL tz — preserved');
+      assert.equal(
+        brief.timezone,
+        'America/Denver',
+        'hermes cron fires in the agent LOCAL tz — preserved',
+      );
       assert.equal(brief.pushTo, 'telegram');
       assert.equal(brief.deliver, 'telegram:8421274536');
       const dream = plan.automations.find((a) => a.name === 'Randy — Dream Cycle');
@@ -572,7 +632,10 @@ describe('planImport (hermes, real anatomy)', () => {
         assert.ok(mem && mem.kind === 'note', `memories table lands (pure=${pure})`);
         assert.match(mem.content ?? '', /flat whites/, 'memory row content extracted');
         assert.match(mem.content ?? '', /LONGMEMSTART/, 'overflow-length row extracted');
-        assert.ok(!(mem.content ?? '').includes(STATE_DB_BAIT), 'secret-shaped value redacted from memory dump');
+        assert.ok(
+          !(mem.content ?? '').includes(STATE_DB_BAIT),
+          'secret-shaped value redacted from memory dump',
+        );
         const ses = plan.steps.find(
           (s) => s.targetRel.replace(/\\/g, '/') === 'MEMORY/imported/sessions-summary.md',
         );
@@ -618,11 +681,18 @@ describe('planImport (hermes, real anatomy)', () => {
     const systemdDir = fixtureSystemdDir(root);
     try {
       const plan = planImport('hermes', root, { systemdDir });
-      assert.equal(plan.systemdUnit, 'hermes-gateway-fixture.service', 'the decoy unit is not matched');
+      assert.equal(
+        plan.systemdUnit,
+        'hermes-gateway-fixture.service',
+        'the decoy unit is not matched',
+      );
       const dropin = plan.secrets.find((s) => s.file.includes('anthropic-bridge.conf'));
       assert.ok(dropin, 'drop-in surfaced');
       assert.deepEqual(dropin.keys, ['ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL']);
-      assert.ok(!plan.secrets.some((s) => s.keys.includes('GROQ_API_KEY')), 'decoy drop-ins not scanned');
+      assert.ok(
+        !plan.secrets.some((s) => s.keys.includes('GROQ_API_KEY')),
+        'decoy drop-ins not scanned',
+      );
       assert.ok(!JSON.stringify(plan).includes(SECRET), 'drop-in values never serialize');
       const off = planImport('hermes', root, { systemdDir, systemd: false });
       assert.equal(off.systemdUnit, undefined, '--no-systemd skips the scan');
@@ -638,19 +708,35 @@ describe('planImport (hermes, real anatomy)', () => {
       const plan = planImport('hermes', root);
       const auth = plan.secrets.find((s) => s.file === 'auth.json');
       assert.ok(auth, 'auth.json flagged by NAME');
-      assert.ok(auth.keys.some((k) => k === 'credential_pool.openrouter: 1 key(s)'), 'provider count surfaced');
-      assert.ok(auth.keys.some((k) => k === 'credential_pool.anthropic: 2 key(s)'), 'array pool counted');
       assert.ok(
-        auth.keys.some((k) => /credential_pool\.anthropic\[\] label="OAuth Home" oauth priority=0 expires=\d{4}-\d{2}-\d{2}/.test(k)),
+        auth.keys.some((k) => k === 'credential_pool.openrouter: 1 key(s)'),
+        'provider count surfaced',
+      );
+      assert.ok(
+        auth.keys.some((k) => k === 'credential_pool.anthropic: 2 key(s)'),
+        'array pool counted',
+      );
+      assert.ok(
+        auth.keys.some((k) =>
+          /credential_pool\.anthropic\[\] label="OAuth Home" oauth priority=0 expires=\d{4}-\d{2}-\d{2}/.test(
+            k,
+          ),
+        ),
         'oauth entry described with priority + expiry',
       );
       assert.ok(
-        auth.keys.some((k) => /credential_pool\.anthropic\[\] label="API backup" api_key priority=1/.test(k)),
+        auth.keys.some((k) =>
+          /credential_pool\.anthropic\[\] label="API backup" api_key priority=1/.test(k),
+        ),
         'api_key entry described',
       );
       const env = plan.secrets.find((s) => s.file === '.env');
       assert.ok(env, '.env flagged');
-      assert.deepEqual(env.keys.sort(), ['CORTEX_DEFAULT_AGENT_ID', 'OPENROUTER_API_KEY', 'TELEGRAM_BOT_TOKEN']);
+      assert.deepEqual(env.keys.sort(), [
+        'CORTEX_DEFAULT_AGENT_ID',
+        'OPENROUTER_API_KEY',
+        'TELEGRAM_BOT_TOKEN',
+      ]);
       assert.ok(
         plan.secrets.some((s) => s.file.replace(/\\/g, '/') === 'secrets/service-account.json'),
         'service-account JSON flagged via the secrets/ dir rule',
@@ -659,17 +745,24 @@ describe('planImport (hermes, real anatomy)', () => {
       for (const v of [OR_KEY, SECRET, BOT_TOKEN]) {
         assert.ok(!serialized.includes(v), 'no secret value in the serialized plan');
       }
-      assert.ok(!plan.steps.some((s) => /auth\.json$|\.env$/.test(s.sourceAbs)), 'secrets are not copy steps');
+      assert.ok(
+        !plan.steps.some((s) => /auth\.json$|\.env$/.test(s.sourceAbs)),
+        'secrets are not copy steps',
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
   it('stripLiveState and sanitizeConfigContent (pure)', () => {
-    const soul = 'keep me\n<!-- LIVE-STATE-BEGIN (auto) -->\nvolatile\n<!-- LIVE-STATE-END -->\nand me';
+    const soul =
+      'keep me\n<!-- LIVE-STATE-BEGIN (auto) -->\nvolatile\n<!-- LIVE-STATE-END -->\nand me';
     const stripped = stripLiveState(soul);
     assert.ok(!stripped.includes('volatile'), 'live-state content removed');
-    assert.ok(stripped.includes('keep me') && stripped.includes('and me'), 'surrounding prose kept');
+    assert.ok(
+      stripped.includes('keep me') && stripped.includes('and me'),
+      'surrounding prose kept',
+    );
     // No END marker → conservative no-op.
     const dangling = 'a\n<!-- LIVE-STATE-BEGIN -->\nb';
     assert.equal(stripLiveState(dangling), dangling, 'dangling BEGIN leaves content untouched');
@@ -694,13 +787,18 @@ describe('applyImport (hermes overlay)', () => {
       const cfg = readFileSync(join(agentRoot, 'CONTEXT', 'imported-hermes-config.yaml'), 'utf8');
       assert.match(cfg, /^# Imported from hermes/, 'yaml provenance header');
       const cron = readFileSync(join(agentRoot, 'CONTEXT', 'imported-hermes-cron.json'), 'utf8');
-      assert.ok(JSON.parse(cron).jobs[0].name === 'Randy — Morning Brief', 'json copied parseable (no header)');
+      assert.ok(
+        JSON.parse(cron).jobs[0].name === 'Randy — Morning Brief',
+        'json copied parseable (no header)',
+      );
       assert.match(
         readFileSync(join(agentRoot, 'CONTEXT', 'imported-hermes-plugins.md'), 'utf8'),
         /current-time/,
       );
       assert.ok(
-        statSync(join(agentRoot, 'SKILLS', 'imported', 'skills', 'demo-skill', 'sub-skill', 'SKILL.md')).isFile(),
+        statSync(
+          join(agentRoot, 'SKILLS', 'imported', 'skills', 'demo-skill', 'sub-skill', 'SKILL.md'),
+        ).isFile(),
         'nested skills copied',
       );
       assert.throws(
@@ -757,16 +855,28 @@ describe('planImport (openclaw, real anatomy)', () => {
       const plan = planImport('openclaw', root);
       const byTarget = new Map(plan.steps.map((s) => [s.targetRel.replace(/\\/g, '/'), s]));
       const persona = byTarget.get('IDENTITY/AGENT.md');
-      assert.ok(persona && /agents[\\/]aria[\\/]agent[\\/]IDENTITY\.md$/.test(persona.sourceAbs), 'persona from agents/<id>/agent/IDENTITY.md');
+      assert.ok(
+        persona && /agents[\\/]aria[\\/]agent[\\/]IDENTITY\.md$/.test(persona.sourceAbs),
+        'persona from agents/<id>/agent/IDENTITY.md',
+      );
       const instructions = byTarget.get('CONTEXT/imported-instructions.md');
-      assert.ok(instructions && /PRIME-CONTEXT\.md$/.test(instructions.sourceAbs), 'instructions from PRIME-CONTEXT.md');
+      assert.ok(
+        instructions && /PRIME-CONTEXT\.md$/.test(instructions.sourceAbs),
+        'instructions from PRIME-CONTEXT.md',
+      );
       const standing = byTarget.get('CONTEXT/imported-standing-orders.md');
-      assert.ok(standing && /STANDING-ORDERS\.md$/.test(standing.sourceAbs), 'standing orders preserved');
+      assert.ok(
+        standing && /STANDING-ORDERS\.md$/.test(standing.sourceAbs),
+        'standing orders preserved',
+      );
 
       // Models chain: the named agent's pin is primary; openrouter/anthropic
       // fallbacks remap to routexor; others drop loudly.
       assert.equal(plan.configPatch.models?.primary, 'openai/gpt-5.4');
-      assert.deepEqual(plan.configPatch.models?.fallbacks, ['openai/gpt-5.4-mini', 'routexor/claude-sonnet-4.6']);
+      assert.deepEqual(plan.configPatch.models?.fallbacks, [
+        'openai/gpt-5.4-mini',
+        'routexor/claude-sonnet-4.6',
+      ]);
       assert.ok(plan.warnings.some((w) => /dropped openrouter\/mistral\/large/.test(w)));
 
       // Telegram: enabled travels; the token surfaces by NAME.
@@ -777,7 +887,10 @@ describe('planImport (openclaw, real anatomy)', () => {
       assert.ok(cfgSecrets.keys.includes('gateway.auth.token'));
       assert.ok(cfgSecrets.keys.includes('env.OPENAI_API_KEY'));
       assert.ok(cfgSecrets.keys.includes('mcp.servers.cortex-v2.env.VOYAGE_API_KEY'));
-      assert.ok(cfgSecrets.keys.includes('mcp.servers.cortex-v2.env.DATABASE_URL'), 'URL with userinfo is secret');
+      assert.ok(
+        cfgSecrets.keys.includes('mcp.servers.cortex-v2.env.DATABASE_URL'),
+        'URL with userinfo is secret',
+      );
 
       // MCP servers land as a real CONNECTIONS/mcp.json (secret env stripped → disabled).
       const mcp = byTarget.get('CONNECTIONS/mcp.json');
@@ -795,7 +908,10 @@ describe('planImport (openclaw, real anatomy)', () => {
 
       // PDF + vision prompt reference docs.
       assert.match(byTarget.get('CONTEXT/imported-openclaw-pdf.md')?.content ?? '', /maxPages: 50/);
-      assert.match(byTarget.get('CONTEXT/imported-vision-prompt.md')?.content ?? '', /Winn Methodology/);
+      assert.match(
+        byTarget.get('CONTEXT/imported-vision-prompt.md')?.content ?? '',
+        /Winn Methodology/,
+      );
 
       // The background `main` agent becomes a DISABLED heartbeat suggestion.
       const hb = plan.automations.find((a) => a.name === 'openclaw-main-heartbeat');
@@ -810,11 +926,15 @@ describe('planImport (openclaw, real anatomy)', () => {
       assert.ok(plan.skipped.some((s) => /memory\/aria\.sqlite.*chunk store/.test(s)));
 
       // Per-agent transcripts skipped by default (logged), copied under --sessions.
-      assert.ok(plan.skipped.some((s) => /sessions.*--sessions/.test(s)), 'agent sessions skip logged');
+      assert.ok(
+        plan.skipped.some((s) => /sessions.*--sessions/.test(s)),
+        'agent sessions skip logged',
+      );
       const withSessions = planImport('openclaw', root, { sessions: true });
       assert.ok(
         withSessions.steps.some(
-          (s) => s.kind === 'dir' && s.targetRel.replace(/\\/g, '/') === 'MEMORY/imported/sessions/aria',
+          (s) =>
+            s.kind === 'dir' && s.targetRel.replace(/\\/g, '/') === 'MEMORY/imported/sessions/aria',
         ),
         'per-agent transcripts planned under --sessions',
       );
@@ -893,7 +1013,10 @@ describe('runImport hermes (end-to-end, isolated MERIDIAN_HOME)', () => {
       assert.ok(dreamFile, 'disabled automation file exists');
       assert.match(readFileSync(join(autoDir, dreamFile), 'utf8'), /enabled: false/);
       // Channel rewiring doc landed.
-      assert.match(readFileSync(join(agentRoot, 'CONNECTIONS', 'imported-channels.md'), 'utf8'), /OPS ROOM/);
+      assert.match(
+        readFileSync(join(agentRoot, 'CONNECTIONS', 'imported-channels.md'), 'utf8'),
+        /OPS ROOM/,
+      );
       assert.ok(statSync(join(agentRoot, '.env')).isFile());
       for (const f of walkFiles(agentRoot)) {
         const c = readFileSync(f, 'utf8');
@@ -909,7 +1032,12 @@ describe('runImport hermes (end-to-end, isolated MERIDIAN_HOME)', () => {
   it('--sessions copies the raw transcripts', async () => {
     const src = fixtureHermesHome();
     try {
-      await runImport('hermes', { from: src, slug: 'withsessions', sessions: true, systemd: false });
+      await runImport('hermes', {
+        from: src,
+        slug: 'withsessions',
+        sessions: true,
+        systemd: false,
+      });
       const copied = join(tmpHome, 'withsessions', 'MEMORY', 'imported', 'sessions');
       assert.deepEqual(
         readdirSync(copied).sort(),
@@ -960,7 +1088,10 @@ describe('runImport openclaw (end-to-end, isolated MERIDIAN_HOME)', () => {
       await runImport('openclaw', { from: src, slug: 'fromclaw' });
       const agentRoot = join(tmpHome, 'fromclaw');
       assert.match(readFileSync(join(agentRoot, 'IDENTITY', 'AGENT.md'), 'utf8'), /You are Aria/);
-      assert.match(readFileSync(join(agentRoot, 'CONTEXT', 'imported-instructions.md'), 'utf8'), /be concise/);
+      assert.match(
+        readFileSync(join(agentRoot, 'CONTEXT', 'imported-instructions.md'), 'utf8'),
+        /be concise/,
+      );
       assert.ok(statSync(join(agentRoot, 'MEMORY', 'imported', 'MEMORY.md')).isFile());
       // operator name patched into config
       assert.match(readFileSync(join(agentRoot, 'config.yaml'), 'utf8'), /Rez Juarez/);
@@ -980,14 +1111,20 @@ describe('runImport openclaw (end-to-end, isolated MERIDIAN_HOME)', () => {
     try {
       await runImport('openclaw', { from: src, slug: 'fromclaw2' });
       const agentRoot = join(tmpHome, 'fromclaw2');
-      assert.match(readFileSync(join(agentRoot, 'IDENTITY', 'AGENT.md'), 'utf8'), /roofing intelligence/);
+      assert.match(
+        readFileSync(join(agentRoot, 'IDENTITY', 'AGENT.md'), 'utf8'),
+        /roofing intelligence/,
+      );
       const mcp = JSON.parse(readFileSync(join(agentRoot, 'CONNECTIONS', 'mcp.json'), 'utf8'));
       assert.equal(mcp.servers[0].name, 'cortex-v2');
       assert.equal(mcp.servers[0].enabled, false);
       const cfg = readFileSync(join(agentRoot, 'config.yaml'), 'utf8');
       assert.match(cfg, /primary: openai\/gpt-5\.4/);
       assert.match(cfg, /routexor\/claude-sonnet-4\.6/);
-      assert.match(readFileSync(join(agentRoot, 'CONTEXT', 'imported-vision-prompt.md'), 'utf8'), /Winn/);
+      assert.match(
+        readFileSync(join(agentRoot, 'CONTEXT', 'imported-vision-prompt.md'), 'utf8'),
+        /Winn/,
+      );
       const autoDir = join(agentRoot, 'AUTOMATIONS');
       const hb = readdirSync(autoDir).find((f) => f.includes('heartbeat'));
       assert.ok(hb, 'heartbeat suggestion written');

@@ -60,7 +60,10 @@ interface SlackEventBody {
   };
 }
 
-export type FetchLike = (url: string, init: Record<string, unknown>) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+export type FetchLike = (
+  url: string,
+  init: Record<string, unknown>,
+) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 
 export interface SlackChannelOptions {
   botToken: string;
@@ -107,8 +110,19 @@ export class SlackChannel implements ChannelAdapter {
     this.handler = null;
   }
 
-  verifySignature(rawBody: string, signature?: string, timestamp?: string, nowSec?: number): boolean {
-    return verifySlackSignature({ signingSecret: this.opts.signingSecret, signature, timestamp, rawBody, nowSec });
+  verifySignature(
+    rawBody: string,
+    signature?: string,
+    timestamp?: string,
+    nowSec?: number,
+  ): boolean {
+    return verifySlackSignature({
+      signingSecret: this.opts.signingSecret,
+      signature,
+      timestamp,
+      rawBody,
+      nowSec,
+    });
   }
 
   /**
@@ -136,7 +150,8 @@ export class SlackChannel implements ChannelAdapter {
 
     // Dedup Slack's at-least-once retries.
     if (body.event_id) {
-      if (this.seen.has(body.event_id)) return { status: 200, body: { ok: true, dedup: true }, done: DONE };
+      if (this.seen.has(body.event_id))
+        return { status: 200, body: { ok: true, dedup: true }, done: DONE };
       this.seen.add(body.event_id);
       if (this.seen.size > 1000) this.seen.delete(this.seen.values().next().value as string);
     }
@@ -167,7 +182,9 @@ export class SlackChannel implements ChannelAdapter {
         await this.postMessage(channel, reply);
       } catch (err) {
         this.opts.logger.error({ msg: 'slack inbound error', err });
-        await this.postMessage(channel, 'Something went wrong on my end. I have logged it.').catch(() => {});
+        await this.postMessage(channel, 'Something went wrong on my end. I have logged it.').catch(
+          () => {},
+        );
       }
     })();
     return { status: 200, body: { ok: true }, done };
@@ -189,7 +206,11 @@ export class SlackChannel implements ChannelAdapter {
       });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || json.ok === false) {
-        this.opts.logger.warn({ msg: 'slack postMessage failed', status: res.status, error: json.error });
+        this.opts.logger.warn({
+          msg: 'slack postMessage failed',
+          status: res.status,
+          error: json.error,
+        });
       }
     }
   }

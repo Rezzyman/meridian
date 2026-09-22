@@ -52,7 +52,7 @@ function main(): void {
   L.push('');
   L.push(`_As of ${catalog.asOf}. Methodology: ${catalog.methodologyDoc}._`);
   L.push('');
-  L.push('> **Read this first.** Cells are scored from each harness\'s **published**');
+  L.push("> **Read this first.** Cells are scored from each harness's **published**");
   L.push('> behavior. `· unpublished` means *no public evidence either way* — it is');
   L.push('> **not** a claim that the capability is absent. We did not run, clone, or');
   L.push('> benchmark any competitor; doing so would measure our wiring of their code,');
@@ -65,7 +65,10 @@ function main(): void {
   L.push(`| ${header.join(' | ')} |`);
   L.push(`|${header.map(() => '---').join('|')}|`);
   for (const d of catalog.dimensions) {
-    const row = [d.label, ...catalog.harnesses.map((h) => GLYPH[h.claims[d.key]?.value ?? 'unpublished'])];
+    const row = [
+      d.label,
+      ...catalog.harnesses.map((h) => GLYPH[h.claims[d.key]?.value ?? 'unpublished']),
+    ];
     L.push(`| ${row.join(' | ')} |`);
   }
   L.push('');
@@ -91,7 +94,9 @@ function main(): void {
   // ── The single defensible headline ──
   const meridian = catalog.harnesses.find((h) => h.name === 'MERIDIAN');
   const others = catalog.harnesses.filter((h) => h.name !== 'MERIDIAN');
-  const noOpenBench = others.every((h) => (h.claims.open_benchmark?.value ?? 'unpublished') !== 'yes');
+  const noOpenBench = others.every(
+    (h) => (h.claims.open_benchmark?.value ?? 'unpublished') !== 'yes',
+  );
   const meridianHasBench = meridian?.claims.open_benchmark?.value === 'yes';
   L.push('## The one defensible headline');
   L.push('');
@@ -119,7 +124,11 @@ function main(): void {
     for (const d of catalog.dimensions) {
       const c = h.claims[d.key];
       if (!c) continue;
-      const src = c.source ? ` — [source](${c.source})` : c.sourceType ? ` — (${c.sourceType})` : '';
+      const src = c.source
+        ? ` — [source](${c.source})`
+        : c.sourceType
+          ? ` — (${c.sourceType})`
+          : '';
       const conf = c.confidence ? ` _[confidence: ${c.confidence}]_` : '';
       L.push(`- **${d.label}: ${GLYPH[c.value]}** — ${c.evidence}${src}${conf}`);
     }
@@ -135,7 +144,8 @@ function main(): void {
   const report = L.join('\n');
   console.log(report);
   const outDir =
-    process.env.MEMPOISON_OUT_DIR ?? join(process.env.HOME ?? '.', 'meridian-parity-build-2026-06-11');
+    process.env.MEMPOISON_OUT_DIR ??
+    join(process.env.HOME ?? '.', 'meridian-parity-build-2026-06-11');
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'harness-comparison.md'), report);
 }

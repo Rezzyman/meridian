@@ -13,7 +13,8 @@ import { defineTool } from '../toolkit.js';
 
 export const dataTools = {
   hash_text: defineTool({
-    description: 'Compute a cryptographic hash (sha256/sha1/sha512/md5) of a UTF-8 string. Returns the hex digest.',
+    description:
+      'Compute a cryptographic hash (sha256/sha1/sha512/md5) of a UTF-8 string. Returns the hex digest.',
     parameters: z.object({
       text: z.string(),
       algorithm: z.enum(['sha256', 'sha1', 'sha512', 'md5']).default('sha256'),

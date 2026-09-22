@@ -79,7 +79,14 @@ export class Conversation {
 
   async send(
     userInput: string,
-    sendOpts?: { onStreamEvent?: (ev: TurnStreamEvent) => void },
+    sendOpts?: {
+      onStreamEvent?: (ev: TurnStreamEvent) => void;
+      isolation?: {
+        disableTools?: boolean;
+        disableMemoryWrite?: boolean;
+        systemPolicy?: string;
+      };
+    },
   ): Promise<MeridianTurn> {
     const userTurn: MeridianTurn = {
       id: `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
@@ -104,6 +111,18 @@ export class Conversation {
         verificationChecks: this.opts.verificationChecks,
         provenanceSigner: this.opts.provenanceSigner,
         senderTrusted: this.opts.senderTrusted,
+        actionGovernance: this.opts.store
+          ? {
+              agentId: this.opts.config.agent.slug,
+              digestArgs: (args) => this.opts.store!.digestActionArgs(args),
+              consumeApproval: (toolName, argsDigest) =>
+                this.opts.store!.consumeApproval(this.sessionId, toolName, argsDigest),
+              record: (receipt) => {
+                this.opts.store!.recordActionReceipt(receipt);
+              },
+            }
+          : undefined,
+        isolation: sendOpts?.isolation,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,
@@ -125,6 +144,7 @@ export class Conversation {
           sessionId: this.sessionId,
           channel: this.opts.channel,
           model: result.trace.model,
+          modelTraceIds: result.trace.modelTraceIds,
           recallQuery: result.trace.recallQuery,
           recallMemoryIds: result.trace.recallMemoryIds,
           recallArtifactIds: result.trace.recallArtifactIds,

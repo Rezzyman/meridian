@@ -11,7 +11,7 @@
 
 // boxen replaced with manual frameBox below for predictable whitespace handling
 import { colors, fg, gradient } from '../utils/truecolor.js';
-import type { CortexHealth, } from '../cortex/types.js';
+import type { CortexHealth } from '../cortex/types.js';
 
 // ─── "MERIDIAN" wordmark ──────────────────────────────────────────────────────
 // 8 rows. Same proportions as the public ATERNA Meridian wordmark.
@@ -179,11 +179,11 @@ function buildRadialBurst(): { glyph: string; dist: number }[][] {
     { angleDeg: 208, maxDist: 14 },
     // Short scatter at irregular angles — every angle distinct, every
     // length under half the spine so the meridian stays dominant.
-    { angleDeg: 138, maxDist: 9 },   // upper-left
-    { angleDeg: 322, maxDist: 8 },   // lower-right
-    { angleDeg: 165, maxDist: 11 },  // upper-left far (shallow)
-    { angleDeg: 78, maxDist: 5 },    // upper-right inner spark
-    { angleDeg: 245, maxDist: 6 },   // lower-left short
+    { angleDeg: 138, maxDist: 9 }, // upper-left
+    { angleDeg: 322, maxDist: 8 }, // lower-right
+    { angleDeg: 165, maxDist: 11 }, // upper-left far (shallow)
+    { angleDeg: 78, maxDist: 5 }, // upper-right inner spark
+    { angleDeg: 245, maxDist: 6 }, // lower-left short
     // Atmosphere dots in the unfilled quadrants only, balancing the
     // visual weight without adding more "rays" per se.
     { angleDeg: 355, maxDist: 36 },
@@ -312,10 +312,7 @@ export function renderLogo(): string {
   // Headline + byline. "AGENT OS" is the product category claim, "by ATERNA AI"
   // is the maker mark. Centered roughly under the wordmark eye.
   const headline =
-    '                  ' +
-    colors.cyan('THE AGENT OS') +
-    '   ' +
-    colors.muted('· BY ATERNA AI');
+    '                  ' + colors.cyan('THE AGENT OS') + '   ' + colors.muted('· BY ATERNA AI');
   return [burst, '', headline].join('\n');
 }
 
@@ -423,7 +420,13 @@ export interface BootPanelData {
     automations: boolean;
   };
   /** CORTEX status only (no fake stats; show counts only when truly known). */
-  cortex: { status: CortexHealth['status']; database: CortexHealth['database']; memoryCount?: number; synapseCount?: number; lastDreamAt?: string };
+  cortex: {
+    status: CortexHealth['status'];
+    database: CortexHealth['database'];
+    memoryCount?: number;
+    synapseCount?: number;
+    lastDreamAt?: string;
+  };
   cwd: string;
   sessionId: string;
 }
@@ -485,13 +488,22 @@ export function renderBootPanel(data: BootPanelData): string {
 
   // ─── CORTEX status (no fake numbers) ──
   right.push(c.memory('CORTEX'));
-  const cortexState = data.cortex.status === 'ok' ? c.ok('connected') : data.cortex.status === 'degraded' ? c.warn('degraded') : c.err('offline');
+  const cortexState =
+    data.cortex.status === 'ok'
+      ? c.ok('connected')
+      : data.cortex.status === 'degraded'
+        ? c.warn('degraded')
+        : c.err('offline');
   right.push(`  ${c.muted('status'.padEnd(11, ' '))}  ${cortexState}`);
   if (typeof data.cortex.memoryCount === 'number' && data.cortex.memoryCount > 0) {
-    right.push(`  ${c.muted('memories'.padEnd(11, ' '))}  ${data.cortex.memoryCount.toLocaleString()}`);
+    right.push(
+      `  ${c.muted('memories'.padEnd(11, ' '))}  ${data.cortex.memoryCount.toLocaleString()}`,
+    );
   }
   if (typeof data.cortex.synapseCount === 'number' && data.cortex.synapseCount > 0) {
-    right.push(`  ${c.muted('synapses'.padEnd(11, ' '))}  ${data.cortex.synapseCount.toLocaleString()}`);
+    right.push(
+      `  ${c.muted('synapses'.padEnd(11, ' '))}  ${data.cortex.synapseCount.toLocaleString()}`,
+    );
   }
   if (data.cortex.lastDreamAt) {
     right.push(`  ${c.muted('last dream'.padEnd(11, ' '))}  ${data.cortex.lastDreamAt}`);
@@ -528,7 +540,9 @@ export function renderBootPanel(data: BootPanelData): string {
           : ch.status === 'armed'
             ? c.warn('armed')
             : c.muted('off');
-      right.push(`  ${dot}  ${c.steel(ch.name.padEnd(18, ' '))}${c.muted(ch.binding.padEnd(28, ' '))}${tag}`);
+      right.push(
+        `  ${dot}  ${c.steel(ch.name.padEnd(18, ' '))}${c.muted(ch.binding.padEnd(28, ' '))}${tag}`,
+      );
     }
     right.push('');
   }
@@ -559,7 +573,9 @@ export function renderBootPanel(data: BootPanelData): string {
       right.push(`  ${renderOne(a)}${renderOne(b)}`);
     }
   } else {
-    right.push(c.cyan('Active Skills') + c.muted('  ·  none loaded — drop SKILLS/<name>/SKILL.md to add'));
+    right.push(
+      c.cyan('Active Skills') + c.muted('  ·  none loaded — drop SKILLS/<name>/SKILL.md to add'),
+    );
   }
   right.push('');
 
@@ -614,7 +630,9 @@ function frameBox(lines: string[], title: string, contentWidth: number): string 
   const top =
     c.cyan('╭') +
     c.cyan(' ') +
-    c.bold + title + c.reset +
+    c.bold +
+    title +
+    c.reset +
     c.cyan('─'.repeat(Math.max(0, inner - titleVw - 1))) +
     c.cyan('╮');
   const bot = c.cyan('╰') + c.cyan('─'.repeat(inner)) + c.cyan('╯');
@@ -647,7 +665,8 @@ export function renderStatusBar(opts: {
   const total = 10;
   const filled = Math.min(total, Math.round((ctxPct / 100) * total));
   const bar = '▓'.repeat(filled) + '░'.repeat(total - filled);
-  const dreamColor = dreamState === 'running' ? c.warn : dreamState === 'encoding' ? c.cyan : c.muted;
+  const dreamColor =
+    dreamState === 'running' ? c.warn : dreamState === 'encoding' ? c.cyan : c.muted;
   return [
     c.cyan('◈'),
     c.muted(`agent ${agent}`),
@@ -783,14 +802,7 @@ export interface CheatSheetCommand {
   argsHint?: string;
 }
 
-const CATEGORY_ORDER = [
-  'Session',
-  'Info',
-  'Configuration',
-  'Tools',
-  'CORTEX',
-  'Exit',
-] as const;
+const CATEGORY_ORDER = ['Session', 'Info', 'Configuration', 'Tools', 'CORTEX', 'Exit'] as const;
 
 export function renderCommandCheatSheet(commands: readonly CheatSheetCommand[]): string {
   const c = colors;
@@ -802,7 +814,9 @@ export function renderCommandCheatSheet(commands: readonly CheatSheetCommand[]):
 
   const lines: string[] = [];
   lines.push('');
-  lines.push(`${c.bold}Slash commands${c.reset}${c.muted('  ·  type any of these inside the REPL')}`);
+  lines.push(
+    `${c.bold}Slash commands${c.reset}${c.muted('  ·  type any of these inside the REPL')}`,
+  );
   for (const cat of CATEGORY_ORDER) {
     const items = grouped[cat];
     if (!items || items.length === 0) continue;

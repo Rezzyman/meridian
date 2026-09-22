@@ -12,7 +12,15 @@ import type { DreamWeaver } from '../dream/weaver.js';
 import type { MeridianHome } from '../config/home.js';
 import type { SkillRegistry } from '../skills/types.js';
 import type { AgentConfig } from '../config/schema.js';
-import { buildBootTrace, renderBootPanel, renderBootTrace, renderCommandCheatSheet, renderLogo, renderStatusBar, welcomeLine } from './banner.js';
+import {
+  buildBootTrace,
+  renderBootPanel,
+  renderBootTrace,
+  renderCommandCheatSheet,
+  renderLogo,
+  renderStatusBar,
+  welcomeLine,
+} from './banner.js';
 import { dispatch } from './commands/handlers.js';
 import { COMMAND_REGISTRY } from './commands/registry.js';
 import { colors } from '../utils/truecolor.js';
@@ -46,12 +54,16 @@ function countLayers(home: MeridianHome) {
   counts.identity = existsSync(idFile);
   const ctxDir = home.layer('CONTEXT');
   if (existsSync(ctxDir))
-    counts.context = readdirSync(ctxDir).filter((f) => f.endsWith('.md') && !f.startsWith('.')).length;
+    counts.context = readdirSync(ctxDir).filter(
+      (f) => f.endsWith('.md') && !f.startsWith('.'),
+    ).length;
   const skillsDir = home.layer('SKILLS');
   if (existsSync(skillsDir)) counts.skills = readdirSync(skillsDir).length;
   const conDir = home.layer('CONNECTIONS');
   if (existsSync(conDir))
-    counts.connections = readdirSync(conDir).filter((f) => f.endsWith('.config') || f === 'mcp.json').length;
+    counts.connections = readdirSync(conDir).filter(
+      (f) => f.endsWith('.config') || f === 'mcp.json',
+    ).length;
   const vDir = home.layer('VERIFICATION');
   if (existsSync(vDir))
     counts.verification = readdirSync(vDir).filter((f) => f.endsWith('.checks.md')).length;
@@ -116,7 +128,10 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
   const isolation = {
     datastore: !!process.env.NEON_DATABASE_URL || !!process.env.DATABASE_URL,
     vectors: !!process.env.VOYAGE_API_KEY,
-    inference: !!process.env.ROUTEXOR_API_KEY || !!process.env.ANTHROPIC_API_KEY || !!process.env.OPENAI_API_KEY,
+    inference:
+      !!process.env.ROUTEXOR_API_KEY ||
+      !!process.env.ANTHROPIC_API_KEY ||
+      !!process.env.OPENAI_API_KEY,
   };
   const channels = {
     telegram: !!config.channels.telegram?.enabled,
@@ -143,9 +158,7 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
   // the provider/gateway slug — that's our proprietary routing concern, not
   // something to broadcast on every boot.
   const primaryModel = config.models.primary;
-  const modelSlug = primaryModel.includes('/')
-    ? primaryModel.split('/').pop()!
-    : primaryModel;
+  const modelSlug = primaryModel.includes('/') ? primaryModel.split('/').pop()! : primaryModel;
   console.log(
     renderBootPanel({
       version: VERSION,
@@ -169,10 +182,9 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
           ? [
               {
                 name: 'Telegram',
-                binding:
-                  process.env.TELEGRAM_BOT_USERNAME
-                    ? `@${process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')}`
-                    : 'bot live',
+                binding: process.env.TELEGRAM_BOT_USERNAME
+                  ? `@${process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, '')}`
+                  : 'bot live',
                 status: 'live' as const,
               },
             ]
@@ -237,9 +249,7 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
     output: process.stdout,
     completer: (line: string) => {
       if (!line.startsWith('/')) return [[], line];
-      const matches = COMMAND_REGISTRY
-        .map((c) => `/${c.name}`)
-        .filter((c) => c.startsWith(line));
+      const matches = COMMAND_REGISTRY.map((c) => `/${c.name}`).filter((c) => c.startsWith(line));
       return [matches, line];
     },
   });
@@ -249,7 +259,16 @@ export async function runRepl(opts: ReplOptions): Promise<void> {
       const text = line.trim();
       if (!text) return ask();
       if (text.startsWith('/')) {
-        const out = await dispatch(text, { home, conversation, cortex, dream, skills, store, passphraseGuard });
+        const out = await dispatch(text, {
+          home,
+          config,
+          conversation,
+          cortex,
+          dream,
+          skills,
+          store,
+          passphraseGuard,
+        });
         if (out !== undefined) console.log(out);
         return ask();
       }

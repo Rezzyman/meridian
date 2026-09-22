@@ -31,7 +31,9 @@ test('redactInternalDisclosure neutralizes our providers/runtime', () => {
   assert.equal(r.text, 'our system call system itself is working');
   assert.equal(r.redacted, true);
 
-  const r2 = redactInternalDisclosure('We route through OpenRouter and Anthropic, with a Groq fallback.');
+  const r2 = redactInternalDisclosure(
+    'We route through OpenRouter and Anthropic, with a Groq fallback.',
+  );
   assert.equal(r2.text, 'We route through our system and our system, with our system fallback.');
   assert.equal(r2.redacted, true);
 });
@@ -61,7 +63,10 @@ test('internal-plumbing leak (server path / MCP / tool id) is caught — 2026-06
   assert.equal(isLeaky(leaked), true);
   assert.equal(sanitizeOutbound(leaked), GENERIC_HICCUP_MESSAGE);
   // stray tool id without a nuke-trigger → redacted, not leaked
-  assert.equal(redactInternalDisclosure('a snag with m365_send_email').text, 'a snag with our tools');
+  assert.equal(
+    redactInternalDisclosure('a snag with m365_send_email').text,
+    'a snag with our tools',
+  );
   // the client's OWN Microsoft 365 is left intact (no false positive)
   assert.equal(redactInternalDisclosure('Your M365 inbox looks fine').redacted, false);
 });

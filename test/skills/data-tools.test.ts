@@ -31,15 +31,15 @@ describe('hash_text — known-answer vectors', () => {
 
 describe('base64_transform', () => {
   it('encodes and decodes round-trip', async () => {
-    const enc = (await b64.execute(
-      { input: 'hello', mode: 'encode' },
-      TOOL_OPTS,
-    )) as Record<string, unknown>;
+    const enc = (await b64.execute({ input: 'hello', mode: 'encode' }, TOOL_OPTS)) as Record<
+      string,
+      unknown
+    >;
     assert.deepEqual(enc, { ok: true, result: 'aGVsbG8=' });
-    const dec = (await b64.execute(
-      { input: 'aGVsbG8=', mode: 'decode' },
-      TOOL_OPTS,
-    )) as Record<string, unknown>;
+    const dec = (await b64.execute({ input: 'aGVsbG8=', mode: 'decode' }, TOOL_OPTS)) as Record<
+      string,
+      unknown
+    >;
     assert.deepEqual(dec, { ok: true, result: 'hello' });
   });
 

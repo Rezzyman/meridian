@@ -308,10 +308,7 @@ function parseOperatorName(userMdPath: string): string | undefined {
  *  bare `<!-- LIVE-STATE ...` variant; conservative when no END marker exists
  *  (leaves the content untouched rather than eating the rest of the file). */
 export function stripLiveState(content: string): string {
-  return content.replace(
-    /<!--\s*LIVE-STATE(?:-BEGIN)?\b[\s\S]*?LIVE-STATE-END\s*-->\s*\n?/g,
-    '',
-  );
+  return content.replace(/<!--\s*LIVE-STATE(?:-BEGIN)?\b[\s\S]*?LIVE-STATE-END\s*-->\s*\n?/g, '');
 }
 
 /** Redact secret-shaped values from config content copied for review. The
@@ -418,7 +415,8 @@ function scanSecrets(sourceRoot: string, profile: SourceProfile): SecretFinding[
       } else if (CONFIG_FILE_RE.test(entry)) {
         // Config-like file: flag it only if it actually contains a secret value.
         try {
-          if (SECRET_VALUE_RE.test(readFileSync(abs, 'utf8'))) findings.push({ file: relPath, keys: [] });
+          if (SECRET_VALUE_RE.test(readFileSync(abs, 'utf8')))
+            findings.push({ file: relPath, keys: [] });
         } catch {
           // ignore unreadable
         }
@@ -533,7 +531,9 @@ function analyzeHermesConfig(sourceRoot: string, acc: PlanAccumulator): string |
   try {
     cfg = (parseYaml(readFileSync(abs, 'utf8')) ?? {}) as Record<string, unknown>;
   } catch (err) {
-    acc.warnings.push(`config.yaml unparseable (${(err as Error).message}) — model/channel translation skipped`);
+    acc.warnings.push(
+      `config.yaml unparseable (${(err as Error).message}) — model/channel translation skipped`,
+    );
     return undefined;
   }
   const tz = typeof cfg.timezone === 'string' ? cfg.timezone : undefined;
@@ -667,7 +667,10 @@ function analyzeHermesCron(sourceRoot: string, tz: string | undefined, acc: Plan
       : [];
   for (const raw of jobs) {
     const job = raw as Record<string, unknown>;
-    const name = typeof job.name === 'string' && job.name.trim() ? job.name.trim() : `hermes-job-${String(job.id ?? 'x')}`;
+    const name =
+      typeof job.name === 'string' && job.name.trim()
+        ? job.name.trim()
+        : `hermes-job-${String(job.id ?? 'x')}`;
     let expr: string | undefined;
     const sched = job.schedule;
     if (typeof sched === 'string') expr = sched;
@@ -682,7 +685,9 @@ function analyzeHermesCron(sourceRoot: string, tz: string | undefined, acc: Plan
     let enabled = job.enabled !== false;
     if (!expr) {
       const kind =
-        sched && typeof sched === 'object' ? String((sched as Record<string, unknown>).kind) : String(sched);
+        sched && typeof sched === 'object'
+          ? String((sched as Record<string, unknown>).kind)
+          : String(sched);
       acc.warnings.push(
         `cron job "${name}": unsupported schedule kind '${kind}' — imported DISABLED with a placeholder schedule`,
       );
@@ -737,7 +742,11 @@ function renderMemoryTable(dump: SqliteTableDump, dbLabel: string): string {
     for (const t of longText) lines.push('', t);
     lines.push('');
   });
-  if (dump.truncated) lines.push(`(truncated at ${MEMORY_ROW_LIMIT} rows — the full table stays in the source state.db)`, '');
+  if (dump.truncated)
+    lines.push(
+      `(truncated at ${MEMORY_ROW_LIMIT} rows — the full table stays in the source state.db)`,
+      '',
+    );
   return sanitizeConfigContent(lines.join('\n'));
 }
 
@@ -801,7 +810,9 @@ function analyzeStateDb(sourceRoot: string, acc: PlanAccumulator): void {
   try {
     db = openSqliteReadOnly(abs);
   } catch (err) {
-    acc.warnings.push(`state.db unreadable (${(err as Error).message}) — memory/session extraction skipped`);
+    acc.warnings.push(
+      `state.db unreadable (${(err as Error).message}) — memory/session extraction skipped`,
+    );
     return;
   }
   try {
@@ -965,12 +976,16 @@ interface OpenclawAgentEntry {
 /** The primary (non-`main`) agent declared in openclaw.json — OpenClaw keeps a
  *  background `main` agent for heartbeat-style behavior; the named agent is
  *  the one being migrated. */
-function openclawPrimaryAgent(cfg: Record<string, unknown> | undefined, sourceRoot: string): {
+function openclawPrimaryAgent(
+  cfg: Record<string, unknown> | undefined,
+  sourceRoot: string,
+): {
   entry?: OpenclawAgentEntry;
   agentDirAbs?: string;
   hasMain: boolean;
 } {
-  const list = ((cfg?.agents as Record<string, unknown> | undefined)?.list ?? []) as OpenclawAgentEntry[];
+  const list = ((cfg?.agents as Record<string, unknown> | undefined)?.list ??
+    []) as OpenclawAgentEntry[];
   const arr = Array.isArray(list) ? list : [];
   const hasMain = arr.some((a) => a?.id === 'main');
   let entry = arr.find((a) => a?.id && a.id !== 'main') ?? arr.find((a) => a?.id);
@@ -1004,7 +1019,10 @@ function readOpenclawConfig(sourceRoot: string): Record<string, unknown> | undef
 }
 
 function sanitizeMcpName(name: string): string {
-  const cleaned = name.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^[-_]+/, '');
+  const cleaned = name
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^[-_]+/, '');
   return cleaned || 'imported';
 }
 
@@ -1135,7 +1153,9 @@ function analyzeOpenclaw(sourceRoot: string, acc: PlanAccumulator): void {
         content,
       });
     } catch (err) {
-      acc.warnings.push(`mcp.servers translation failed validation (${(err as Error).message}) — skipped`);
+      acc.warnings.push(
+        `mcp.servers translation failed validation (${(err as Error).message}) — skipped`,
+      );
     }
   }
 
@@ -1154,11 +1174,13 @@ function analyzeOpenclaw(sourceRoot: string, acc: PlanAccumulator): void {
       `- model.primary: \`${String(pdfModel.primary ?? '?')}\`${mappedPrimary ? ` (Meridian equivalent: \`${mappedPrimary}\`)` : ''}`,
     );
     if (Array.isArray(pdfModel.fallbacks)) {
-      for (const f of pdfModel.fallbacks as unknown[]) pdfBits.push(`- model.fallback: \`${String(f)}\``);
+      for (const f of pdfModel.fallbacks as unknown[])
+        pdfBits.push(`- model.fallback: \`${String(f)}\``);
     }
   }
   if (typeof defaults.pdfMaxPages === 'number') pdfBits.push(`- maxPages: ${defaults.pdfMaxPages}`);
-  if (typeof defaults.pdfMaxBytesMb === 'number') pdfBits.push(`- maxBytesMb: ${defaults.pdfMaxBytesMb}`);
+  if (typeof defaults.pdfMaxBytesMb === 'number')
+    pdfBits.push(`- maxBytesMb: ${defaults.pdfMaxBytesMb}`);
   if (pdfBits.length > 0) {
     const content = sanitizeConfigContent(
       [
@@ -1184,9 +1206,9 @@ function analyzeOpenclaw(sourceRoot: string, acc: PlanAccumulator): void {
   }
 
   // Vision prompt: operational prompt engineering — preserve it verbatim.
-  const image = ((cfg.tools as Record<string, unknown> | undefined)?.media as
-    | Record<string, unknown>
-    | undefined)?.image as Record<string, unknown> | undefined;
+  const image = (
+    (cfg.tools as Record<string, unknown> | undefined)?.media as Record<string, unknown> | undefined
+  )?.image as Record<string, unknown> | undefined;
   if (typeof image?.prompt === 'string' && image.prompt.trim()) {
     const models = Array.isArray(image.models)
       ? (image.models as Array<Record<string, unknown>>)
@@ -1332,10 +1354,26 @@ export function planImport(
       label: 'persona → IDENTITY/AGENT.md',
       transform: profile.personaTransform,
     },
-    { candidates: profile.user, targetRel: join('IDENTITY', 'USER.md'), label: 'operator profile → IDENTITY/USER.md' },
-    { candidates: profile.memory, targetRel: join('MEMORY', 'imported', 'MEMORY.md'), label: 'memory → MEMORY/imported/MEMORY.md' },
-    { candidates: instructionCandidates, targetRel: join('CONTEXT', 'imported-instructions.md'), label: 'instructions → CONTEXT/imported-instructions.md' },
-    ...extraFiles.map((e) => ({ candidates: e.candidates, targetRel: e.targetRel, label: e.label })),
+    {
+      candidates: profile.user,
+      targetRel: join('IDENTITY', 'USER.md'),
+      label: 'operator profile → IDENTITY/USER.md',
+    },
+    {
+      candidates: profile.memory,
+      targetRel: join('MEMORY', 'imported', 'MEMORY.md'),
+      label: 'memory → MEMORY/imported/MEMORY.md',
+    },
+    {
+      candidates: instructionCandidates,
+      targetRel: join('CONTEXT', 'imported-instructions.md'),
+      label: 'instructions → CONTEXT/imported-instructions.md',
+    },
+    ...extraFiles.map((e) => ({
+      candidates: e.candidates,
+      targetRel: e.targetRel,
+      label: e.label,
+    })),
   ];
   for (const m of fileMap) {
     const hit = firstExisting(sourceRoot, m.candidates);
@@ -1583,7 +1621,8 @@ export function patchImportedConfig(home: MeridianHome, plan: ImportPlan): void 
           sr.maxSimpleChars = patch.models.smartRouting.maxSimpleChars;
         if (patch.models.smartRouting.maxSimpleWords != null)
           sr.maxSimpleWords = patch.models.smartRouting.maxSimpleWords;
-        if (patch.models.smartRouting.cheapModel) sr.cheapModel = patch.models.smartRouting.cheapModel;
+        if (patch.models.smartRouting.cheapModel)
+          sr.cheapModel = patch.models.smartRouting.cheapModel;
         models.smartRouting = sr;
       }
     }
@@ -1612,7 +1651,15 @@ function scaffoldHome(slug: string, embedded: boolean): MeridianHome {
   if (!existsSync(home.envPath)) {
     writeFileSync(home.envPath, embedded ? embeddedEnvFileTemplate(slug) : envFileTemplate(slug));
   }
-  const LAYERS = ['IDENTITY', 'CONTEXT', 'SKILLS', 'MEMORY', 'CONNECTIONS', 'VERIFICATION', 'AUTOMATIONS'] as const;
+  const LAYERS = [
+    'IDENTITY',
+    'CONTEXT',
+    'SKILLS',
+    'MEMORY',
+    'CONNECTIONS',
+    'VERIFICATION',
+    'AUTOMATIONS',
+  ] as const;
   if (existsSync(SKELETON_ROOT)) {
     for (const layer of LAYERS) {
       const from = join(SKELETON_ROOT, layer);
@@ -1635,7 +1682,9 @@ export async function runImport(source: string, opts: ImportOptions): Promise<vo
   if (!existsSync(sourceRoot)) {
     console.error(
       colors.err(`No ${src} home found at ${sourceRoot}.`) +
-        colors.muted(`\n  Point at it explicitly:  meridian import ${src} --from /path/to/${src}-home`),
+        colors.muted(
+          `\n  Point at it explicitly:  meridian import ${src} --from /path/to/${src}-home`,
+        ),
     );
     process.exit(1);
   }
@@ -1649,18 +1698,26 @@ export async function runImport(source: string, opts: ImportOptions): Promise<vo
   // What we'll bring over.
   for (const step of plan.steps) console.log(`  ${colors.ok('+')} ${step.label}`);
   const patch = plan.configPatch;
-  if (patch.models?.primary) console.log(`  ${colors.ok('+')} models.primary: ${patch.models.primary}`);
+  if (patch.models?.primary)
+    console.log(`  ${colors.ok('+')} models.primary: ${patch.models.primary}`);
   if (patch.models?.fallbacks?.length)
     console.log(`  ${colors.ok('+')} models.fallbacks: ${patch.models.fallbacks.join(', ')}`);
   if (patch.models?.smartRouting?.cheapModel)
-    console.log(`  ${colors.ok('+')} models.smartRouting.cheapModel: ${patch.models.smartRouting.cheapModel}`);
+    console.log(
+      `  ${colors.ok('+')} models.smartRouting.cheapModel: ${patch.models.smartRouting.cheapModel}`,
+    );
   if (patch.telegramEnabled)
     console.log(
       `  ${colors.ok('+')} channels.telegram: enabled${patch.telegramDefaultChatId ? ` (defaultChatId ${patch.telegramDefaultChatId})` : ''}`,
     );
-  if (plan.systemdUnit) console.log(`  ${colors.ok('+')} systemd unit matched: ${plan.systemdUnit} (drop-in env names below)`);
-  for (const nf of plan.notFound) console.log(`  ${colors.muted('·')} ${colors.muted(`not found: ${nf}`)}`);
-  for (const sk of plan.skipped) console.log(`  ${colors.muted('·')} ${colors.muted(`skipped: ${sk}`)}`);
+  if (plan.systemdUnit)
+    console.log(
+      `  ${colors.ok('+')} systemd unit matched: ${plan.systemdUnit} (drop-in env names below)`,
+    );
+  for (const nf of plan.notFound)
+    console.log(`  ${colors.muted('·')} ${colors.muted(`not found: ${nf}`)}`);
+  for (const sk of plan.skipped)
+    console.log(`  ${colors.muted('·')} ${colors.muted(`skipped: ${sk}`)}`);
   if (plan.operatorName) console.log(`  ${colors.ok('+')} operator name: ${plan.operatorName}`);
 
   if (plan.warnings.length > 0) {
@@ -1675,7 +1732,9 @@ export async function runImport(source: string, opts: ImportOptions): Promise<vo
       const keys = s.keys.length ? `: ${s.keys.join(', ')}` : '';
       console.log(colors.warn(`     ${s.file}${keys}`));
     }
-    console.log(colors.muted(`     Set them in ~/.meridian/${slug}/.env or via \`meridian skills setup\`.`));
+    console.log(
+      colors.muted(`     Set them in ~/.meridian/${slug}/.env or via \`meridian skills setup\`.`),
+    );
   }
 
   if (opts.dryRun) {
@@ -1697,7 +1756,11 @@ export async function runImport(source: string, opts: ImportOptions): Promise<vo
   patchImportedConfig(home, plan);
 
   console.log(colors.ok(`\n✓ Imported ${written.length} item(s) into ${home.agentRoot}`));
-  console.log(colors.muted(`  memory: ${opts.cortex ? 'CORTEX (set NEON/VOYAGE keys in .env)' : 'embedded (zero-config, ready now)'}`));
+  console.log(
+    colors.muted(
+      `  memory: ${opts.cortex ? 'CORTEX (set NEON/VOYAGE keys in .env)' : 'embedded (zero-config, ready now)'}`,
+    ),
+  );
   if (plan.automations.length > 0) {
     const on = plan.automations.filter((a) => a.enabled).length;
     console.log(
@@ -1707,11 +1770,24 @@ export async function runImport(source: string, opts: ImportOptions): Promise<vo
     );
   }
   if (src === 'hermes') {
-    console.log(colors.muted('\n  Hermes config, cron, and channels were copied to CONTEXT/ for reference;'));
-    console.log(colors.muted('  schedules became real AUTOMATIONS entries and model pins landed in config.yaml.'));
+    console.log(
+      colors.muted('\n  Hermes config, cron, and channels were copied to CONTEXT/ for reference;'),
+    );
+    console.log(
+      colors.muted(
+        '  schedules became real AUTOMATIONS entries and model pins landed in config.yaml.',
+      ),
+    );
   }
   console.log(colors.muted('\nNext:'));
-  console.log(colors.muted(`  1. Review IDENTITY/AGENT.md, CONTEXT/, and AUTOMATIONS/ in ${home.agentRoot}`));
-  if (plan.secrets.length) console.log(colors.muted('  2. Re-add the secrets listed above (they were not copied).'));
-  console.log(colors.muted(`  ${plan.secrets.length ? 3 : 2}. meridian use ${slug} && meridian doctor && meridian`));
+  console.log(
+    colors.muted(`  1. Review IDENTITY/AGENT.md, CONTEXT/, and AUTOMATIONS/ in ${home.agentRoot}`),
+  );
+  if (plan.secrets.length)
+    console.log(colors.muted('  2. Re-add the secrets listed above (they were not copied).'));
+  console.log(
+    colors.muted(
+      `  ${plan.secrets.length ? 3 : 2}. meridian use ${slug} && meridian doctor && meridian`,
+    ),
+  );
 }

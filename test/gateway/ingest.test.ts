@@ -48,11 +48,7 @@ async function boot(opts: Partial<Parameters<typeof startGateway>[0]> = {}): Pro
   return `http://127.0.0.1:${addr.port}`;
 }
 
-const post = (
-  base: string,
-  body: unknown,
-  token?: string,
-): Promise<Response> =>
+const post = (base: string, body: unknown, token?: string): Promise<Response> =>
   fetch(`${base}/ingest`, {
     method: 'POST',
     headers: {
@@ -84,11 +80,7 @@ describe('gateway /ingest', () => {
   it('lands a utf8 document in the inbox with a traversal-proof name', async () => {
     const inboxDir = mkdtempSync(join(tmpdir(), 'ingest-'));
     const base = await boot({ ingest: { inboxDir, token: 'tok' } });
-    const res = await post(
-      base,
-      { filename: '../../etc/passwd', content: 'survey text' },
-      'tok',
-    );
+    const res = await post(base, { filename: '../../etc/passwd', content: 'survey text' }, 'tok');
     assert.equal(res.status, 200);
     const body = (await res.json()) as { ok: boolean; file: string };
     assert.ok(body.ok);
@@ -120,10 +112,7 @@ describe('gateway /ingest', () => {
     const inboxDir = mkdtempSync(join(tmpdir(), 'ingest-'));
     const base = await boot({ ingest: { inboxDir, token: 'tok' } });
     assert.equal((await post(base, { filename: 'a.txt', content: '' }, 'tok')).status, 400);
-    assert.equal(
-      (await post(base, { filename: '...', content: 'x' }, 'tok')).status,
-      400,
-    );
+    assert.equal((await post(base, { filename: '...', content: 'x' }, 'tok')).status, 400);
   });
 });
 

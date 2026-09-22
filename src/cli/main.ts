@@ -18,7 +18,13 @@ process.removeAllListeners('warning');
 import { Command } from 'commander';
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { activeAgentSlug, ensureAgentHome, listAgents, loadAgentConfig, setActiveAgent } from '../config/home.js';
+import {
+  activeAgentSlug,
+  ensureAgentHome,
+  listAgents,
+  loadAgentConfig,
+  setActiveAgent,
+} from '../config/home.js';
 import { loadAgentEnv, envFileTemplate } from '../config/loader.js';
 import { bindCortex } from '../cortex/bind.js';
 import { createMemoryProvider } from '../memory/index.js';
@@ -37,12 +43,19 @@ import { runGateway } from './gateway-cmd.js';
 import { initAgent } from './init-cmd.js';
 import { runOnboard } from './onboard-cmd.js';
 import { pickAgentInteractive } from './agent-picker.js';
-import { runSkillsList, runSkillsInstall, runSkillsRemove, runSkillsSetup, runSkillNew } from './skills-cmd.js';
+import {
+  runSkillsList,
+  runSkillsInstall,
+  runSkillsRemove,
+  runSkillsSetup,
+  runSkillNew,
+} from './skills-cmd.js';
 import { runIngest } from './ingest-cmd.js';
 import { runVoicePassphrase, runVoiceStatus, runVoiceCall } from './voice-cmd.js';
 import { runMcpAdd, runMcpList, runMcpRemove, runMcpServe, runMcpToggle } from './mcp-cmd.js';
 import { runDemo } from './demo-cmd.js';
 import { runImport } from './import-cmd.js';
+import { runLoopPair } from './loop-cmd.js';
 
 // Read the real version from package.json so `--version` never drifts from the
 // published release. `../../package.json` resolves the same from src/cli (tsx
@@ -77,8 +90,14 @@ program
   .description('Initialize a new agent home with the seven-layer AgentOS scaffold')
   .option('--template <name>', 'starter template (frontdesk | receptionist | sales | concierge)')
   .option('--inherits <slug>', 'inherit CONTEXT, MEMORY, CONNECTIONS from a hub agent')
-  .option('--embedded', 'force zero-config local memory (the default unless CORTEX creds are present)')
-  .option('--cortex', 'provision for the CORTEX server path (needs NEON_DATABASE_URL + VOYAGE_API_KEY)')
+  .option(
+    '--embedded',
+    'force zero-config local memory (the default unless CORTEX creds are present)',
+  )
+  .option(
+    '--cortex',
+    'provision for the CORTEX server path (needs NEON_DATABASE_URL + VOYAGE_API_KEY)',
+  )
   .action(
     async (
       slug: string,
@@ -96,7 +115,9 @@ program
 
 program
   .command('onboard')
-  .description('Run the extended onboarding interview to populate IDENTITY/USER.md and CONTEXT/* files')
+  .description(
+    'Run the extended onboarding interview to populate IDENTITY/USER.md and CONTEXT/* files',
+  )
   .action(async () => {
     await runOnboard();
   });
@@ -137,7 +158,9 @@ program
     await runDemo();
   });
 
-const mcp = program.command('mcp').description('Model Context Protocol — consume servers, or serve this agent');
+const mcp = program
+  .command('mcp')
+  .description('Model Context Protocol — consume servers, or serve this agent');
 mcp
   .command('list')
   .description('Probe MCP servers declared in CONNECTIONS/mcp.json and list their tools')
@@ -149,10 +172,15 @@ mcp
   .description('Register an MCP server in CONNECTIONS/mcp.json (no hand-editing JSON)')
   .option('--transport <kind>', 'stdio | http | sse', 'stdio')
   .option('--command <cmd>', 'stdio: the executable to launch (e.g. npx)')
-  .option('--arg <value>', 'stdio: a command argument (repeatable)', (v: string, acc: string[]) => {
-    acc.push(v);
-    return acc;
-  }, [] as string[])
+  .option(
+    '--arg <value>',
+    'stdio: a command argument (repeatable)',
+    (v: string, acc: string[]) => {
+      acc.push(v);
+      return acc;
+    },
+    [] as string[],
+  )
   .option('--url <url>', 'http/sse: the server endpoint URL')
   .option('--channels <list>', 'comma-separated channels that may see the tools (default cli)')
   .option('--force', 'overwrite an existing server of the same name')
@@ -175,7 +203,10 @@ mcp
           command: opts.command,
           args: opts.arg,
           url: opts.url,
-          channels: opts.channels?.split(',').map((c) => c.trim()).filter(Boolean),
+          channels: opts.channels
+            ?.split(',')
+            .map((c) => c.trim())
+            .filter(Boolean),
           force: opts.force,
         }),
       );
@@ -246,10 +277,17 @@ program
     await runGateway(opts);
   });
 
+const loopCmd = program.command('loop').description('Pair the first-party Aterna Loop app');
+loopCmd
+  .command('pair')
+  .description('Create a one-use code for this agent')
+  .option('--ttl <minutes>', 'code lifetime (1–60 minutes)', (value) => Number(value), 10)
+  .action((opts: { ttl: number }) => runLoopPair(opts.ttl));
+
 // `meridian ingest <path>` — feed a file (or directory) into CORTEX.
 program
   .command('ingest <path>')
-  .description('Ingest a file (text, markdown, PDF, image, audio) into the active agent\'s CORTEX')
+  .description("Ingest a file (text, markdown, PDF, image, audio) into the active agent's CORTEX")
   .action(async (path: string) => {
     await runIngest(path);
   });
@@ -265,7 +303,7 @@ program
   .option('--overwrite', 'overwrite an existing agent home of the same slug')
   .option('--dry-run', 'preview the import without writing anything')
   .option('--sessions', 'also copy raw session transcripts (JSONL) — they can run 50-160MB')
-  .option('--no-systemd', 'skip scanning systemd units for the source home\'s env var names')
+  .option('--no-systemd', "skip scanning systemd units for the source home's env var names")
   .action(
     async (
       source: string,
@@ -300,8 +338,10 @@ voiceCmd
   .action(() => runVoiceStatus());
 voiceCmd
   .command('call <to>')
-  .description('Place an outbound voice call to an E.164 number (requires the gateway to be running)')
-  .option('--first-message <text>', 'override the assistant\'s opening line for this call')
+  .description(
+    'Place an outbound voice call to an E.164 number (requires the gateway to be running)',
+  )
+  .option('--first-message <text>', "override the assistant's opening line for this call")
   .option('--customer-name <name>', 'pass a name to the assistant for personalized greetings')
   .action(async (to: string, opts: { firstMessage?: string; customerName?: string }) => {
     await runVoiceCall({ to, firstMessage: opts.firstMessage, customerName: opts.customerName });
@@ -325,13 +365,15 @@ skillsCmd
   .action((name: string) => runSkillsRemove(name));
 skillsCmd
   .command('setup <name>')
-  .description('Run a skill\'s interactive setup walkthrough (env keys, passphrase, OAuth, etc.)')
+  .description("Run a skill's interactive setup walkthrough (env keys, passphrase, OAuth, etc.)")
   .action(async (name: string) => {
     await runSkillsSetup(name);
   });
 skillsCmd
   .command('new')
-  .description('Author a NEW markdown skill from a description — screened by the memory-poisoning defense before install')
+  .description(
+    'Author a NEW markdown skill from a description — screened by the memory-poisoning defense before install',
+  )
   .requiredOption('--description <text>', 'what the skill should do')
   .option('--context <text>', 'optional experience/context to encode into the skill')
   .option('--overwrite', 'overwrite an existing skill of the same name')
@@ -399,7 +441,15 @@ async function openChat(): Promise<void> {
 
   // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
   // place shared with the gateway (src/agent/tool-surface.ts).
-  const surface = await buildToolSurface({ home, config, env, cortex, logger, router, memory: memorySelection.provider });
+  const surface = await buildToolSurface({
+    home,
+    config,
+    env,
+    cortex,
+    logger,
+    router,
+    memory: memorySelection.provider,
+  });
   const { tools, skillToolNames, skills, guard, verificationChecks, provenanceSigner } = surface;
 
   // ── Runtime loadout — regenerate at every REPL boot ──
@@ -417,7 +467,9 @@ async function openChat(): Promise<void> {
       skills,
       automations: loadAutomationDefs(home),
       builtinToolNames: surface.builtinToolNames,
-      mcpTools: surface.mcpStatus.flatMap((st) => st.tools.map((t) => ({ name: t, server: st.server }))),
+      mcpTools: surface.mcpStatus.flatMap((st) =>
+        st.tools.map((t) => ({ name: t, server: st.server })),
+      ),
       cortexStats: cortexStats ?? undefined,
     });
   } catch (err) {
@@ -459,7 +511,16 @@ async function openChat(): Promise<void> {
     return turn;
   };
 
-  await runRepl({ home, config, conversation, cortex, dream, skills, store, passphraseGuard: guard });
+  await runRepl({
+    home,
+    config,
+    conversation,
+    cortex,
+    dream,
+    skills,
+    store,
+    passphraseGuard: guard,
+  });
   dream.stop();
   store.close();
   await surface.close();

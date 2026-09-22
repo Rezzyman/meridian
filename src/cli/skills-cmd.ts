@@ -10,7 +10,15 @@
  * the operator can re-install or browse alternatives.
  */
 
-import { existsSync, mkdirSync, copyFileSync, rmSync, readdirSync, statSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  copyFileSync,
+  rmSync,
+  readdirSync,
+  statSync,
+  readFileSync,
+} from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline/promises';
@@ -41,7 +49,9 @@ export interface SetupCtx {
       runJson: <T = unknown>(opts: GogRunOptions) => Promise<T>;
       listAccounts: (
         client: string,
-      ) => Promise<Array<{ email: string; client: string; scopes: string; expires?: string; type: string }>>;
+      ) => Promise<
+        Array<{ email: string; client: string; scopes: string; expires?: string; type: string }>
+      >;
       /** Spawn `gog auth login <email> --client <bucket>` with inherited
        *  stdio so the operator sees the OAuth URL gog prints and gets
        *  prompted by gog directly. Returns the gog exit code. */
@@ -55,10 +65,7 @@ export interface SetupCtx {
  * pasted API key isn't shoulder-surfable. Falls back to plain readline
  * when stdin isn't a TTY (CI, piped input).
  */
-async function promptOnce(
-  question: string,
-  opts?: { mask?: boolean },
-): Promise<string> {
+async function promptOnce(question: string, opts?: { mask?: boolean }): Promise<string> {
   if (opts?.mask && process.stdin.isTTY) {
     return await maskedPrompt(question);
   }
@@ -195,9 +202,7 @@ export function runSkillsInstall(name: string): void {
     }
   }
   console.log(colors.ok(`installed ${name} → ${dstDir}`));
-  console.log(
-    colors.muted('  restart the gateway (or REPL) for the agent to load it.'),
-  );
+  console.log(colors.muted('  restart the gateway (or REPL) for the agent to load it.'));
 }
 
 export function runSkillsRemove(name: string): void {
@@ -413,7 +418,11 @@ export async function runSkillNew(
     console.error(colors.err('\n🛡️  BLOCKED by the memory-poisoning defense.'));
     console.error(colors.err(`   ${screen.reason}`));
     console.error(colors.muted(`   signals: ${screen.flags.join(', ')}`));
-    console.error(colors.muted('   Nothing was written. A safe skill is never installed without passing this screen.'));
+    console.error(
+      colors.muted(
+        '   Nothing was written. A safe skill is never installed without passing this screen.',
+      ),
+    );
     process.exit(2);
   }
 

@@ -55,7 +55,10 @@ describe('evaluateExpression', () => {
 
 describe('calculate tool', () => {
   it('returns a numeric result', async () => {
-    const r = (await calc.execute({ expression: '3 * (4 + 5)' }, TOOL_OPTS)) as Record<string, unknown>;
+    const r = (await calc.execute({ expression: '3 * (4 + 5)' }, TOOL_OPTS)) as Record<
+      string,
+      unknown
+    >;
     assert.deepEqual(r, { ok: true, result: 27 });
   });
 
@@ -99,17 +102,29 @@ describe('json_query tool', () => {
   });
 
   it('labels arrays and null distinctly', async () => {
-    const arr = (await jq.execute({ json: '{"x":[1,2]}', path: 'x' }, TOOL_OPTS)) as Record<string, unknown>;
+    const arr = (await jq.execute({ json: '{"x":[1,2]}', path: 'x' }, TOOL_OPTS)) as Record<
+      string,
+      unknown
+    >;
     assert.equal(arr.type, 'array');
-    const nul = (await jq.execute({ json: '{"x":null}', path: 'x' }, TOOL_OPTS)) as Record<string, unknown>;
+    const nul = (await jq.execute({ json: '{"x":null}', path: 'x' }, TOOL_OPTS)) as Record<
+      string,
+      unknown
+    >;
     assert.deepEqual(nul, { ok: true, value: null, type: 'null' });
   });
 
   it('errors on invalid JSON and on a missing path', async () => {
-    const badJson = (await jq.execute({ json: 'not json', path: 'a' }, TOOL_OPTS)) as Record<string, unknown>;
+    const badJson = (await jq.execute({ json: 'not json', path: 'a' }, TOOL_OPTS)) as Record<
+      string,
+      unknown
+    >;
     assert.equal(badJson.ok, false);
     assert.match(badJson.error as string, /invalid JSON/);
-    const missing = (await jq.execute({ json: '{"a":1}', path: 'b' }, TOOL_OPTS)) as Record<string, unknown>;
+    const missing = (await jq.execute({ json: '{"a":1}', path: 'b' }, TOOL_OPTS)) as Record<
+      string,
+      unknown
+    >;
     assert.equal(missing.ok, false);
     assert.match(missing.error as string, /not found/);
   });
