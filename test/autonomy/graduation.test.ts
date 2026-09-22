@@ -31,12 +31,16 @@ function plane(): AutonomyControlPlane {
   return new AutonomyControlPlane(home);
 }
 
+let tick = 0;
 function run(
   p: AutonomyControlPlane,
   job: string,
   outcome: 'success' | 'failed' | 'awaiting_approval' | 'skipped',
 ) {
-  const at = new Date();
+  // Distinct scheduledAt per run: the control plane dedupes an occurrence by
+  // its scheduled time, and CI can call this twice in the same millisecond.
+  tick += 1;
+  const at = new Date(Date.UTC(2026, 8, 22, 12, tick, 0));
   const begun = p.begin(job, at, 60_000, at);
   assert.ok(begun.acquired && begun.run);
   p.finish(job, begun.run!.runId, outcome, {}, new Date(at.getTime() + 1));
