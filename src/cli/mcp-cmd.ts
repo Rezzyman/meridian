@@ -224,7 +224,11 @@ export async function runMcpToggle(name: string, enabled: boolean): Promise<numb
   }
   const { servers: next, changed, found } = setMcpServerEnabled(servers, name, enabled);
   if (!found) {
-    console.log(colors.err(`no MCP server named "${name}" (have: ${servers.map((s) => s.name).join(', ') || 'none'})`));
+    console.log(
+      colors.err(
+        `no MCP server named "${name}" (have: ${servers.map((s) => s.name).join(', ') || 'none'})`,
+      ),
+    );
     return 1;
   }
   if (!changed) {
@@ -254,7 +258,11 @@ export async function runMcpRemove(name: string): Promise<number> {
   }
   const { servers: next, removed } = removeMcpServer(servers, name);
   if (!removed) {
-    console.log(colors.err(`no MCP server named "${name}" (have: ${servers.map((s) => s.name).join(', ') || 'none'})`));
+    console.log(
+      colors.err(
+        `no MCP server named "${name}" (have: ${servers.map((s) => s.name).join(', ') || 'none'})`,
+      ),
+    );
     return 1;
   }
   writeFileSync(path, `${JSON.stringify({ servers: next }, null, 2)}\n`);

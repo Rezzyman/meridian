@@ -84,7 +84,9 @@ function buildDelegateTool(
       tools: z
         .array(z.string())
         .optional()
-        .describe(`Tool names to grant from your own surface. Default: ${dcfg.childTools.join(', ')}`),
+        .describe(
+          `Tool names to grant from your own surface. Default: ${dcfg.childTools.join(', ')}`,
+        ),
     }),
     execute: async ({ task, context, tools: requested }) => {
       const startedAt = Date.now();

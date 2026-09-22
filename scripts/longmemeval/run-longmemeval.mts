@@ -101,7 +101,9 @@ async function main(): Promise<void> {
   const tmpRoot = mkdtempSync(join(tmpdir(), 'lme-'));
   const providerFor = async (inst: LongMemEvalInstance): Promise<MemoryProvider> => {
     if (args.provider !== 'embedded') {
-      block(`provider '${args.provider}' wiring is intentionally not auto-started here (needs a server).`);
+      block(
+        `provider '${args.provider}' wiring is intentionally not auto-started here (needs a server).`,
+      );
     }
     return new EmbeddedMemoryProvider({
       agentId: `lme-${inst.question_id}`,
@@ -129,7 +131,16 @@ async function main(): Promise<void> {
       ...process.env,
     });
     const router = new ProviderRouter(env);
-    const models: ModelChain = { primary: args.model, fallbacks: [], smartRouting: { enabled: false, maxSimpleChars: 200, maxSimpleWords: 35, cheapModel: args.model } };
+    const models: ModelChain = {
+      primary: args.model,
+      fallbacks: [],
+      smartRouting: {
+        enabled: false,
+        maxSimpleChars: 200,
+        maxSimpleWords: 35,
+        cheapModel: args.model,
+      },
+    };
     modelLabel = args.model;
     const modelFor = (q: string) => router.chainFor(q, models)[0].model;
     answer = async (question, context) => {
@@ -188,13 +199,17 @@ async function main(): Promise<void> {
   console.log(`\n## LongMemEval — ${mode}`);
   console.log(`provider: ${summary.provider} · instances: ${summary.total}`);
   const metric = args.confirmLive ? 'accuracy' : 'retrieval-recall';
-  console.log(`${metric}: ${(summary.accuracy * 100).toFixed(1)}% (${summary.correct}/${summary.total})`);
+  console.log(
+    `${metric}: ${(summary.accuracy * 100).toFixed(1)}% (${summary.correct}/${summary.total})`,
+  );
   console.log('\nby question type:');
   for (const [type, t] of Object.entries(summary.byType).sort()) {
     console.log(`  ${type.padEnd(28)} ${(t.accuracy * 100).toFixed(1)}% (${t.correct}/${t.total})`);
   }
   if (summary.abstention.total > 0) {
-    console.log(`\nabstention: ${(summary.abstention.accuracy * 100).toFixed(1)}% (${summary.abstention.correct}/${summary.abstention.total})`);
+    console.log(
+      `\nabstention: ${(summary.abstention.accuracy * 100).toFixed(1)}% (${summary.abstention.correct}/${summary.abstention.total})`,
+    );
   }
   if (!args.confirmLive) {
     console.log(

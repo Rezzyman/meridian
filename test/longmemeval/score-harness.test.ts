@@ -6,10 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type {
-  EncodeResult,
-  RecallResult,
-} from '../../src/cortex/types.js';
+import type { EncodeResult, RecallResult } from '../../src/cortex/types.js';
 import type { EncodeOptions, MemoryProvider, RecallOptions } from '../../src/memory/provider.js';
 import {
   isAbstentionText,
@@ -43,7 +40,10 @@ describe('LongMemEval score — offline scorer', () => {
   });
 
   it('scores abstention instances on whether the prediction abstains', () => {
-    assert.equal(scoreOffline('single-session-abstention', 'There is no information about that.', 'N/A'), true);
+    assert.equal(
+      scoreOffline('single-session-abstention', 'There is no information about that.', 'N/A'),
+      true,
+    );
     assert.equal(scoreOffline('single-session-abstention', 'It was on Tuesday.', 'N/A'), false);
   });
 
@@ -71,9 +71,20 @@ function stubProvider(): MemoryProvider & { encoded: string[] } {
     async recall(query: string, _o?: RecallOptions): Promise<RecallResult> {
       // Return only memories that share a token with the query (toy retrieval).
       const q = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
-      const hits = encoded.filter((c) => c.toLowerCase().split(/\W+/).some((t) => q.has(t)));
+      const hits = encoded.filter((c) =>
+        c
+          .toLowerCase()
+          .split(/\W+/)
+          .some((t) => q.has(t)),
+      );
       const context = hits.join('\n');
-      return { context, memories: [], artifacts: [], tokenCount: context.length, tokenBudget: 2000 };
+      return {
+        context,
+        memories: [],
+        artifacts: [],
+        tokenCount: context.length,
+        tokenBudget: 2000,
+      };
     },
     async listArtifacts() {
       return { agentId: 'stub', sinceHours: 0, cutoff: '', count: 0, artifacts: [] };
@@ -115,7 +126,10 @@ describe('LongMemEval harness — ingest → recall → answer → score', () =>
     });
     assert.equal(r.ingestedTurns, 2, 'both haystack turns ingested');
     assert.equal(provider.encoded.length, 2);
-    assert.ok(provider.encoded[0].includes('[2026-01-01]'), 'session date prefixed for temporal reasoning');
+    assert.ok(
+      provider.encoded[0].includes('[2026-01-01]'),
+      'session date prefixed for temporal reasoning',
+    );
     assert.equal(r.correct, true);
     assert.equal(r.scoredBy, 'offline');
   });
@@ -133,9 +147,42 @@ describe('LongMemEval harness — ingest → recall → answer → score', () =>
 
   it('summarize computes accuracy, per-type, and abstention breakdowns', () => {
     const results: InstanceResult[] = [
-      { question_id: 'a', question_type: 'multi-session', question: '', goldAnswer: '', predictedAnswer: '', correct: true, scoredBy: 'offline', isAbstention: false, recallTokens: 0, ingestedTurns: 0 },
-      { question_id: 'b', question_type: 'multi-session', question: '', goldAnswer: '', predictedAnswer: '', correct: false, scoredBy: 'offline', isAbstention: false, recallTokens: 0, ingestedTurns: 0 },
-      { question_id: 'c', question_type: 'single-session-abstention', question: '', goldAnswer: '', predictedAnswer: '', correct: true, scoredBy: 'offline', isAbstention: true, recallTokens: 0, ingestedTurns: 0 },
+      {
+        question_id: 'a',
+        question_type: 'multi-session',
+        question: '',
+        goldAnswer: '',
+        predictedAnswer: '',
+        correct: true,
+        scoredBy: 'offline',
+        isAbstention: false,
+        recallTokens: 0,
+        ingestedTurns: 0,
+      },
+      {
+        question_id: 'b',
+        question_type: 'multi-session',
+        question: '',
+        goldAnswer: '',
+        predictedAnswer: '',
+        correct: false,
+        scoredBy: 'offline',
+        isAbstention: false,
+        recallTokens: 0,
+        ingestedTurns: 0,
+      },
+      {
+        question_id: 'c',
+        question_type: 'single-session-abstention',
+        question: '',
+        goldAnswer: '',
+        predictedAnswer: '',
+        correct: true,
+        scoredBy: 'offline',
+        isAbstention: true,
+        recallTokens: 0,
+        ingestedTurns: 0,
+      },
     ];
     const s = summarize(results, { dataset: 'd', provider: 'embedded', model: 'none' }, 'offline');
     assert.equal(s.total, 3);

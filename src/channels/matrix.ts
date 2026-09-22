@@ -15,7 +15,12 @@
  */
 
 import type { Logger } from 'pino';
-import type { ChannelAdapter, ChannelStartOptions, InboundMessage, OutboundMessage } from './types.js';
+import type {
+  ChannelAdapter,
+  ChannelStartOptions,
+  InboundMessage,
+  OutboundMessage,
+} from './types.js';
 
 export interface MatrixEvent {
   type?: string;
@@ -175,7 +180,10 @@ export class MatrixChannel implements ChannelAdapter {
     return sync.next_batch;
   }
 
-  private async fetchSync(since: string | undefined, timeoutMs: number): Promise<MatrixSyncResponse> {
+  private async fetchSync(
+    since: string | undefined,
+    timeoutMs: number,
+  ): Promise<MatrixSyncResponse> {
     const params = new URLSearchParams({ timeout: String(timeoutMs) });
     if (since) params.set('since', since);
     const res = await this.fetchImpl(`${this.base}/_matrix/client/v3/sync?${params.toString()}`, {

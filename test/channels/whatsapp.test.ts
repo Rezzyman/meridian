@@ -15,7 +15,15 @@ import {
   verifyWhatsappSignature,
 } from '../../src/channels/whatsapp.js';
 
-const silent = { info() {}, warn() {}, error() {}, debug() {}, child() { return silent; } } as unknown as Logger;
+const silent = {
+  info() {},
+  warn() {},
+  error() {},
+  debug() {},
+  child() {
+    return silent;
+  },
+} as unknown as Logger;
 const APP_SECRET = 'meta-app-secret';
 
 function sign(rawBody: string, secret = APP_SECRET): string {
@@ -25,24 +33,59 @@ function sign(rawBody: string, secret = APP_SECRET): string {
 function textPayload(from: string, body: string, id = 'wamid.1'): string {
   return JSON.stringify({
     object: 'whatsapp_business_account',
-    entry: [{ changes: [{ value: {
-      metadata: { phone_number_id: 'PNID' },
-      contacts: [{ profile: { name: 'Rez' }, wa_id: from }],
-      messages: [{ from, id, type: 'text', text: { body } }],
-    } }] }],
+    entry: [
+      {
+        changes: [
+          {
+            value: {
+              metadata: { phone_number_id: 'PNID' },
+              contacts: [{ profile: { name: 'Rez' }, wa_id: from }],
+              messages: [{ from, id, type: 'text', text: { body } }],
+            },
+          },
+        ],
+      },
+    ],
   });
 }
 
 describe('verifyWhatsappSignature', () => {
   const body = textPayload('15551230000', 'hi');
   it('accepts a correct sha256= signature', () => {
-    assert.equal(verifyWhatsappSignature({ appSecret: APP_SECRET, signature: sign(body), rawBody: body }), true);
+    assert.equal(
+      verifyWhatsappSignature({ appSecret: APP_SECRET, signature: sign(body), rawBody: body }),
+      true,
+    );
   });
   it('rejects wrong secret / tampered body / no prefix / missing', () => {
-    assert.equal(verifyWhatsappSignature({ appSecret: APP_SECRET, signature: sign(body, 'other'), rawBody: body }), false);
-    assert.equal(verifyWhatsappSignature({ appSecret: APP_SECRET, signature: sign(body), rawBody: `${body} ` }), false);
-    assert.equal(verifyWhatsappSignature({ appSecret: APP_SECRET, signature: createHmac('sha256', APP_SECRET).update(body).digest('hex'), rawBody: body }), false);
-    assert.equal(verifyWhatsappSignature({ appSecret: APP_SECRET, signature: undefined, rawBody: body }), false);
+    assert.equal(
+      verifyWhatsappSignature({
+        appSecret: APP_SECRET,
+        signature: sign(body, 'other'),
+        rawBody: body,
+      }),
+      false,
+    );
+    assert.equal(
+      verifyWhatsappSignature({
+        appSecret: APP_SECRET,
+        signature: sign(body),
+        rawBody: `${body} `,
+      }),
+      false,
+    );
+    assert.equal(
+      verifyWhatsappSignature({
+        appSecret: APP_SECRET,
+        signature: createHmac('sha256', APP_SECRET).update(body).digest('hex'),
+        rawBody: body,
+      }),
+      false,
+    );
+    assert.equal(
+      verifyWhatsappSignature({ appSecret: APP_SECRET, signature: undefined, rawBody: body }),
+      false,
+    );
   });
 });
 
@@ -54,10 +97,20 @@ function makeChannel(opts: { allowedNumbers?: string[] } = {}) {
   };
   const seen: string[] = [];
   const ch = new WhatsappChannel({
-    phoneNumberId: 'PNID', accessToken: 'tok', appSecret: APP_SECRET, verifyToken: 'verify-me',
-    allowedNumbers: opts.allowedNumbers, logger: silent, fetchImpl,
+    phoneNumberId: 'PNID',
+    accessToken: 'tok',
+    appSecret: APP_SECRET,
+    verifyToken: 'verify-me',
+    allowedNumbers: opts.allowedNumbers,
+    logger: silent,
+    fetchImpl,
   });
-  ch.start(undefined, { onInbound: async (m) => { seen.push(`${m.from}:${m.text}`); return `echo: ${m.text}`; } });
+  ch.start(undefined, {
+    onInbound: async (m) => {
+      seen.push(`${m.from}:${m.text}`);
+      return `echo: ${m.text}`;
+    },
+  });
   return { ch, calls, seen };
 }
 
@@ -82,12 +135,21 @@ describe('WhatsappChannel.handleRequest', () => {
     assert.deepEqual(seen, ['15551230000:hello']);
     assert.equal(calls.length, 1);
     assert.match(calls[0].url, /graph\.facebook\.com\/v21\.0\/PNID\/messages$/);
-    assert.deepEqual(calls[0].body, { messaging_product: 'whatsapp', to: '15551230000', type: 'text', text: { body: 'echo: hello' } });
+    assert.deepEqual(calls[0].body, {
+      messaging_product: 'whatsapp',
+      to: '15551230000',
+      type: 'text',
+      text: { body: 'echo: hello' },
+    });
   });
 
   it('ignores delivery-status payloads (no messages)', async () => {
     const { ch, seen } = makeChannel();
-    const r = ch.handleRequest(JSON.stringify({ entry: [{ changes: [{ value: { statuses: [{ status: 'delivered' }] } }] }] }));
+    const r = ch.handleRequest(
+      JSON.stringify({
+        entry: [{ changes: [{ value: { statuses: [{ status: 'delivered' }] } }] }],
+      }),
+    );
     await r.done;
     assert.deepEqual(seen, []);
   });

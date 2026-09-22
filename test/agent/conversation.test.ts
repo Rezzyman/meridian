@@ -8,7 +8,13 @@ import { Conversation } from '../../src/agent/conversation.js';
 import type { ConversationOptions } from '../../src/agent/conversation.js';
 import type { MeridianSession, MeridianTurn } from '../../src/agent/types.js';
 import type { SessionStore, TurnTrace } from '../../src/session/store.js';
-import { makeConfig, mockCortex, mockRouter, silentLogger, textModel } from '../helpers/fixtures.js';
+import {
+  makeConfig,
+  mockCortex,
+  mockRouter,
+  silentLogger,
+  textModel,
+} from '../helpers/fixtures.js';
 
 function makeConversation(extra: Partial<ConversationOptions> = {}): Conversation {
   return new Conversation({

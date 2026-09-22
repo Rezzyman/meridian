@@ -110,9 +110,7 @@ export class CortexBind implements MemoryProvider {
   }
 
   // ─── List recent cognitive artifacts (reflector clusters, dream insights) ────
-  async listArtifacts(
-    opts: { sinceHours?: number; limit?: number } = {},
-  ): Promise<{
+  async listArtifacts(opts: { sinceHours?: number; limit?: number } = {}): Promise<{
     agentId: string;
     sinceHours: number;
     cutoff: string;

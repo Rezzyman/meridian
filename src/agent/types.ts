@@ -13,12 +13,27 @@ export interface MeridianTurn {
   content: string;
   toolCalls?: Array<{ name: string; args: unknown }>;
   toolResults?: Array<{ name: string; result: unknown }>;
-  channel: 'cli' | 'telegram' | 'voice' | 'gateway' | 'system' | 'slack' | 'discord' | 'whatsapp' | 'matrix' | 'sms';
+  channel:
+    | 'cli'
+    | 'telegram'
+    | 'voice'
+    | 'gateway'
+    | 'system'
+    | 'slack'
+    | 'discord'
+    | 'whatsapp'
+    | 'matrix'
+    | 'sms';
   ts: string; // ISO
   /** CORTEX memory id assigned post-encode */
   memoryId?: number;
   /** Verification check results */
-  verifications?: Array<{ name: string; passed: boolean; severity: 'block' | 'warn'; note?: string }>;
+  verifications?: Array<{
+    name: string;
+    passed: boolean;
+    severity: 'block' | 'warn';
+    note?: string;
+  }>;
 }
 
 export interface MeridianSession {

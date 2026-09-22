@@ -33,11 +33,11 @@ const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
 
 export interface AutomationDef {
   name: string;
-  schedule: string;          // cron expression
+  schedule: string; // cron expression
   /** IANA tz the schedule fires in (imported jobs keep their source agent's
    *  local tz); absent = process TZ / America/Chicago. */
   timezone?: string;
-  mode: 'direct' | 'draft';  // direct = push immediately; draft = save + tag for approval
+  mode: 'direct' | 'draft'; // direct = push immediately; draft = save + tag for approval
   requiresApproval: boolean;
   /** observe = read-only tools; draft = read-only tools + no delivery;
    * execute = consequential tools, always gated by an owner grant. */
@@ -50,8 +50,8 @@ export interface AutomationDef {
   misfireGraceMinutes: number;
   cooldownMinutes: number;
   pushTo?: 'telegram' | 'none';
-  prompt: string;            // markdown body the agent sees on fire
-  source: string;            // file path (for audit)
+  prompt: string; // markdown body the agent sees on fire
+  source: string; // file path (for audit)
 }
 
 export interface AutomationManagerOptions {
@@ -84,7 +84,8 @@ export interface AutomationRunResult {
   reason?: string;
 }
 
-const CONSEQUENTIAL_TOOL = /(^|_)(send|write|edit|delete|remove|create|update|post|put|patch|execute|run|bash|delegate|encode|ingest|dream|call|dm)(_|$)/i;
+const CONSEQUENTIAL_TOOL =
+  /(^|_)(send|write|edit|delete|remove|create|update|post|put|patch|execute|run|bash|delegate|encode|ingest|dream|call|dm)(_|$)/i;
 
 export function toolIsConsequential(name: string): boolean {
   return CONSEQUENTIAL_TOOL.test(name) || ['http_request', 'telegram_dm'].includes(name);
@@ -126,9 +127,16 @@ export function loadAutomationDefs(home: MeridianHome): AutomationDef[] {
       ...(typeof meta.timezone === 'string' ? { timezone: meta.timezone } : {}),
       mode: meta.mode === 'direct' ? 'direct' : 'draft',
       requiresApproval: meta.requiresApproval !== false,
-      actionTier: meta.actionTier === 'execute' ? 'execute' : meta.actionTier === 'draft' ? 'draft' : 'observe',
+      actionTier:
+        meta.actionTier === 'execute'
+          ? 'execute'
+          : meta.actionTier === 'draft'
+            ? 'draft'
+            : 'observe',
       autonomyMode: meta.autonomyMode === 'live' ? 'live' : 'shadow',
-      tools: Array.isArray(meta.tools) ? meta.tools.filter((x): x is string => typeof x === 'string') : [],
+      tools: Array.isArray(meta.tools)
+        ? meta.tools.filter((x): x is string => typeof x === 'string')
+        : [],
       audit: meta.audit !== false,
       leaseMinutes: positiveNumber(meta.leaseMinutes, 30),
       timeoutMinutes: positiveNumber(meta.timeoutMinutes, 15),
@@ -192,7 +200,11 @@ export class AutomationManager {
         },
       );
       this.tasks.push(task);
-      if (missedAt && missedAt <= now && now.getTime() - missedAt.getTime() <= def.misfireGraceMinutes * 60_000) {
+      if (
+        missedAt &&
+        missedAt <= now &&
+        now.getTime() - missedAt.getTime() <= def.misfireGraceMinutes * 60_000
+      ) {
         void this.fire(def.name, missedAt).catch((err) =>
           this.opts.logger.error({ msg: 'automation catch-up failed', name: def.name, err }),
         );
@@ -229,35 +241,76 @@ export class AutomationManager {
     const started = Date.now();
     const acquired = this.controlPlane.begin(def.name, scheduledAt, def.leaseMinutes * 60_000);
     if (!acquired.acquired || !acquired.run) {
-      this.opts.logger.info({ msg: 'automation occurrence suppressed', name, reason: acquired.reason });
+      this.opts.logger.info({
+        msg: 'automation occurrence suppressed',
+        name,
+        reason: acquired.reason,
+      });
       return null;
     }
     const runId = acquired.run.runId;
-    this.opts.logger.info({ msg: 'automation firing', name, runId, scheduledAt: scheduledAt.toISOString() });
+    this.opts.logger.info({
+      msg: 'automation firing',
+      name,
+      runId,
+      scheduledAt: scheduledAt.toISOString(),
+    });
 
     const selected = this.selectTools(def);
     const consequential = Object.keys(selected).filter(toolIsConsequential);
     if (consequential.length > 0 && def.actionTier !== 'execute') {
-      return this.terminal(def, runId, started, 'failed', '', [],
-        `read-only action tier cannot expose consequential tools: ${consequential.join(', ')}`);
+      return this.terminal(
+        def,
+        runId,
+        started,
+        'failed',
+        '',
+        [],
+        `read-only action tier cannot expose consequential tools: ${consequential.join(', ')}`,
+      );
     }
     if (def.actionTier === 'execute' && consequential.length > 0 && !def.requiresApproval) {
-      return this.terminal(def, runId, started, 'failed', '', [],
-        'execute-tier automations with consequential tools must declare requiresApproval: true');
+      return this.terminal(
+        def,
+        runId,
+        started,
+        'failed',
+        '',
+        [],
+        'execute-tier automations with consequential tools must declare requiresApproval: true',
+      );
     }
     if (def.requiresApproval) {
       if (!this.opts.config.operator?.id) {
-        return this.terminal(def, runId, started, 'failed', '', [], 'owner approval required but no operator id is configured');
+        return this.terminal(
+          def,
+          runId,
+          started,
+          'failed',
+          '',
+          [],
+          'owner approval required but no operator id is configured',
+        );
       }
-      const approvalDigest = this.opts.store.digestActionArgs({ job: def.name, scheduledAt: scheduledAt.toISOString() });
+      const approvalDigest = this.opts.store.digestActionArgs({
+        job: def.name,
+        scheduledAt: scheduledAt.toISOString(),
+      });
       const approved = this.opts.store.consumeApproval(
         `op:${this.opts.config.operator.id}`,
         `automation:${def.name}`,
         approvalDigest,
       );
       if (!approved) {
-        return this.terminal(def, runId, started, 'awaiting_approval', '', [],
-          `owner approval required: /approve automation:${def.name}`);
+        return this.terminal(
+          def,
+          runId,
+          started,
+          'awaiting_approval',
+          '',
+          [],
+          `owner approval required: /approve automation:${def.name}`,
+        );
       }
     }
 
@@ -330,7 +383,12 @@ export class AutomationManager {
           break;
         }
       } catch (err) {
-        this.opts.logger.warn({ msg: 'automation provider failed', name, provider: provider.ref, err });
+        this.opts.logger.warn({
+          msg: 'automation provider failed',
+          name,
+          provider: provider.ref,
+          err,
+        });
       }
     }
     if (!reply) {
@@ -347,8 +405,12 @@ export class AutomationManager {
     // notify or perform an outward delivery.
     const pushed: string[] = [];
     const deliveryAllowed = def.autonomyMode === 'live' && def.mode === 'direct';
-    if (!silent && deliveryAllowed && def.pushTo === 'telegram' &&
-        this.controlPlane.notificationAllowed(def.name, reply, def.cooldownMinutes * 60_000)) {
+    if (
+      !silent &&
+      deliveryAllowed &&
+      def.pushTo === 'telegram' &&
+      this.controlPlane.notificationAllowed(def.name, reply, def.cooldownMinutes * 60_000)
+    ) {
       const tg = this.opts.channels.get('telegram');
       if (tg?.send && op?.channels.telegram[0]) {
         try {
@@ -382,13 +444,17 @@ export class AutomationManager {
       ? 'degraded'
       : silent
         ? 'skipped'
-        : def.autonomyMode === 'shadow' ? 'shadow' : 'success';
+        : def.autonomyMode === 'shadow'
+          ? 'shadow'
+          : 'success';
     return this.terminal(def, runId, started, outcome, reply, pushed);
   }
 
   private selectTools(def: AutomationDef): ToolSet {
     if (!this.opts.tools || def.tools.length === 0) return {};
-    const raw = Object.fromEntries(def.tools.flatMap((name) => this.opts.tools?.[name] ? [[name, this.opts.tools[name]]] : [])) as ToolSet;
+    const raw = Object.fromEntries(
+      def.tools.flatMap((name) => (this.opts.tools?.[name] ? [[name, this.opts.tools[name]]] : [])),
+    ) as ToolSet;
     return governToolSet({
       tools: raw,
       config: this.opts.config,
@@ -399,7 +465,9 @@ export class AutomationManager {
         senderTrusted: true,
       },
       digestArgs: (args) => this.opts.store.digestActionArgs(args),
-      record: (receipt) => { this.opts.store.recordActionReceipt(receipt); },
+      record: (receipt) => {
+        this.opts.store.recordActionReceipt(receipt);
+      },
     });
   }
 
@@ -412,11 +480,32 @@ export class AutomationManager {
     pushedTo: string[],
     reason?: string,
   ): AutomationRunResult {
-    this.controlPlane.finish(def.name, runId, outcome, { reason, output: reply, metadata: { pushedTo } });
-    const result = { name: def.name, runId, ts: new Date().toISOString(), pushedTo, durationMs: Date.now() - started, reply, outcome, reason };
+    this.controlPlane.finish(def.name, runId, outcome, {
+      reason,
+      output: reply,
+      metadata: { pushedTo },
+    });
+    const result = {
+      name: def.name,
+      runId,
+      ts: new Date().toISOString(),
+      pushedTo,
+      durationMs: Date.now() - started,
+      reply,
+      outcome,
+      reason,
+    };
     if (def.audit) this.opts.store.audit('automation_run', result);
     this.lastRuns.set(def.name, result);
-    this.opts.logger.info({ msg: 'automation complete', name: def.name, runId, outcome, reason, durationMs: result.durationMs, pushed: pushedTo });
+    this.opts.logger.info({
+      msg: 'automation complete',
+      name: def.name,
+      runId,
+      outcome,
+      reason,
+      durationMs: result.durationMs,
+      pushed: pushedTo,
+    });
     return result;
   }
 }

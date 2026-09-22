@@ -364,7 +364,7 @@ const MJS_TOOL = (toolName: string) =>
     '  return {',
     `    ${toolName}: tool({`,
     `      description: 'compiled tool ${toolName}',`,
-    "      parameters: z.object({ input: z.string() }),",
+    '      parameters: z.object({ input: z.string() }),',
     '      execute: async (args) => ({ echoed: args.input, via: "mjs" }),',
     '    }),',
     '  };',
@@ -375,7 +375,10 @@ test('loader prefers a compiled tools.mjs over raw tools.ts', async () => {
   const { home, skillsDir } = makeWorld();
   const dir = join(skillsDir, 'dual-skill');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), skillMd('dual-skill', { category: 'testing', runtime: 'ts' }));
+  writeFileSync(
+    join(dir, 'SKILL.md'),
+    skillMd('dual-skill', { category: 'testing', runtime: 'ts' }),
+  );
   // tools.ts declares a tool that must NOT win; tools.mjs declares the winner.
   writeFileSync(join(dir, 'tools.ts'), FIXTURE_TOOLS_TS); // exports `fixture_tool`
   writeFileSync(join(dir, 'tools.mjs'), MJS_TOOL('compiled_tool'));
@@ -383,7 +386,11 @@ test('loader prefers a compiled tools.mjs over raw tools.ts', async () => {
   const registry = await loadSkills(home, { ctx: makeCtx() });
   const skill = registry.byName('dual-skill');
   assert.ok(skill?.dynamicTools, 'dynamic tools loaded');
-  assert.deepEqual(Object.keys(skill.dynamicTools), ['compiled_tool'], 'tools.mjs won over tools.ts');
+  assert.deepEqual(
+    Object.keys(skill.dynamicTools),
+    ['compiled_tool'],
+    'tools.mjs won over tools.ts',
+  );
   assert.equal(registry.asTools().fixture_tool, undefined, 'the tools.ts tool did not leak in');
 });
 

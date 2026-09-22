@@ -112,7 +112,10 @@ describe('visionChain', () => {
   it('skips refs whose provider key is missing', () => {
     const { router } = refRouter({ 'routexor/claude-sonnet-4.6': answeringModel('x').model });
     const chain = visionChain(router, MODELS, undefined);
-    assert.deepEqual(chain.map((c) => c.ref), ['routexor/claude-sonnet-4.6']);
+    assert.deepEqual(
+      chain.map((c) => c.ref),
+      ['routexor/claude-sonnet-4.6'],
+    );
   });
 
   it('never filters the chain to empty via the breaker', () => {

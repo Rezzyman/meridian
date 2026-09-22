@@ -30,13 +30,21 @@ const RAW = new URLSearchParams(PARAMS).toString();
 describe('verifyTwilioSignature', () => {
   it('accepts a correctly-signed request', () => {
     const sig = twilioSign('tok', TWILIO_URL, PARAMS);
-    assert.equal(verifyTwilioSignature({ authToken: 'tok', signature: sig, url: TWILIO_URL, rawBody: RAW }), true);
+    assert.equal(
+      verifyTwilioSignature({ authToken: 'tok', signature: sig, url: TWILIO_URL, rawBody: RAW }),
+      true,
+    );
   });
 
   it('rejects a tampered body, a wrong token, and a missing signature', () => {
     const sig = twilioSign('tok', TWILIO_URL, PARAMS);
     assert.equal(
-      verifyTwilioSignature({ authToken: 'tok', signature: sig, url: TWILIO_URL, rawBody: `${RAW}&Extra=1` }),
+      verifyTwilioSignature({
+        authToken: 'tok',
+        signature: sig,
+        url: TWILIO_URL,
+        rawBody: `${RAW}&Extra=1`,
+      }),
       false,
     );
     assert.equal(
@@ -44,7 +52,12 @@ describe('verifyTwilioSignature', () => {
       false,
     );
     assert.equal(
-      verifyTwilioSignature({ authToken: 'tok', signature: undefined, url: TWILIO_URL, rawBody: RAW }),
+      verifyTwilioSignature({
+        authToken: 'tok',
+        signature: undefined,
+        url: TWILIO_URL,
+        rawBody: RAW,
+      }),
       false,
     );
   });

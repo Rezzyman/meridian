@@ -77,9 +77,7 @@ test('blank topics are skipped, not turned into matchers', () => {
 });
 
 test('sacredPatterns are raw regex sources', () => {
-  const guard = buildSacredGuard(
-    makeOperator({ sensitivity: { sacredPatterns: ['acct-\\d+'] } }),
-  );
+  const guard = buildSacredGuard(makeOperator({ sensitivity: { sacredPatterns: ['acct-\\d+'] } }));
   assert.equal(guard.patterns.length, 4);
   assert.ok(sacredViolation('reference acct-9931 on file', guard));
   assert.equal(sacredViolation('reference acct-none on file', guard), null);
@@ -88,9 +86,7 @@ test('sacredPatterns are raw regex sources', () => {
 test('malformed sacredPattern does not crash; valid patterns still build', () => {
   let guard: SacredGuard | undefined;
   assert.doesNotThrow(() => {
-    guard = buildSacredGuard(
-      makeOperator({ sensitivity: { sacredPatterns: ['(', 'acct-\\d+'] } }),
-    );
+    guard = buildSacredGuard(makeOperator({ sensitivity: { sacredPatterns: ['(', 'acct-\\d+'] } }));
   });
   assert.ok(guard);
   // 3 universal + only the 1 valid pattern (malformed swallowed).
@@ -125,9 +121,7 @@ test('refusal: personalized with operator.name when set', () => {
 
 test('refusal: explicit sensitivity.refusal overrides both default and name', () => {
   const custom = 'No comment.';
-  const guard = buildSacredGuard(
-    makeOperator({ name: 'Dana', sensitivity: { refusal: custom } }),
-  );
+  const guard = buildSacredGuard(makeOperator({ name: 'Dana', sensitivity: { refusal: custom } }));
   assert.equal(guard.refusal, custom);
 });
 

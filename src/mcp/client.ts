@@ -177,7 +177,8 @@ export async function connectMcpServers(
 
 /** MCP content blocks → single string (text blocks joined; others JSON-encoded). */
 function flattenContent(content: unknown): string {
-  if (!Array.isArray(content)) return typeof content === 'string' ? content : JSON.stringify(content);
+  if (!Array.isArray(content))
+    return typeof content === 'string' ? content : JSON.stringify(content);
   return content
     .map((block) => {
       if (block && typeof block === 'object' && (block as { type?: string }).type === 'text') {

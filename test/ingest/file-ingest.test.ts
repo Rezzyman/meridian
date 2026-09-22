@@ -63,7 +63,10 @@ describe('image ingest', () => {
         enabled: true,
         analyze: async (p) => {
           analyzed.push(p);
-          return { description: 'Hail bruising across the south slope shingles.', model: 'anthropic/mock' };
+          return {
+            description: 'Hail bruising across the south slope shingles.',
+            model: 'anthropic/mock',
+          };
         },
       },
     });

@@ -3,7 +3,10 @@ import { after, describe, it } from 'node:test';
 import type { FastifyInstance } from 'fastify';
 import type { Conversation } from '../../src/agent/conversation.js';
 import { startGateway } from '../../src/gateway/server.js';
-import { localOllamaImageDescriber, parseDeviceLookMultipart } from '../../src/gateway/device-media.js';
+import {
+  localOllamaImageDescriber,
+  parseDeviceLookMultipart,
+} from '../../src/gateway/device-media.js';
 import { silentLogger } from '../helpers/fixtures.js';
 
 const apps: FastifyInstance[] = [];
@@ -11,8 +14,12 @@ after(async () => Promise.all(apps.map((app) => app.close())));
 
 function multipart(boundary: string, prompt: string, frame: Buffer): Buffer {
   return Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="meta"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ prompt })}\r\n`),
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="frame"; filename="frame.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`),
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="meta"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ prompt })}\r\n`,
+    ),
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="frame"; filename="frame.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`,
+    ),
     frame,
     Buffer.from(`\r\n--${boundary}--\r\n`),
   ]);
@@ -62,7 +69,7 @@ describe('POST /v1/turns/look', () => {
       body: multipart(boundary, 'What is this?', Buffer.alloc(32, 7)),
     });
     assert.equal(response.status, 200);
-    const json = await response.json() as { text: string; observation: string; turnId: string };
+    const json = (await response.json()) as { text: string; observation: string; turnId: string };
     assert.equal(json.observation, 'A red toy rabbit on a table.');
     assert.match(json.text, /Visual observation from the R1 camera/);
     assert.equal(json.turnId, 'look-turn-1');

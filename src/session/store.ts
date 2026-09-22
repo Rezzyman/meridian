@@ -14,7 +14,14 @@
  * semantics fall out of replay order.
  */
 
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import type { MeridianHome } from '../config/home.js';
@@ -185,12 +192,16 @@ export class SessionStore {
   }
 
   digestActionArgs(args: unknown): string {
-    return createHash('sha256').update(JSON.stringify(args ?? null)).digest('hex');
+    return createHash('sha256')
+      .update(JSON.stringify(args ?? null))
+      .digest('hex');
   }
 
   recordActionReceipt(input: ActionReceiptInput): ActionReceipt {
     const unsigned = { ...input, previousHash: this.lastActionHash };
-    const hash = createHmac('sha256', this.actionKey).update(JSON.stringify(unsigned)).digest('hex');
+    const hash = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
     const receipt: ActionReceipt = { ...unsigned, hash };
     this.actions.set(receipt.receiptId, receipt);
     this.lastActionHash = hash;
@@ -199,12 +210,17 @@ export class SessionStore {
   }
 
   listActionReceipts(sessionId?: string, limit = 100): ActionReceipt[] {
-    return [...this.actions.values()].filter((r) => !sessionId || r.sessionId === sessionId).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, limit);
+    return [...this.actions.values()]
+      .filter((r) => !sessionId || r.sessionId === sessionId)
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, limit);
   }
 
   verifyActionReceipt(receipt: ActionReceipt): boolean {
     const { hash, ...unsigned } = receipt;
-    const expected = createHmac('sha256', this.actionKey).update(JSON.stringify(unsigned)).digest('hex');
+    const expected = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
     return expected === hash;
   }
 
@@ -217,14 +233,25 @@ export class SessionStore {
     return true;
   }
 
-  grantApproval(sessionId: string, toolName: string, ttlMinutes = 5, argsDigest?: string): ApprovalGrant {
+  grantApproval(
+    sessionId: string,
+    toolName: string,
+    ttlMinutes = 5,
+    argsDigest?: string,
+  ): ApprovalGrant {
     const now = Date.now();
     const unsigned = {
-      grantId: `appr_${randomBytes(12).toString('hex')}`, sessionId, toolName,
-      argsDigest, createdAt: new Date(now).toISOString(), expiresAt: new Date(now + ttlMinutes * 60_000).toISOString(),
+      grantId: `appr_${randomBytes(12).toString('hex')}`,
+      sessionId,
+      toolName,
+      argsDigest,
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + ttlMinutes * 60_000).toISOString(),
       remainingUses: 1,
     };
-    const signature = createHmac('sha256', this.actionKey).update(JSON.stringify(unsigned)).digest('hex');
+    const signature = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
     const grant: ApprovalGrant = { ...unsigned, signature };
     this.approvals.set(grant.grantId, grant);
     this.write({ t: 'approval', grant });
@@ -234,7 +261,13 @@ export class SessionStore {
   consumeApproval(sessionId: string, toolName: string, argsDigest: string): boolean {
     const now = new Date().toISOString();
     for (const grant of [...this.approvals.values()].reverse()) {
-      if (grant.sessionId !== sessionId || grant.toolName !== toolName || grant.remainingUses < 1 || grant.expiresAt <= now) continue;
+      if (
+        grant.sessionId !== sessionId ||
+        grant.toolName !== toolName ||
+        grant.remainingUses < 1 ||
+        grant.expiresAt <= now
+      )
+        continue;
       if (grant.argsDigest && grant.argsDigest !== argsDigest) continue;
       const { signature: _oldSignature, ...unsigned } = grant;
       const consumed = this.signApproval({ ...unsigned, remainingUses: 0 });
@@ -246,16 +279,23 @@ export class SessionStore {
   }
 
   listApprovals(sessionId?: string): ApprovalGrant[] {
-    return [...this.approvals.values()].filter((g) => !sessionId || g.sessionId === sessionId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return [...this.approvals.values()]
+      .filter((g) => !sessionId || g.sessionId === sessionId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   verifyApproval(grant: ApprovalGrant): boolean {
     const { signature, ...unsigned } = grant;
-    return createHmac('sha256', this.actionKey).update(JSON.stringify(unsigned)).digest('hex') === signature;
+    return (
+      createHmac('sha256', this.actionKey).update(JSON.stringify(unsigned)).digest('hex') ===
+      signature
+    );
   }
 
   private signApproval(unsigned: Omit<ApprovalGrant, 'signature'>): ApprovalGrant {
-    const signature = createHmac('sha256', this.actionKey).update(JSON.stringify(unsigned)).digest('hex');
+    const signature = createHmac('sha256', this.actionKey)
+      .update(JSON.stringify(unsigned))
+      .digest('hex');
     return { ...unsigned, signature };
   }
 
@@ -282,8 +322,20 @@ export class SessionStore {
   }
 }
 
-export interface ActionReceipt extends ActionReceiptInput { previousHash: string; hash: string; }
-export interface ApprovalGrant { grantId: string; sessionId: string; toolName: string; argsDigest?: string; createdAt: string; expiresAt: string; remainingUses: number; signature: string; }
+export interface ActionReceipt extends ActionReceiptInput {
+  previousHash: string;
+  hash: string;
+}
+export interface ApprovalGrant {
+  grantId: string;
+  sessionId: string;
+  toolName: string;
+  argsDigest?: string;
+  createdAt: string;
+  expiresAt: string;
+  remainingUses: number;
+  signature: string;
+}
 
 // ─── Trace types ────────────────────────────────────────────────────────────────
 export interface TurnTrace {

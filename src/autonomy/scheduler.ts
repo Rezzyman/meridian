@@ -28,34 +28,66 @@ function field(source: string, min: number, max: number, sundayAlias = false): S
     if (base === '*') [start, end] = [min, max];
     else if (base?.includes('-')) [start, end] = base.split('-').map(Number) as [number, number];
     else start = end = Number(base);
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < min || end > max || start > end) {
+    if (
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      start < min ||
+      end > max ||
+      start > end
+    ) {
       throw new Error(`invalid cron field '${segment}'`);
     }
-    for (let value = start; value <= end; value += step) out.add(sundayAlias && value === 7 ? 0 : value);
+    for (let value = start; value <= end; value += step)
+      out.add(sundayAlias && value === 7 ? 0 : value);
   }
   return out;
 }
 
 function parse(expression: string): CronFields {
   const parts = expression.trim().split(/\s+/);
-  if (parts.length !== 5 && parts.length !== 6) throw new Error(`cron must have 5 or 6 fields: '${expression}'`);
+  if (parts.length !== 5 && parts.length !== 6)
+    throw new Error(`cron must have 5 or 6 fields: '${expression}'`);
   const hasSeconds = parts.length === 6;
   const [second, minute, hour, day, month, weekday] = hasSeconds ? parts : ['0', ...parts];
   return {
-    second: field(second!, 0, 59), minute: field(minute!, 0, 59), hour: field(hour!, 0, 23),
-    day: field(day!, 1, 31), month: field(month!, 1, 12), weekday: field(weekday!, 0, 7, true),
-    dayWildcard: day === '*', weekdayWildcard: weekday === '*', hasSeconds,
+    second: field(second!, 0, 59),
+    minute: field(minute!, 0, 59),
+    hour: field(hour!, 0, 23),
+    day: field(day!, 1, 31),
+    month: field(month!, 1, 12),
+    weekday: field(weekday!, 0, 7, true),
+    dayWildcard: day === '*',
+    weekdayWildcard: weekday === '*',
+    hasSeconds,
   };
 }
 
-function localParts(date: Date, timezone: string): { second: number; minute: number; hour: number; day: number; month: number; weekday: number } {
+function localParts(
+  date: Date,
+  timezone: string,
+): { second: number; minute: number; hour: number; day: number; month: number; weekday: number } {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone, weekday: 'short', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23',
+    timeZone: timezone,
+    weekday: 'short',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hourCycle: 'h23',
   }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
   const weekday = WEEKDAY[parts.find((part) => part.type === 'weekday')?.value ?? ''];
   if (weekday === undefined) throw new Error(`could not resolve weekday in timezone '${timezone}'`);
-  return { second: get('second'), minute: get('minute'), hour: get('hour'), day: get('day'), month: get('month'), weekday };
+  return {
+    second: get('second'),
+    minute: get('minute'),
+    hour: get('hour'),
+    day: get('day'),
+    month: get('month'),
+    weekday,
+  };
 }
 
 function matches(cron: CronFields, value: ReturnType<typeof localParts>): boolean {
@@ -66,7 +98,13 @@ function matches(cron: CronFields, value: ReturnType<typeof localParts>): boolea
     : cron.weekdayWildcard
       ? dayMatches
       : dayMatches || weekdayMatches;
-  return cron.second.has(value.second) && cron.minute.has(value.minute) && cron.hour.has(value.hour) && cron.month.has(value.month) && calendarMatches;
+  return (
+    cron.second.has(value.second) &&
+    cron.minute.has(value.minute) &&
+    cron.hour.has(value.hour) &&
+    cron.month.has(value.month) &&
+    calendarMatches
+  );
 }
 
 export function nextCronOccurrence(expression: string, from = new Date(), timezone = 'UTC'): Date {
@@ -84,7 +122,7 @@ export function nextCronOccurrence(expression: string, from = new Date(), timezo
 export function scheduleDeterministic(
   expression: string,
   callback: (scheduledAt: Date) => void | Promise<void>,
-  options: { timezone: string; onScheduled?: (next: Date) => void } ,
+  options: { timezone: string; onScheduled?: (next: Date) => void },
 ): DeterministicTask {
   let timer: NodeJS.Timeout | null = null;
   let next: Date | null = null;
@@ -101,14 +139,24 @@ export function scheduleDeterministic(
       // timer ceiling.
       if (Date.now() + 500 < next.getTime()) return arm(new Date());
       const scheduledAt = next;
-      try { await callback(scheduledAt); }
-      finally { arm(scheduledAt); }
+      try {
+        await callback(scheduledAt);
+      } finally {
+        arm(scheduledAt);
+      }
     }, delay);
     timer.unref();
   };
   arm(new Date());
   return {
-    stop() { stopped = true; if (timer) clearTimeout(timer); timer = null; next = null; },
-    getNextRun() { return next ? new Date(next) : null; },
+    stop() {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      next = null;
+    },
+    getNextRun() {
+      return next ? new Date(next) : null;
+    },
   };
 }

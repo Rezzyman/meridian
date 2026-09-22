@@ -170,7 +170,8 @@ function classifyIPv6(host: string): { reason: SsrfReason | null; ip: string } |
   if (h === null) return null;
   const leadingZero = h[0] === 0 && h[1] === 0 && h[2] === 0 && h[3] === 0 && h[4] === 0;
 
-  if (leadingZero && h[5] === 0 && h[6] === 0 && h[7] === 1) return { reason: 'loopback', ip: host };
+  if (leadingZero && h[5] === 0 && h[6] === 0 && h[7] === 1)
+    return { reason: 'loopback', ip: host };
   if (h.every((x) => x === 0)) return { reason: 'unspecified', ip: host };
 
   // ::ffff:a.b.c.d (mapped) and ::a.b.c.d (compatible) tunnel an IPv4 target.

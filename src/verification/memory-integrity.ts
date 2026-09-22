@@ -47,11 +47,72 @@ import type { ProvenanceResolver } from './provenance.js';
 // for. Source class: Unicode TR39 confusables, Latin-target subset.
 const CONFUSABLES: Record<string, string> = {
   // Cyrillic lowercase
-  а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x', і: 'i', ј: 'j', ѕ: 's', ԁ: 'd', ԛ: 'q', ԝ: 'w', ѓ: 'r', ё: 'e', ї: 'i',
+  а: 'a',
+  в: 'b',
+  е: 'e',
+  к: 'k',
+  м: 'm',
+  н: 'h',
+  о: 'o',
+  р: 'p',
+  с: 'c',
+  т: 't',
+  у: 'y',
+  х: 'x',
+  і: 'i',
+  ј: 'j',
+  ѕ: 's',
+  ԁ: 'd',
+  ԛ: 'q',
+  ԝ: 'w',
+  ѓ: 'r',
+  ё: 'e',
+  ї: 'i',
   // Cyrillic uppercase
-  А: 'a', В: 'b', Е: 'e', К: 'k', М: 'm', Н: 'h', О: 'o', Р: 'p', С: 'c', Т: 't', У: 'y', Х: 'x', І: 'i', Ј: 'j', Ѕ: 's', Ԛ: 'q', Ԝ: 'w', Ё: 'e',
+  А: 'a',
+  В: 'b',
+  Е: 'e',
+  К: 'k',
+  М: 'm',
+  Н: 'h',
+  О: 'o',
+  Р: 'p',
+  С: 'c',
+  Т: 't',
+  У: 'y',
+  Х: 'x',
+  І: 'i',
+  Ј: 'j',
+  Ѕ: 's',
+  Ԛ: 'q',
+  Ԝ: 'w',
+  Ё: 'e',
   // Greek
-  ο: 'o', α: 'a', ν: 'v', ε: 'e', ρ: 'p', τ: 't', υ: 'u', χ: 'x', κ: 'k', ι: 'i', μ: 'm', Ο: 'o', Α: 'a', Ε: 'e', Ρ: 'p', Τ: 't', Χ: 'x', Κ: 'k', Μ: 'm', Ν: 'n', Β: 'b', Ζ: 'z', Η: 'h', Ι: 'i', Υ: 'y',
+  ο: 'o',
+  α: 'a',
+  ν: 'v',
+  ε: 'e',
+  ρ: 'p',
+  τ: 't',
+  υ: 'u',
+  χ: 'x',
+  κ: 'k',
+  ι: 'i',
+  μ: 'm',
+  Ο: 'o',
+  Α: 'a',
+  Ε: 'e',
+  Ρ: 'p',
+  Τ: 't',
+  Χ: 'x',
+  Κ: 'k',
+  Μ: 'm',
+  Ν: 'n',
+  Β: 'b',
+  Ζ: 'z',
+  Η: 'h',
+  Ι: 'i',
+  Υ: 'y',
 };
 
 const ZERO_WIDTH = /[​-‍⁠﻿­]/g;
@@ -59,7 +120,16 @@ const ZERO_WIDTH = /[​-‍⁠﻿­]/g;
 // Leetspeak substitutions, applied only to alpha-dominant tokens so account
 // numbers and dollar figures are never mangled (see normalizeForMatch).
 const LEET: Record<string, string> = {
-  '4': 'a', '3': 'e', '0': 'o', '1': 'i', '5': 's', '7': 't', '@': 'a', $: 's', '8': 'b', '9': 'g',
+  '4': 'a',
+  '3': 'e',
+  '0': 'o',
+  '1': 'i',
+  '5': 's',
+  '7': 't',
+  '@': 'a',
+  $: 's',
+  '8': 'b',
+  '9': 'g',
 };
 
 function hasConfusable(tok: string): boolean {
@@ -108,26 +178,45 @@ export function normalizeForMatch(s: string): string {
 // command aimed at the agent.
 const ABSOLUTE_ADVERBS = [
   // en
-  'always', 'never',
+  'always',
+  'never',
   // fr
-  'toujours', 'jamais',
+  'toujours',
+  'jamais',
   // es
-  'siempre', 'nunca',
+  'siempre',
+  'nunca',
   // de
-  'immer', 'niemals', 'nie',
+  'immer',
+  'niemals',
+  'nie',
   // pt / it
-  'sempre', 'mai',
+  'sempre',
+  'mai',
   // nl
-  'altijd', 'nooit',
+  'altijd',
+  'nooit',
 ];
 const OVERRIDE_VERBS = [
-  'ignore', 'disregard', 'forget', 'override',
-  'ignorez', 'oubliez', // fr
-  'ignora', 'olvida', 'descarta', // es
-  'ignoriere', 'vergiss', 'missachte', // de
-  'ignora', 'dimentica', // it (ignora shared with es)
-  'negeer', 'vergeet', // nl
-  'ignore', 'esqueça', 'esqueca', // pt
+  'ignore',
+  'disregard',
+  'forget',
+  'override',
+  'ignorez',
+  'oubliez', // fr
+  'ignora',
+  'olvida',
+  'descarta', // es
+  'ignoriere',
+  'vergiss',
+  'missachte', // de
+  'ignora',
+  'dimentica', // it (ignora shared with es)
+  'negeer',
+  'vergeet', // nl
+  'ignore',
+  'esqueça',
+  'esqueca', // pt
 ];
 // Imperative directive verbs. The red-team showed that covered Latin languages
 // (DE/IT/NL/PT, and gaps in ES/FR) evaded because their natural verb-FIRST
@@ -135,14 +224,66 @@ const OVERRIDE_VERBS = [
 // from this list. Each language's high-frequency money/authorization verbs are
 // now here so the order-independent and clause-initial checks can fire.
 const DIRECTIVE_VERBS = [
-  'approve', 'refuse', 'reject', 'deny', 'decline', 'disable', 'enable', 'send', 'forward',
-  'bypass', 'skip', 'execute', 'reveal', 'disclose', 'wire', 'transfer', 'pay', 'delete', 'release',
-  'approuver', 'approuvez', 'refuser', 'refusez', 'envoyer', 'payez', 'virez', 'autorisez', // fr
-  'aprueba', 'rechaza', 'envia', 'transfiere', 'paga', 'retira', 'autoriza', 'aprobá', // es
-  'genehmige', 'überweise', 'uberweise', 'zahle', 'sende', 'autorisiere', 'deaktiviere', 'lösche', 'losche', // de
-  'autorizza', 'approva', 'trasferisci', 'paga', 'invia', 'elimina', 'disabilita', // it
-  'keur', 'betaal', 'stuur', 'verstuur', // nl
-  'aprove', 'transfira', 'pague', 'envie', 'autorize', // pt
+  'approve',
+  'refuse',
+  'reject',
+  'deny',
+  'decline',
+  'disable',
+  'enable',
+  'send',
+  'forward',
+  'bypass',
+  'skip',
+  'execute',
+  'reveal',
+  'disclose',
+  'wire',
+  'transfer',
+  'pay',
+  'delete',
+  'release',
+  'approuver',
+  'approuvez',
+  'refuser',
+  'refusez',
+  'envoyer',
+  'payez',
+  'virez',
+  'autorisez', // fr
+  'aprueba',
+  'rechaza',
+  'envia',
+  'transfiere',
+  'paga',
+  'retira',
+  'autoriza',
+  'aprobá', // es
+  'genehmige',
+  'überweise',
+  'uberweise',
+  'zahle',
+  'sende',
+  'autorisiere',
+  'deaktiviere',
+  'lösche',
+  'losche', // de
+  'autorizza',
+  'approva',
+  'trasferisci',
+  'paga',
+  'invia',
+  'elimina',
+  'disabilita', // it
+  'keur',
+  'betaal',
+  'stuur',
+  'verstuur', // nl
+  'aprove',
+  'transfira',
+  'pague',
+  'envie',
+  'autorize', // pt
 ];
 
 const ABS_RE = new RegExp(`\\b(?:${ABSOLUTE_ADVERBS.join('|')})\\b`, 'i');
@@ -164,7 +305,8 @@ const VERB_THEN_ABS_RE = new RegExp(
 // A directive verb scoped to a quantifier ("refuse every request", "send all
 // invoices", "approve any withdrawal", "transfiere todo", "genehmige alle").
 // Quantifiers are multilingual so verb+quantifier fires across covered langs.
-const QUANTIFIER = 'all|every|any|each|todos|todas|todo|tous|toutes|tout|alle|alles|tutti|tutte|tutto|tudo|tutte';
+const QUANTIFIER =
+  'all|every|any|each|todos|todas|todo|tous|toutes|tout|alle|alles|tutti|tutte|tutto|tudo|tutte';
 const QUANTIFIED_DIRECTIVE_RE = new RegExp(
   `\\b(?:${OVERRIDE_VERBS.join('|')}|${DIRECTIVE_VERBS.join('|')})\\b[^.!?\\n]{0,40}\\b(?:${QUANTIFIER})\\b`,
   'i',
@@ -203,14 +345,20 @@ const OVERRIDE_RE = new RegExp(
 // anteriores"). Override verbs are near-never benign as a clause head, so this
 // is safe to fire unconditionally — unlike bare directive verbs (pay/send),
 // which can head ordinary sentences and are gated by quantifier/adverb instead.
-const OVERRIDE_VERB_HEAD_RE = new RegExp(`^\\W*(?:please\\s+)?(?:${OVERRIDE_VERBS.join('|')})\\b`, 'i');
-const POLICY_RE = /\b(?:policy|rule|directive|standing order|system prompt|règle|directive|política|regla)\b\s*[:=\-—]/i;
+const OVERRIDE_VERB_HEAD_RE = new RegExp(
+  `^\\W*(?:please\\s+)?(?:${OVERRIDE_VERBS.join('|')})\\b`,
+  'i',
+);
+const POLICY_RE =
+  /\b(?:policy|rule|directive|standing order|system prompt|règle|directive|política|regla)\b\s*[:=\-—]/i;
 const ROLE_HEADER_RE = /^(?:system|assistant|admin|root|developer|superuser)\s*[:=]/im;
 
 // Sensitive actions an attacker actually targets — used both for the
 // bypass-framing pattern and for gradual-subversion clustering.
-const SENSITIVE_VERB = '(?:wire|transfer|pay|send|withdraw|approve|execute|delete|disclose|reveal|rotate|disable)';
-const BYPASS_NOUN = '(?:confirmation|approval|review|verification|check|2fa|two[- ]factor|sign[- ]?off)';
+const SENSITIVE_VERB =
+  '(?:wire|transfer|pay|send|withdraw|approve|execute|delete|disclose|reveal|rotate|disable)';
+const BYPASS_NOUN =
+  '(?:confirmation|approval|review|verification|check|2fa|two[- ]factor|sign[- ]?off)';
 
 // ─── Layer 3: imperative-mood gating ──────────────────────────────────────────
 // The same word is a command or prose depending on mood. We treat a memory as
@@ -240,7 +388,10 @@ const NO_CONFIRM_RE = new RegExp(
 
 /** Split into clauses/sentences for clause-initial imperative detection. */
 function clauses(norm: string): string[] {
-  return norm.split(/[.!?\n;]+/).map((c) => c.trim()).filter(Boolean);
+  return norm
+    .split(/[.!?\n;]+/)
+    .map((c) => c.trim())
+    .filter(Boolean);
 }
 
 /** Does a clause START with an imperative directive (adverb+verb or bare verb)? */
@@ -248,10 +399,17 @@ function clauseIsImperative(clause: string): boolean {
   // Strip a leading absolute adverb, then expect an action verb early.
   const head = clause.replace(/^(?:please\s+)?/i, '');
   // "always/never <verb>", "toujours <verb>", or bare override/directive verb at start.
-  if (ABS_RE.test(head) && new RegExp(`^\\W*(?:${ABSOLUTE_ADVERBS.join('|')})\\b`, 'i').test(head)) {
+  if (
+    ABS_RE.test(head) &&
+    new RegExp(`^\\W*(?:${ABSOLUTE_ADVERBS.join('|')})\\b`, 'i').test(head)
+  ) {
     return true;
   }
-  if (new RegExp(`^\\W*(?:${OVERRIDE_VERBS.join('|')}|${DIRECTIVE_VERBS.join('|')})\\b`, 'i').test(head)) {
+  if (
+    new RegExp(`^\\W*(?:${OVERRIDE_VERBS.join('|')}|${DIRECTIVE_VERBS.join('|')})\\b`, 'i').test(
+      head,
+    )
+  ) {
     return true;
   }
   return false;
@@ -301,7 +459,14 @@ const SCRIPT_LEXICONS: Record<string, ScriptLexicon> = {
     absolute: ['دائما', 'دائماً', 'افتراضي'],
     override: ['تجاهل', 'تجاهل التعليمات', 'تجاهل كل'],
     action: ['تحويل', 'حوّل', 'حول', 'وافق', 'الموافقة', 'اعتمد', 'ادفع', 'الدفع', 'أرسل', 'صرف'],
-    bypass: ['دون تأكيد', 'بدون تأكيد', 'دون مراجعة', 'بدون مراجعة', 'دون موافقة', 'دون انتظار الموافقة'],
+    bypass: [
+      'دون تأكيد',
+      'بدون تأكيد',
+      'دون مراجعة',
+      'بدون مراجعة',
+      'دون موافقة',
+      'دون انتظار الموافقة',
+    ],
   },
   han: {
     // Chinese (and Han shared with Japanese kanji where applicable).
@@ -330,7 +495,18 @@ const SCRIPT_LEXICONS: Record<string, ScriptLexicon> = {
     ruleMarker: ['постоянное правило', 'отныне', 'с этого момента'],
     absolute: ['всегда', 'никогда', 'по умолчанию'],
     override: ['игнорируй', 'игнорировать', 'не обращай внимания', 'игнорируй предыдущие'],
-    action: ['переведи', 'перевод', 'переводи', 'одобряй', 'одобрить', 'одобри', 'оплати', 'платеж', 'отправь', 'выплати'],
+    action: [
+      'переведи',
+      'перевод',
+      'переводи',
+      'одобряй',
+      'одобрить',
+      'одобри',
+      'оплати',
+      'платеж',
+      'отправь',
+      'выплати',
+    ],
     bypass: ['без подтверждения', 'без проверки', 'без одобрения', 'без согласования'],
   },
   devanagari: {
@@ -416,11 +592,7 @@ const SCRIPT_LEXICONS: Record<string, ScriptLexicon> = {
 /** NFKC + zero-width strip + lowercase + whitespace-collapse, WITHOUT confusable
  *  folding — so real Cyrillic/Greek/Arabic text is preserved for matching. */
 function normalizeMultilingual(s: string): string {
-  return s
-    .normalize('NFKC')
-    .replace(ZERO_WIDTH, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
+  return s.normalize('NFKC').replace(ZERO_WIDTH, '').toLowerCase().replace(/\s+/g, ' ');
 }
 
 /**
@@ -455,7 +627,10 @@ export function hasMultilingualDirective(content: string): boolean {
 // ONLY when no bypass-of-control, quantifier, or second-person cue is also
 // present (those would make it a real directive). Fixes the red-team's
 // over-quarantine of benign habituals.
-const HABITUAL_RE = new RegExp(`\\b(?:i|he|she|it|they|we)\\s+(?:${ABSOLUTE_ADVERBS.join('|')})\\b`, 'i');
+const HABITUAL_RE = new RegExp(
+  `\\b(?:i|he|she|it|they|we)\\s+(?:${ABSOLUTE_ADVERBS.join('|')})\\b`,
+  'i',
+);
 const QUANTIFIER_RE = new RegExp(`\\b(?:${QUANTIFIER})\\b`, 'i');
 const BYPASS_NOUN_RE = new RegExp(`\\b${BYPASS_NOUN}\\b`, 'i');
 
@@ -625,9 +800,40 @@ export interface ClusterFlag {
  *  (Northgate), and account/identifier digit runs. Sentence-initial function
  *  words are excluded so "The"/"For"/"When" don't link unrelated facts. */
 const ENTITY_STOPWORDS = new Set([
-  'the', 'for', 'when', 'this', 'that', 'their', 'they', 'from', 'always', 'never', 'with', 'your',
-  'our', 'his', 'her', 'its', 'and', 'but', 'not', 'all', 'any', 'each', 'every', 'last', 'next',
-  'account', 'vendor', 'payment', 'transfer', 'invoice', 'supplier', 'user', 'customer', 'client',
+  'the',
+  'for',
+  'when',
+  'this',
+  'that',
+  'their',
+  'they',
+  'from',
+  'always',
+  'never',
+  'with',
+  'your',
+  'our',
+  'his',
+  'her',
+  'its',
+  'and',
+  'but',
+  'not',
+  'all',
+  'any',
+  'each',
+  'every',
+  'last',
+  'next',
+  'account',
+  'vendor',
+  'payment',
+  'transfer',
+  'invoice',
+  'supplier',
+  'user',
+  'customer',
+  'client',
 ]);
 function salientEntities(content: string): Set<string> {
   const out = new Set<string>();
@@ -790,7 +996,8 @@ export function screenRecall(
   // Base context: byte-for-byte passthrough unless we quarantined something,
   // in which case rebuild from kept memories so a poisoned directive can't
   // ride the server-formatted string.
-  let safeContext = quarantined.length === 0 ? context : kept.map((m) => `- ${m.content}`).join('\n');
+  let safeContext =
+    quarantined.length === 0 ? context : kept.map((m) => `- ${m.content}`).join('\n');
 
   // A gradual-subversion cluster is KEPT (its members are individually benign —
   // removing them would be over-blocking) but the model is warned so it treats
@@ -838,7 +1045,8 @@ export function screenBeforeEncode(content: string): EncodeScreenResult {
   if (hasStandingDirective(content)) {
     return {
       isDirective: true,
-      reason: 'content carries a standing directive; refuse trusted provenance (encode untrusted or drop)',
+      reason:
+        'content carries a standing directive; refuse trusted provenance (encode untrusted or drop)',
     };
   }
   if (hasMultilingualDirective(content)) {

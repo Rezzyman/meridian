@@ -21,7 +21,12 @@ export * from './heartbeat/index.js';
 // MCP (client + server), delegation, structured output — parity surface.
 export * from './mcp/index.js';
 export { delegateTools, type DelegateDeps } from './skills/builtin/delegate-tools.js';
-export { defineTool, type DefineToolOptions, type ExecutionFailure, type OutputValidationFailure } from './skills/toolkit.js';
+export {
+  defineTool,
+  type DefineToolOptions,
+  type ExecutionFailure,
+  type OutputValidationFailure,
+} from './skills/toolkit.js';
 export {
   generateStructured,
   StructuredOutputError,

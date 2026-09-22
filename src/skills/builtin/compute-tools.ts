@@ -30,7 +30,11 @@ const CONSTS: Record<string, number> = { pi: Math.PI, e: Math.E };
 const PREC: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2, '%': 2, '^': 3, 'u-': 4 };
 const RIGHT_ASSOC = new Set(['^', 'u-']);
 
-type Tok = { t: 'num'; v: number } | { t: 'op'; v: string } | { t: 'fn'; v: string } | { t: 'paren'; v: '(' | ')' };
+type Tok =
+  | { t: 'num'; v: number }
+  | { t: 'op'; v: string }
+  | { t: 'fn'; v: string }
+  | { t: 'paren'; v: '(' | ')' };
 
 function tokenize(src: string): Tok[] {
   const tokens: Tok[] = [];
@@ -50,7 +54,8 @@ function tokenize(src: string): Tok[] {
     if (isOpChar(c)) {
       // Unary minus: leading, or after another operator / '('.
       const prev = tokens[tokens.length - 1];
-      const unary = c === '-' && (!prev || prev.t === 'op' || (prev.t === 'paren' && prev.v === '('));
+      const unary =
+        c === '-' && (!prev || prev.t === 'op' || (prev.t === 'paren' && prev.v === '('));
       tokens.push({ t: 'op', v: unary ? 'u-' : c });
       i++;
       continue;
@@ -134,12 +139,24 @@ export function evaluateExpression(src: string): number {
       const a = vals.pop();
       if (a === undefined || b === undefined) throw new Error('malformed expression');
       switch (tok.v) {
-        case '+': vals.push(a + b); break;
-        case '-': vals.push(a - b); break;
-        case '*': vals.push(a * b); break;
-        case '/': vals.push(a / b); break;
-        case '%': vals.push(a % b); break;
-        case '^': vals.push(a ** b); break;
+        case '+':
+          vals.push(a + b);
+          break;
+        case '-':
+          vals.push(a - b);
+          break;
+        case '*':
+          vals.push(a * b);
+          break;
+        case '/':
+          vals.push(a / b);
+          break;
+        case '%':
+          vals.push(a % b);
+          break;
+        case '^':
+          vals.push(a ** b);
+          break;
       }
     }
   }

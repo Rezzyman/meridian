@@ -12,7 +12,10 @@ import { recordWaitlist, readWaitlist } from '../../src/hosted/waitlist.js';
 
 function tmpDb(): { path: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'wl-'));
-  return { path: join(dir, 'waitlist.jsonl'), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return {
+    path: join(dir, 'waitlist.jsonl'),
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
 }
 
 describe('waitlist capture', () => {
@@ -20,7 +23,12 @@ describe('waitlist capture', () => {
     const { path, cleanup } = tmpDb();
     try {
       const saved = recordWaitlist(
-        { email: '  You@Example.COM ', plan: 'secure-memory', note: 'from HN', ts: '2026-06-11T00:00:00Z' },
+        {
+          email: '  You@Example.COM ',
+          plan: 'secure-memory',
+          note: 'from HN',
+          ts: '2026-06-11T00:00:00Z',
+        },
         path,
       );
       assert.equal(saved.email, 'you@example.com', 'email lowercased + trimmed');
@@ -35,7 +43,10 @@ describe('waitlist capture', () => {
   it('rejects an invalid email', () => {
     const { path, cleanup } = tmpDb();
     try {
-      assert.throws(() => recordWaitlist({ email: 'not-an-email', ts: 't' }, path), /invalid email/);
+      assert.throws(
+        () => recordWaitlist({ email: 'not-an-email', ts: 't' }, path),
+        /invalid email/,
+      );
     } finally {
       cleanup();
     }
@@ -45,7 +56,10 @@ describe('waitlist capture', () => {
     const { path, cleanup } = tmpDb();
     try {
       recordWaitlist({ email: 'a@b.co', ts: 't1' }, path);
-      assert.throws(() => recordWaitlist({ email: 'A@B.CO', ts: 't2' }, path), /already on the waitlist/);
+      assert.throws(
+        () => recordWaitlist({ email: 'A@B.CO', ts: 't2' }, path),
+        /already on the waitlist/,
+      );
     } finally {
       cleanup();
     }

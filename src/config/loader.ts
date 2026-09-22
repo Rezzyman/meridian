@@ -82,7 +82,9 @@ export function loadAgentEnv(home: MeridianHome): AgentEnv {
  * regression and LIMITLESS_API_KEY). Skill manifests are now the source of
  * truth; this helper closes the loop at construction.
  */
-export function collectSkillEnv(declaredKeys: Iterable<string>): Record<string, string | undefined> {
+export function collectSkillEnv(
+  declaredKeys: Iterable<string>,
+): Record<string, string | undefined> {
   const out: Record<string, string | undefined> = {};
   for (const k of declaredKeys) {
     out[k] = process.env[k];
@@ -180,7 +182,10 @@ export function readEnvFile(path: string): Record<string, string> {
     const eq = trimmed.indexOf('=');
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+    const value = trimmed
+      .slice(eq + 1)
+      .trim()
+      .replace(/^["']|["']$/g, '');
     if (key && value) out[key] = value;
   }
   return out;

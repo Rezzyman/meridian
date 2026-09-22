@@ -32,10 +32,7 @@ import { parseDeviceLookMultipart } from './device-media.js';
 import type { AudioTranscriber, ImageDescriber } from './device-media.js';
 import { registerLoopRoute } from './loop-contract.js';
 import { registerLoopPairingRoute, type LoopPairingStore } from './loop-pairing.js';
-import {
-  createMeridianLoopAgentAdapter,
-  type LoopAgentAdapter,
-} from './loop-agent-adapter.js';
+import { createMeridianLoopAgentAdapter, type LoopAgentAdapter } from './loop-agent-adapter.js';
 
 export interface GatewayOptions {
   port: number;
@@ -105,10 +102,8 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     { parseAs: 'buffer' },
     (_req, body, done) => done(null, body),
   );
-  app.addContentTypeParser(
-    /^multipart\/form-data/i,
-    { parseAs: 'buffer' },
-    (_req, body, done) => done(null, body),
+  app.addContentTypeParser(/^multipart\/form-data/i, { parseAs: 'buffer' }, (_req, body, done) =>
+    done(null, body),
   );
 
   // Twilio posts application/x-www-form-urlencoded; its signature is computed
@@ -132,9 +127,9 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
   // First-party Aterna AI Loop channel. The route imposes a stricter contract
   // than generic chat: exact request shape, mandatory bearer auth, no tools,
   // no durable memory write, and request-bound evidence identifiers.
-  const loopAgent = opts.loop?.agent ?? createMeridianLoopAgentAdapter(
-    opts.loop?.conversation ?? opts.conversation,
-  );
+  const loopAgent =
+    opts.loop?.agent ??
+    createMeridianLoopAgentAdapter(opts.loop?.conversation ?? opts.conversation);
   registerLoopRoute(app, {
     token: opts.loop?.token,
     authorizeToken: opts.loop?.pairing
@@ -184,7 +179,10 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
   // skeleton/web/README.md instead).
   if (opts.web) {
     const html = readFileSync(opts.web.htmlPath, 'utf8');
-    const serveChat = async (_req: unknown, reply: { header: (k: string, v: string) => unknown }) => {
+    const serveChat = async (
+      _req: unknown,
+      reply: { header: (k: string, v: string) => unknown },
+    ) => {
       reply.header('content-type', 'text/html; charset=utf-8');
       return html;
     };
@@ -295,7 +293,9 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
         return { error: 'filename and content required' };
       }
       // basename() + charset allowlist: an upload names a file, never a path.
-      const safeName = basename(filename).replace(/[^\w.\- ]+/g, '_').slice(0, 140);
+      const safeName = basename(filename)
+        .replace(/[^\w.\- ]+/g, '_')
+        .slice(0, 140);
       if (!safeName || safeName.startsWith('.')) {
         reply.code(400);
         return { error: 'invalid filename' };
@@ -422,9 +422,7 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
         return { error: 'vision not configured' };
       }
       try {
-        const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(
-          req.headers['content-type'] ?? '',
-        );
+        const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(req.headers['content-type'] ?? '');
         const parts = parseDeviceLookMultipart(req.body, boundary?.[1] ?? boundary?.[2] ?? '');
         const observation = await opts.describeImage(parts.frame, parts.prompt);
         const turn = await opts.conversation.send(
@@ -572,38 +570,44 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
 
   // WhatsApp (Meta Cloud API). GET = webhook verification handshake; POST =
   // signed inbound messages → ack, then reply via the Graph API.
-  app.get<{ Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string } }>(
+  app.get<{
+    Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string };
+  }>('/whatsapp/webhook', async (req, reply) => {
+    if (!opts.whatsapp) {
+      reply.code(404);
+      return { error: 'whatsapp channel not configured' };
+    }
+    const q = req.query;
+    const challenge = opts.whatsapp.handleVerification(
+      q['hub.mode'],
+      q['hub.verify_token'],
+      q['hub.challenge'],
+    );
+    if (challenge === null) {
+      reply.code(403);
+      return { error: 'verification failed' };
+    }
+    reply.code(200).header('content-type', 'text/plain').send(challenge);
+    return reply;
+  });
+  app.post<{ Headers: { 'x-hub-signature-256'?: string } }>(
     '/whatsapp/webhook',
     async (req, reply) => {
       if (!opts.whatsapp) {
         reply.code(404);
         return { error: 'whatsapp channel not configured' };
       }
-      const q = req.query;
-      const challenge = opts.whatsapp.handleVerification(q['hub.mode'], q['hub.verify_token'], q['hub.challenge']);
-      if (challenge === null) {
-        reply.code(403);
-        return { error: 'verification failed' };
+      const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
+      if (!opts.whatsapp.verifySignature(rawBody, req.headers['x-hub-signature-256'])) {
+        reply.code(401);
+        return { error: 'invalid signature' };
       }
-      reply.code(200).header('content-type', 'text/plain').send(challenge);
-      return reply;
+      const result = opts.whatsapp.handleRequest(rawBody);
+      void result.done; // fire-and-forget the async turn + reply
+      reply.code(result.status);
+      return result.body;
     },
   );
-  app.post<{ Headers: { 'x-hub-signature-256'?: string } }>('/whatsapp/webhook', async (req, reply) => {
-    if (!opts.whatsapp) {
-      reply.code(404);
-      return { error: 'whatsapp channel not configured' };
-    }
-    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
-    if (!opts.whatsapp.verifySignature(rawBody, req.headers['x-hub-signature-256'])) {
-      reply.code(401);
-      return { error: 'invalid signature' };
-    }
-    const result = opts.whatsapp.handleRequest(rawBody);
-    void result.done; // fire-and-forget the async turn + reply
-    reply.code(result.status);
-    return result.body;
-  });
 
   // Twilio inbound SMS (application/x-www-form-urlencoded). Verify the
   // X-Twilio-Signature over the raw body, ack with TwiML, run the turn async.

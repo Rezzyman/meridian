@@ -27,13 +27,14 @@ async function boot(opts: { configured?: boolean } = {}): Promise<string> {
     token: 'device-token',
     logger: silentLogger,
     conversation,
-    transcribeAudio: opts.configured === false
-      ? undefined
-      : async (audio, mime) => {
-          assert.equal(mime, 'audio/wav');
-          assert.equal(audio.length, 64);
-          return 'what time is it';
-        },
+    transcribeAudio:
+      opts.configured === false
+        ? undefined
+        : async (audio, mime) => {
+            assert.equal(mime, 'audio/wav');
+            assert.equal(audio.length, 64);
+            return 'what time is it';
+          },
   });
   apps.push(app);
   const address = app.server.address();
@@ -59,22 +60,37 @@ describe('POST /v1/turns/ptt', () => {
 
   it('fails closed for unauthorized, missing, or unconfigured audio', async () => {
     const base = await boot();
-    assert.equal((await fetch(`${base}/v1/turns/ptt`, {
-      method: 'POST',
-      headers: { 'content-type': 'audio/wav' },
-      body: Buffer.alloc(64),
-    })).status, 401);
-    assert.equal((await fetch(`${base}/v1/turns/ptt`, {
-      method: 'POST',
-      headers: { authorization: 'Bearer device-token', 'content-type': 'audio/wav' },
-      body: Buffer.alloc(12),
-    })).status, 400);
+    assert.equal(
+      (
+        await fetch(`${base}/v1/turns/ptt`, {
+          method: 'POST',
+          headers: { 'content-type': 'audio/wav' },
+          body: Buffer.alloc(64),
+        })
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await fetch(`${base}/v1/turns/ptt`, {
+          method: 'POST',
+          headers: { authorization: 'Bearer device-token', 'content-type': 'audio/wav' },
+          body: Buffer.alloc(12),
+        })
+      ).status,
+      400,
+    );
 
     const unconfigured = await boot({ configured: false });
-    assert.equal((await fetch(`${unconfigured}/v1/turns/ptt`, {
-      method: 'POST',
-      headers: { authorization: 'Bearer device-token', 'content-type': 'audio/wav' },
-      body: Buffer.alloc(64),
-    })).status, 503);
+    assert.equal(
+      (
+        await fetch(`${unconfigured}/v1/turns/ptt`, {
+          method: 'POST',
+          headers: { authorization: 'Bearer device-token', 'content-type': 'audio/wav' },
+          body: Buffer.alloc(64),
+        })
+      ).status,
+      503,
+    );
   });
 });

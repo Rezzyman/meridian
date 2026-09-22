@@ -57,13 +57,7 @@ export async function runDoctor(): Promise<number> {
 
   // 1. Node version
   const major = parseInt(process.versions.node.split('.')[0]!, 10);
-  rows.push(
-    row(
-      'Node 20+',
-      major >= 20 ? 'ok' : 'fail',
-      `running ${process.versions.node}`,
-    ),
-  );
+  rows.push(row('Node 20+', major >= 20 ? 'ok' : 'fail', `running ${process.versions.node}`));
 
   // 2. Agents discovered (template scaffolds with __ in the name are not
   // real agents — skip them).
@@ -95,7 +89,9 @@ export async function runDoctor(): Promise<number> {
     }
     if (env.VOYAGE_API_KEY) {
       if (seenVoyage.has(env.VOYAGE_API_KEY))
-        triadIssues.push(`Voyage key shared between ${seenVoyage.get(env.VOYAGE_API_KEY)} and ${slug}`);
+        triadIssues.push(
+          `Voyage key shared between ${seenVoyage.get(env.VOYAGE_API_KEY)} and ${slug}`,
+        );
       else seenVoyage.set(env.VOYAGE_API_KEY, slug);
     }
     if (env.ROUTEXOR_API_KEY) {
@@ -107,9 +103,7 @@ export async function runDoctor(): Promise<number> {
     }
     if (env.GROQ_API_KEY) {
       if (seenGroq.has(env.GROQ_API_KEY))
-        triadIssues.push(
-          `Groq key shared between ${seenGroq.get(env.GROQ_API_KEY)} and ${slug}`,
-        );
+        triadIssues.push(`Groq key shared between ${seenGroq.get(env.GROQ_API_KEY)} and ${slug}`);
       else seenGroq.set(env.GROQ_API_KEY, slug);
     }
   }
@@ -117,7 +111,9 @@ export async function runDoctor(): Promise<number> {
     row(
       'Isolation triad uniqueness',
       triadIssues.length ? 'fail' : 'ok',
-      triadIssues.length ? triadIssues.join('; ') : 'each agent has unique Neon + Voyage + ROUTEXOR',
+      triadIssues.length
+        ? triadIssues.join('; ')
+        : 'each agent has unique Neon + Voyage + ROUTEXOR',
     ),
   );
 
@@ -243,7 +239,7 @@ export async function runDoctor(): Promise<number> {
             ? 'Anthropic present'
             : env.OPENAI_API_KEY
               ? 'OpenAI present'
-              : 'no model key. ROUTEXOR is Meridian\'s recommended setup: sign up at https://routexor.com, add your provider key in the dashboard, then create a ROUTEXOR key.',
+              : "no model key. ROUTEXOR is Meridian's recommended setup: sign up at https://routexor.com, add your provider key in the dashboard, then create a ROUTEXOR key.",
     ),
   );
 

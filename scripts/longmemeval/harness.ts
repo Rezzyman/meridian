@@ -10,11 +10,7 @@
  * FRESH, empty memory store per instance, or one haystack bleeds into the next.
  */
 
-import type {
-  InstanceResult,
-  LongMemEvalInstance,
-  RunSummary,
-} from './types.js';
+import type { InstanceResult, LongMemEvalInstance, RunSummary } from './types.js';
 import type { MemoryProvider } from '../../src/memory/provider.js';
 import { isAbstentionType, scoreOffline } from './score.js';
 
@@ -39,7 +35,10 @@ export interface HarnessDeps {
  *  have the date available even on providers that don't accept an explicit
  *  createdAt (embedded). Encodes are awaited in order so the store is fully
  *  populated before recall. */
-async function ingestInstance(provider: MemoryProvider, inst: LongMemEvalInstance): Promise<number> {
+async function ingestInstance(
+  provider: MemoryProvider,
+  inst: LongMemEvalInstance,
+): Promise<number> {
   let turns = 0;
   for (let i = 0; i < inst.haystack_sessions.length; i++) {
     const session = inst.haystack_sessions[i];

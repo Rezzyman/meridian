@@ -122,7 +122,10 @@ export class WhatsappChannel implements ChannelAdapter {
             if (this.seen.size > 1000) this.seen.delete(this.seen.values().next().value as string);
           }
           if (this.allow.size > 0 && !this.allow.has(msg.from)) {
-            this.opts.logger.warn({ msg: 'whatsapp message from non-allowlisted number ignored', from: msg.from });
+            this.opts.logger.warn({
+              msg: 'whatsapp message from non-allowlisted number ignored',
+              from: msg.from,
+            });
             continue;
           }
           if (!this.handler) continue;
@@ -132,18 +135,30 @@ export class WhatsappChannel implements ChannelAdapter {
           jobs.push(
             (async () => {
               try {
-                const reply = await this.handler!({ channel: 'whatsapp', from, text, meta: { name } });
+                const reply = await this.handler!({
+                  channel: 'whatsapp',
+                  from,
+                  text,
+                  meta: { name },
+                });
                 await this.sendMessage(from, reply);
               } catch (err) {
                 this.opts.logger.error({ msg: 'whatsapp inbound error', err });
-                await this.sendMessage(from, 'Something went wrong on my end. I have logged it.').catch(() => {});
+                await this.sendMessage(
+                  from,
+                  'Something went wrong on my end. I have logged it.',
+                ).catch(() => {});
               }
             })(),
           );
         }
       }
     }
-    return { status: 200, body: { ok: true }, done: jobs.length ? Promise.all(jobs).then(() => undefined) : DONE };
+    return {
+      status: 200,
+      body: { ok: true },
+      done: jobs.length ? Promise.all(jobs).then(() => undefined) : DONE,
+    };
   }
 
   async send(msg: OutboundMessage): Promise<void> {
@@ -159,7 +174,12 @@ export class WhatsappChannel implements ChannelAdapter {
           authorization: `Bearer ${this.opts.accessToken}`,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: chunk } }),
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to,
+          type: 'text',
+          text: { body: chunk },
+        }),
       });
       if (!res.ok) this.opts.logger.warn({ msg: 'whatsapp send failed', status: res.status });
     }

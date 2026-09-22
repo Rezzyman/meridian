@@ -132,7 +132,9 @@ export class SmsChannel implements ChannelAdapter {
         await this.sendSms(from, reply);
       } catch (err) {
         this.opts.logger.error({ msg: 'sms inbound error', err });
-        await this.sendSms(from, 'Something went wrong on my end. I have logged it.').catch(() => {});
+        await this.sendSms(from, 'Something went wrong on my end. I have logged it.').catch(
+          () => {},
+        );
       }
     })();
     return { ...ack, done };

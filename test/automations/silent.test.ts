@@ -15,7 +15,10 @@ describe('automation [SILENT] contract', () => {
 
   it('treats a fully-exhausted provider chain as silent — outage noise never pushes', () => {
     assert.ok(
-      automationRunIsSilent('(inbox-scan produced no output — provider chain exhausted)', 'inbox-scan'),
+      automationRunIsSilent(
+        '(inbox-scan produced no output — provider chain exhausted)',
+        'inbox-scan',
+      ),
     );
   });
 
@@ -29,7 +32,10 @@ describe('automation [SILENT] contract', () => {
   });
 
   it('stripSilentMarker keeps the internal note for the memory encode', () => {
-    assert.equal(stripSilentMarker('[SILENT] scanned 12, nothing on fire'), 'scanned 12, nothing on fire');
+    assert.equal(
+      stripSilentMarker('[SILENT] scanned 12, nothing on fire'),
+      'scanned 12, nothing on fire',
+    );
     assert.equal(stripSilentMarker('[SILENT]'), '(silent run, no content)');
   });
 });

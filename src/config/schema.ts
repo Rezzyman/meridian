@@ -8,90 +8,90 @@ import { z } from 'zod';
 // ─── Per-agent isolation triad (env-loaded) ────────────────────────────────────
 export const AgentEnvSchema = z
   .object({
-  MERIDIAN_AGENT: z.string().min(1, 'agent slug required'),
-  CORTEX_AGENT_ID: z.string().min(1),
-  // NEON + VOYAGE power the CORTEX/Quartz backends. They are OPTIONAL so the
-  // zero-config embedded provider (MERIDIAN_MEMORY_PROVIDER=embedded) boots
-  // with no external keys at all; a superRefine below still requires them for
-  // the cortex/quartz providers.
-  NEON_DATABASE_URL: z.string().url('Neon Postgres URL required').optional(),
-  VOYAGE_API_KEY: z.string().min(20, 'Voyage AI key required for embeddings').optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
-  GROQ_API_KEY: z.string().optional(),
-  OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),
-  // ROUTEXOR — ATERNA's BYOK zero-markup model router (recommended default,
-  // never mandatory). OpenAI-compatible; BASE_URL overrides the endpoint.
-  ROUTEXOR_API_KEY: z.string().optional(),
-  ROUTEXOR_BASE_URL: z.string().url().optional(),
+    MERIDIAN_AGENT: z.string().min(1, 'agent slug required'),
+    CORTEX_AGENT_ID: z.string().min(1),
+    // NEON + VOYAGE power the CORTEX/Quartz backends. They are OPTIONAL so the
+    // zero-config embedded provider (MERIDIAN_MEMORY_PROVIDER=embedded) boots
+    // with no external keys at all; a superRefine below still requires them for
+    // the cortex/quartz providers.
+    NEON_DATABASE_URL: z.string().url('Neon Postgres URL required').optional(),
+    VOYAGE_API_KEY: z.string().min(20, 'Voyage AI key required for embeddings').optional(),
+    ANTHROPIC_API_KEY: z.string().optional(),
+    OPENAI_API_KEY: z.string().optional(),
+    GROQ_API_KEY: z.string().optional(),
+    OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),
+    // ROUTEXOR — ATERNA's BYOK zero-markup model router (recommended default,
+    // never mandatory). OpenAI-compatible; BASE_URL overrides the endpoint.
+    ROUTEXOR_API_KEY: z.string().optional(),
+    ROUTEXOR_BASE_URL: z.string().url().optional(),
 
-  // VAPI voice channel (optional but headline)
-  VAPI_API_KEY: z.string().optional(),
-  VAPI_PHONE_NUMBER_ID: z.string().optional(),
-  VAPI_ASSISTANT_ID: z.string().optional(),
-  VAPI_WEBHOOK_SECRET: z.string().optional(),
+    // VAPI voice channel (optional but headline)
+    VAPI_API_KEY: z.string().optional(),
+    VAPI_PHONE_NUMBER_ID: z.string().optional(),
+    VAPI_ASSISTANT_ID: z.string().optional(),
+    VAPI_WEBHOOK_SECRET: z.string().optional(),
 
-  // Telegram
-  TELEGRAM_BOT_TOKEN: z.string().optional(),
-  TELEGRAM_DEFAULT_CHAT_ID: z.string().optional(),
+    // Telegram
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_DEFAULT_CHAT_ID: z.string().optional(),
 
-  // Slack (Events API): bot token (xoxb-…) + the app signing secret.
-  SLACK_BOT_TOKEN: z.string().optional(),
-  SLACK_SIGNING_SECRET: z.string().optional(),
+    // Slack (Events API): bot token (xoxb-…) + the app signing secret.
+    SLACK_BOT_TOKEN: z.string().optional(),
+    SLACK_SIGNING_SECRET: z.string().optional(),
 
-  // Discord (Interactions): the app public key (Ed25519) + application id.
-  DISCORD_PUBLIC_KEY: z.string().optional(),
-  DISCORD_APPLICATION_ID: z.string().optional(),
-  DISCORD_BOT_TOKEN: z.string().optional(),
+    // Discord (Interactions): the app public key (Ed25519) + application id.
+    DISCORD_PUBLIC_KEY: z.string().optional(),
+    DISCORD_APPLICATION_ID: z.string().optional(),
+    DISCORD_BOT_TOKEN: z.string().optional(),
 
-  // WhatsApp (Meta Cloud API): phone-number id + access token + app secret +
-  // the webhook verify token.
-  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
-  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
-  WHATSAPP_APP_SECRET: z.string().optional(),
-  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+    // WhatsApp (Meta Cloud API): phone-number id + access token + app secret +
+    // the webhook verify token.
+    WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+    WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+    WHATSAPP_APP_SECRET: z.string().optional(),
+    WHATSAPP_VERIFY_TOKEN: z.string().optional(),
 
-  // Matrix (client-server API): the homeserver, a bot access token, and the
-  // bot's own MXID (to ignore its own messages). Polls /sync — no webhook.
-  MATRIX_HOMESERVER_URL: z.string().url().optional(),
-  MATRIX_ACCESS_TOKEN: z.string().optional(),
-  MATRIX_USER_ID: z.string().optional(),
+    // Matrix (client-server API): the homeserver, a bot access token, and the
+    // bot's own MXID (to ignore its own messages). Polls /sync — no webhook.
+    MATRIX_HOMESERVER_URL: z.string().url().optional(),
+    MATRIX_ACCESS_TOKEN: z.string().optional(),
+    MATRIX_USER_ID: z.string().optional(),
 
-  // SMS (Twilio): account SID + auth token + the agent's Twilio number, plus
-  // the exact public webhook URL Twilio POSTs to (needed for signature checks).
-  TWILIO_ACCOUNT_SID: z.string().optional(),
-  TWILIO_AUTH_TOKEN: z.string().optional(),
-  TWILIO_PHONE_NUMBER: z.string().optional(),
-  TWILIO_WEBHOOK_URL: z.string().url().optional(),
+    // SMS (Twilio): account SID + auth token + the agent's Twilio number, plus
+    // the exact public webhook URL Twilio POSTs to (needed for signature checks).
+    TWILIO_ACCOUNT_SID: z.string().optional(),
+    TWILIO_AUTH_TOKEN: z.string().optional(),
+    TWILIO_PHONE_NUMBER: z.string().optional(),
+    TWILIO_WEBHOOK_URL: z.string().url().optional(),
 
-  // Gateway
-  MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
-  // Least-privilege credential used only by the first-party Aterna Loop
-  // evidence route. Never give a wearable client the operator gateway token.
-  MERIDIAN_LOOP_TOKEN: z.string().min(32).optional(),
-  MERIDIAN_LOOP_BASE_URL: z.string().url().optional(),
-  MERIDIAN_LOOP_STATE_PATH: z.string().regex(/^\//).optional(),
-  // Stable Loop API, swappable server-side agent runtime. Existing installs
-  // default to Meridian until an OpenClaw/Hermes bridge is explicitly armed.
-  ATERNA_LOOP_HARNESS: z.enum(['openclaw', 'hermes', 'meridian']).default('meridian'),
-  ATERNA_LOOP_HARNESS_URL: z.string().url().optional(),
-  ATERNA_LOOP_HARNESS_TOKEN: z.string().min(32).optional(),
-  MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
-  MERIDIAN_DEVICE_CITY: z.string().min(1).optional(),
-  MERIDIAN_DEVICE_LATITUDE: z.coerce.number().min(-90).max(90).optional(),
-  MERIDIAN_DEVICE_LONGITUDE: z.coerce.number().min(-180).max(180).optional(),
+    // Gateway
+    MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
+    // Least-privilege credential used only by the first-party Aterna Loop
+    // evidence route. Never give a wearable client the operator gateway token.
+    MERIDIAN_LOOP_TOKEN: z.string().min(32).optional(),
+    MERIDIAN_LOOP_BASE_URL: z.string().url().optional(),
+    MERIDIAN_LOOP_STATE_PATH: z.string().regex(/^\//).optional(),
+    // Stable Loop API, swappable server-side agent runtime. Existing installs
+    // default to Meridian until an OpenClaw/Hermes bridge is explicitly armed.
+    ATERNA_LOOP_HARNESS: z.enum(['openclaw', 'hermes', 'meridian']).default('meridian'),
+    ATERNA_LOOP_HARNESS_URL: z.string().url().optional(),
+    ATERNA_LOOP_HARNESS_TOKEN: z.string().min(32).optional(),
+    MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
+    MERIDIAN_DEVICE_CITY: z.string().min(1).optional(),
+    MERIDIAN_DEVICE_LATITUDE: z.coerce.number().min(-90).max(90).optional(),
+    MERIDIAN_DEVICE_LONGITUDE: z.coerce.number().min(-180).max(180).optional(),
 
-  // CORTEX server URL (used by CortexBind)
-  MERIDIAN_CORTEX_URL: z.string().url().optional(),
-  MERIDIAN_CORTEX_TOKEN: z.string().min(32).optional(),
+    // CORTEX server URL (used by CortexBind)
+    MERIDIAN_CORTEX_URL: z.string().url().optional(),
+    MERIDIAN_CORTEX_TOKEN: z.string().min(32).optional(),
 
-  // Memory provider selection. "cortex" is the open-source default;
-  // "quartz" lazy-loads @aterna/quartz and falls back to cortex on failure;
-  // "embedded" is the zero-config local provider (no server, no keys).
-  MERIDIAN_MEMORY_PROVIDER: z.enum(['cortex', 'quartz', 'embedded']).default('cortex'),
+    // Memory provider selection. "cortex" is the open-source default;
+    // "quartz" lazy-loads @aterna/quartz and falls back to cortex on failure;
+    // "embedded" is the zero-config local provider (no server, no keys).
+    MERIDIAN_MEMORY_PROVIDER: z.enum(['cortex', 'quartz', 'embedded']).default('cortex'),
 
-  // ngrok auth token (optional, for tunnel automation)
-  NGROK_AUTHTOKEN: z.string().optional(),
+    // ngrok auth token (optional, for tunnel automation)
+    NGROK_AUTHTOKEN: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     // CORTEX + Quartz need the dedicated Neon DB + Voyage key; embedded needs
@@ -231,7 +231,13 @@ export const ChannelConfigSchema = z.object({
       phoneNumberId: z.string().optional(),
       assistantId: z.string().optional(),
       voicePersona: z
-        .enum(['warm_professional', 'friendly_casual', 'authoritative', 'energetic', 'calm_concierge'])
+        .enum([
+          'warm_professional',
+          'friendly_casual',
+          'authoritative',
+          'energetic',
+          'calm_concierge',
+        ])
         .default('warm_professional'),
     })
     .default({ enabled: false }),
@@ -347,13 +353,21 @@ export type ToolsConfig = z.infer<typeof ToolsConfigSchema>;
 export const TOOLS_CHAT_DEFAULT = CHAT_SAFE_DEFAULT;
 export const TOOLS_CLI_DEFAULT = CLI_SAFE_DEFAULT;
 
-export const GovernanceConfigSchema = z.object({
-  enabled: z.boolean().default(true),
-  denyTools: z.array(z.string()).default([]),
-  trustedOnlyTools: z.array(z.string()).default([]),
-  requireApprovalTools: z.array(z.string()).default([]),
-  maxToolCallsPerTurn: z.number().int().min(1).max(100).default(8),
-}).default({ enabled: true, denyTools: [], trustedOnlyTools: [], requireApprovalTools: [], maxToolCallsPerTurn: 8 });
+export const GovernanceConfigSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    denyTools: z.array(z.string()).default([]),
+    trustedOnlyTools: z.array(z.string()).default([]),
+    requireApprovalTools: z.array(z.string()).default([]),
+    maxToolCallsPerTurn: z.number().int().min(1).max(100).default(8),
+  })
+  .default({
+    enabled: true,
+    denyTools: [],
+    trustedOnlyTools: [],
+    requireApprovalTools: [],
+    maxToolCallsPerTurn: 8,
+  });
 export type GovernanceConfig = z.infer<typeof GovernanceConfigSchema>;
 
 // ─── Delegation (sub-agents) ───────────────────────────────────────────────────
@@ -707,7 +721,13 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     timeoutSeconds: 120,
   },
   pdf: { maxPages: 50, maxBytesMb: 32 },
-  governance: { enabled: true, denyTools: [], trustedOnlyTools: [], requireApprovalTools: [], maxToolCallsPerTurn: 8 },
+  governance: {
+    enabled: true,
+    denyTools: [],
+    trustedOnlyTools: [],
+    requireApprovalTools: [],
+    maxToolCallsPerTurn: 8,
+  },
   cortex: {
     agentId: slug,
     recallTopK: 8,

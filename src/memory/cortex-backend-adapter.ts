@@ -109,7 +109,7 @@ export class CortexBackendAdapter implements CortexBackend {
     const ref =
       opts.provider && opts.model
         ? `${opts.provider}/${opts.model}`
-        : opts.model ?? this.defaultModelRef;
+        : (opts.model ?? this.defaultModelRef);
 
     const resolved = this.router.resolve(ref);
 

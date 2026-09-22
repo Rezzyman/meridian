@@ -21,13 +21,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import {
-  chmodSync,
-  createWriteStream,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-} from 'node:fs';
+import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -48,13 +42,18 @@ const CHECKSUMS: Record<string, string> = {
 };
 
 function platformKey(): string {
-  const platform = process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : null;
+  const platform =
+    process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : null;
   if (!platform) {
-    throw new Error(`unsupported platform for gog: ${process.platform}. only darwin and linux are supported.`);
+    throw new Error(
+      `unsupported platform for gog: ${process.platform}. only darwin and linux are supported.`,
+    );
   }
   const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'amd64' : null;
   if (!arch) {
-    throw new Error(`unsupported architecture for gog: ${process.arch}. only arm64 and amd64 are supported.`);
+    throw new Error(
+      `unsupported architecture for gog: ${process.arch}. only arm64 and amd64 are supported.`,
+    );
   }
   return `${platform}-${arch}`;
 }
@@ -98,7 +97,9 @@ async function extractGogFromTarball(tarballPath: string, outBinaryPath: string)
     throw new Error(`tar list failed: ${list.stderr}`);
   }
   const entries = list.stdout.split('\n').filter(Boolean);
-  const binaryEntry = entries.find((e) => e === 'gog' || e === 'gogcli' || /\/gog$/.test(e) || /\/gogcli$/.test(e));
+  const binaryEntry = entries.find(
+    (e) => e === 'gog' || e === 'gogcli' || /\/gog$/.test(e) || /\/gogcli$/.test(e),
+  );
   if (!binaryEntry) {
     throw new Error(`gog binary not found inside ${tarballPath}: ${entries.join(', ')}`);
   }
@@ -106,7 +107,9 @@ async function extractGogFromTarball(tarballPath: string, outBinaryPath: string)
   const { tmpdir } = await import('node:os');
   const stagingDir = mkdtempSync(join(tmpdir(), 'meridian-gog-extract-'));
   try {
-    const ex = spawnSync('tar', ['-xzf', tarballPath, '-C', stagingDir, binaryEntry], { encoding: 'utf8' });
+    const ex = spawnSync('tar', ['-xzf', tarballPath, '-C', stagingDir, binaryEntry], {
+      encoding: 'utf8',
+    });
     if (ex.status !== 0) {
       throw new Error(`tar extract failed: ${ex.stderr}`);
     }
@@ -114,7 +117,11 @@ async function extractGogFromTarball(tarballPath: string, outBinaryPath: string)
     copyFileSync(join(stagingDir, binaryEntry), outBinaryPath);
     chmodSync(outBinaryPath, 0o755);
   } finally {
-    try { rmSync(stagingDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      rmSync(stagingDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -155,7 +162,9 @@ export async function resolveGog(opts: { allowPathFallback?: boolean } = {}): Pr
     await fetchBinary(url, tarballPath);
     const actualSha = sha256File(tarballPath);
     if (actualSha !== expectedSha) {
-      throw new Error(`checksum mismatch for ${tarballName}: expected ${expectedSha}, got ${actualSha}`);
+      throw new Error(
+        `checksum mismatch for ${tarballName}: expected ${expectedSha}, got ${actualSha}`,
+      );
     }
     await extractGogFromTarball(tarballPath, managed);
     // macOS Sequoia tags downloaded binaries with com.apple.provenance and
@@ -171,7 +180,9 @@ export async function resolveGog(opts: { allowPathFallback?: boolean } = {}): Pr
     // Validate it runs.
     const v = spawnSync(managed, ['--version'], { encoding: 'utf8' });
     if (v.status !== 0) {
-      throw new Error(`extracted gog binary failed to run (exit ${v.status}): ${v.stderr ?? '(no stderr)'}`);
+      throw new Error(
+        `extracted gog binary failed to run (exit ${v.status}): ${v.stderr ?? '(no stderr)'}`,
+      );
     }
     resolvedPath = managed;
     return managed;
@@ -251,13 +262,17 @@ export async function runGog(opts: GogRunOptions): Promise<GogRunResult> {
 export async function runGogJson<T = unknown>(opts: GogRunOptions): Promise<T> {
   const result = await runGog(opts);
   if (result.exitCode !== 0) {
-    throw new Error(`gog ${opts.args.join(' ')} failed (${result.exitCode}): ${result.stderr.trim()}`);
+    throw new Error(
+      `gog ${opts.args.join(' ')} failed (${result.exitCode}): ${result.stderr.trim()}`,
+    );
   }
   if (!result.stdout.trim()) return undefined as unknown as T;
   try {
     return JSON.parse(result.stdout) as T;
   } catch (err) {
-    throw new Error(`gog returned non-JSON output: ${(err as Error).message}\n${result.stdout.slice(0, 500)}`);
+    throw new Error(
+      `gog returned non-JSON output: ${(err as Error).message}\n${result.stdout.slice(0, 500)}`,
+    );
   }
 }
 
@@ -265,7 +280,11 @@ export async function runGogJson<T = unknown>(opts: GogRunOptions): Promise<T> {
  * List authorized accounts in a given client bucket. Returns the parsed
  * `gog auth list` output filtered to the client.
  */
-export async function listAccounts(client: string): Promise<Array<{ email: string; client: string; scopes: string; expires?: string; type: string }>> {
+export async function listAccounts(
+  client: string,
+): Promise<
+  Array<{ email: string; client: string; scopes: string; expires?: string; type: string }>
+> {
   const bin = await resolveGog({ allowPathFallback: true });
   // `gog auth list` is the unscoped form — list everything, filter ourselves
   // because --client filters by bucket but we want a top-level survey.
@@ -273,7 +292,13 @@ export async function listAccounts(client: string): Promise<Array<{ email: strin
   if (result.status !== 0) {
     throw new Error(`gog auth list failed: ${result.stderr}`);
   }
-  const out: Array<{ email: string; client: string; scopes: string; expires?: string; type: string }> = [];
+  const out: Array<{
+    email: string;
+    client: string;
+    scopes: string;
+    expires?: string;
+    type: string;
+  }> = [];
   for (const line of result.stdout.split('\n')) {
     if (!line.trim()) continue;
     const parts = line.split('\t');

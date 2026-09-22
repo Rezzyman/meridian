@@ -45,18 +45,27 @@ if (isMain()) {
       if (!email) throw new Error('--email is required');
       // Date.now()/new Date() are fine in a CLI (not a resumable workflow).
       const saved = recordWaitlist(
-        { email, plan: flag(argv, 'plan'), note: flag(argv, 'note'), source: flag(argv, 'source'), ts: new Date().toISOString() },
+        {
+          email,
+          plan: flag(argv, 'plan'),
+          note: flag(argv, 'note'),
+          source: flag(argv, 'source'),
+          ts: new Date().toISOString(),
+        },
         dbPath,
       );
       console.log(`✓ added ${saved.email}${saved.plan ? ` (${saved.plan})` : ''} → ${dbPath}`);
     } else if (cmd === 'list') {
       const entries = readWaitlist(dbPath);
-      for (const e of entries) console.log(`${e.ts}  ${e.email}  ${e.plan ?? '-'}  ${e.note ?? ''}`);
+      for (const e of entries)
+        console.log(`${e.ts}  ${e.email}  ${e.plan ?? '-'}  ${e.note ?? ''}`);
       console.log(`\n${entries.length} on the waitlist (${dbPath})`);
     } else if (cmd === 'count') {
       console.log(readWaitlist(dbPath).length);
     } else {
-      console.log('usage: waitlist.mts <add|list|count> [--email x --plan y --note z --source s --db path]');
+      console.log(
+        'usage: waitlist.mts <add|list|count> [--email x --plan y --note z --source s --db path]',
+      );
       process.exit(cmd ? 1 : 0);
     }
   } catch (err) {

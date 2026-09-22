@@ -67,10 +67,7 @@ These rules are absolute. The operator's persona file may add tone, mission, and
  * (per-agent opt-in) and falls back to safe defaults: conversational set
  * for chat channels, full set for CLI/REPL.
  */
-function pickToolAllowlist(
-  config: AgentConfig,
-  channel: MeridianTurn['channel'],
-): Set<string> {
+function pickToolAllowlist(config: AgentConfig, channel: MeridianTurn['channel']): Set<string> {
   const cfg = config.tools;
   if (channel === 'cli') {
     return new Set(cfg?.cli ?? TOOLS_CLI_DEFAULT);
@@ -289,8 +286,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // Channel-aware sensitivity gate. Public-voice callers see ONLY public memories.
   // Trusted channels (CLI, gated Telegram, authenticated gateway) see public+internal.
   // Sacred topics are filtered at verification time, not recall time.
-  const sensitivityFilter: string[] =
-    ctx.channel === 'voice' ? ['public'] : ['public', 'internal'];
+  const sensitivityFilter: string[] = ctx.channel === 'voice' ? ['public'] : ['public', 'internal'];
 
   // 1) CORTEX recall (CA3 pattern completion)
   // 1500 token budget: enough to seed deep context, small enough to keep
@@ -356,9 +352,18 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         sources: screen.quarantined.map((q) => q.source),
       });
     }
-    ctx.logger.debug({ msg: 'cortex recall', tokens: r.tokenCount, memories: screen.kept.length, quarantined: screen.quarantined.length, sensitivityFilter });
+    ctx.logger.debug({
+      msg: 'cortex recall',
+      tokens: r.tokenCount,
+      memories: screen.kept.length,
+      quarantined: screen.quarantined.length,
+      sensitivityFilter,
+    });
   } catch (err) {
-    ctx.logger.warn({ msg: 'cortex recall failed or timed out; proceeding without memory', err: (err as Error).message });
+    ctx.logger.warn({
+      msg: 'cortex recall failed or timed out; proceeding without memory',
+      err: (err as Error).message,
+    });
   } finally {
     // The race leaves the loser's timer live; clear it so a fast recall
     // doesn't strand an 8s timer per turn (event-loop noise, test latency).
@@ -387,10 +392,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     .filter(Boolean)
     .join('\n\n');
 
-  const messages: CoreMessage[] = [
-    ...ctx.history,
-    { role: 'user', content: userInput },
-  ];
+  const messages: CoreMessage[] = [...ctx.history, { role: 'user', content: userInput }];
 
   // 3) Provider call with primary + fallback chain
   const chain = ctx.router.chainFor(userInput, ctx.config.models);
@@ -416,16 +418,17 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // is in its set — independent of config.tools, which stays the operator
   // surface for builtins.
   const mcpAllowed = (name: string): boolean => ctx.mcpGate?.get(name)?.has(ctx.channel) === true;
-  const allowedTools: ToolSet | undefined = !ctx.isolation?.disableTools && ctx.tools
-    ? Object.fromEntries(
-        Object.entries(ctx.tools).filter(
-          ([k]) =>
-            k !== 'cortex_recall' &&
-            k !== 'cortex_encode' &&
-            (ctx.mcpGate?.has(k) ? mcpAllowed(k) : allow.has(k)),
-        ),
-      )
-    : undefined;
+  const allowedTools: ToolSet | undefined =
+    !ctx.isolation?.disableTools && ctx.tools
+      ? Object.fromEntries(
+          Object.entries(ctx.tools).filter(
+            ([k]) =>
+              k !== 'cortex_recall' &&
+              k !== 'cortex_encode' &&
+              (ctx.mcpGate?.has(k) ? mcpAllowed(k) : allow.has(k)),
+          ),
+        )
+      : undefined;
 
   // ── Tool-loop / empty-result breaker ──
   // A tool that returns empty twice this turn is short-circuited at the tool
@@ -435,21 +438,22 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // update: Good, I can see..." hallucination class. onStepFinish still logs the
   // empties for the trace.
   const emptyByTool: Record<string, number> = {};
-  const governedTools = allowedTools && ctx.actionGovernance
-    ? governToolSet({
-        tools: allowedTools,
-        config: ctx.config,
-        context: {
-          agentId: ctx.actionGovernance.agentId,
-          sessionId: ctx.sessionId,
-          channel: ctx.channel,
-          senderTrusted: ctx.senderTrusted !== false,
-        },
-        digestArgs: ctx.actionGovernance.digestArgs,
-        consumeApproval: ctx.actionGovernance.consumeApproval,
-        record: ctx.actionGovernance.record,
-      })
-    : allowedTools;
+  const governedTools =
+    allowedTools && ctx.actionGovernance
+      ? governToolSet({
+          tools: allowedTools,
+          config: ctx.config,
+          context: {
+            agentId: ctx.actionGovernance.agentId,
+            sessionId: ctx.sessionId,
+            channel: ctx.channel,
+            senderTrusted: ctx.senderTrusted !== false,
+          },
+          digestArgs: ctx.actionGovernance.digestArgs,
+          consumeApproval: ctx.actionGovernance.consumeApproval,
+          record: ctx.actionGovernance.record,
+        })
+      : allowedTools;
   const turnTools = governedTools
     ? withEmptyResultBreaker(governedTools, {
         threshold: 2,
@@ -554,7 +558,9 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         const steps = await stream.steps;
         modelTraceIds = steps.flatMap((step) => {
           const headers = step.response.headers ?? {};
-          const trace = Object.entries(headers).find(([name]) => name.toLowerCase() === 'x-routexor-trace-id')?.[1];
+          const trace = Object.entries(headers).find(
+            ([name]) => name.toLowerCase() === 'x-routexor-trace-id',
+          )?.[1];
           return trace ? [trace] : [];
         });
       }
@@ -648,7 +654,14 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       break;
     }
   }
-  const TEXT_CHANNELS: Array<MeridianTurn['channel']> = ['cli', 'telegram', 'gateway', 'slack', 'discord', 'whatsapp'];
+  const TEXT_CHANNELS: Array<MeridianTurn['channel']> = [
+    'cli',
+    'telegram',
+    'gateway',
+    'slack',
+    'discord',
+    'whatsapp',
+  ];
   if (commitmentDetected && TEXT_CHANNELS.includes(ctx.channel)) {
     const trimQuote =
       commitmentQuote.length > 80 ? `${commitmentQuote.slice(0, 79)}…` : commitmentQuote;

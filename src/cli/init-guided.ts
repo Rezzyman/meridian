@@ -45,13 +45,28 @@ async function ask(rl: readline.Interface, prompt: string, defaultValue?: string
 }
 
 async function askOptional(rl: readline.Interface, prompt: string): Promise<string | undefined> {
-  const ans = (await rl.question(`${colors.cyan('?')} ${prompt}  ${colors.muted('(optional, enter to skip)')} `)).trim();
+  const ans = (
+    await rl.question(
+      `${colors.cyan('?')} ${prompt}  ${colors.muted('(optional, enter to skip)')} `,
+    )
+  ).trim();
   return ans || undefined;
 }
 
-async function askChoice(rl: readline.Interface, prompt: string, choices: readonly string[], defaultValue: string): Promise<string> {
-  const choiceTag = choices.map((c) => (c === defaultValue ? colors.cyan(c) : colors.muted(c))).join(' / ');
-  const ans = (await rl.question(`${colors.cyan('?')} ${prompt}\n  ${choiceTag}\n  ${colors.muted(`[${defaultValue}]`)} `)).trim();
+async function askChoice(
+  rl: readline.Interface,
+  prompt: string,
+  choices: readonly string[],
+  defaultValue: string,
+): Promise<string> {
+  const choiceTag = choices
+    .map((c) => (c === defaultValue ? colors.cyan(c) : colors.muted(c)))
+    .join(' / ');
+  const ans = (
+    await rl.question(
+      `${colors.cyan('?')} ${prompt}\n  ${choiceTag}\n  ${colors.muted(`[${defaultValue}]`)} `,
+    )
+  ).trim();
   if (!ans) return defaultValue;
   // Allow loose match: any choice that startsWith the user's input.
   const match = choices.find((c) => c.toLowerCase().startsWith(ans.toLowerCase()));
@@ -66,16 +81,35 @@ export async function runGuidedIntake(slug: string): Promise<IntakeAnswers> {
   console.log(colors.muted('  Six quick questions. Skip any with Enter.'));
   console.log('');
 
-  const agentName = await ask(rl, "What's the agent's name?", slug.charAt(0).toUpperCase() + slug.slice(1));
-  const oneLiner = await ask(rl, 'One sentence — what does this agent do?', 'Personal chief of staff');
+  const agentName = await ask(
+    rl,
+    "What's the agent's name?",
+    slug.charAt(0).toUpperCase() + slug.slice(1),
+  );
+  const oneLiner = await ask(
+    rl,
+    'One sentence — what does this agent do?',
+    'Personal chief of staff',
+  );
   const operatorName = await ask(rl, 'Your name (the operator)?', '');
   const operatorEmail = await askOptional(rl, 'Your email?');
-  const operatorTelegram = await askOptional(rl, 'Your Telegram chat id (run /start with the bot to find it)?');
+  const operatorTelegram = await askOptional(
+    rl,
+    'Your Telegram chat id (run /start with the bot to find it)?',
+  );
   const operatorVoice = await askOptional(rl, 'Your phone number (E.164, e.g. +13035551234)?');
-  const tone = await askChoice(rl, "How should they sound?", TONE_CHOICES, 'warm-professional');
-  const rulesRaw = await ask(rl, 'One rule they should always enforce? (or Enter to use defaults)', '');
+  const tone = await askChoice(rl, 'How should they sound?', TONE_CHOICES, 'warm-professional');
+  const rulesRaw = await ask(
+    rl,
+    'One rule they should always enforce? (or Enter to use defaults)',
+    '',
+  );
   const rules = rulesRaw
-    ? [rulesRaw, 'Always tell the user what is missing or unclear.', 'Flag when over-committing for the next week.']
+    ? [
+        rulesRaw,
+        'Always tell the user what is missing or unclear.',
+        'Flag when over-committing for the next week.',
+      ]
     : [
         'Always tell the user what is missing or unclear.',
         'Never send external messages without showing a draft first.',
@@ -138,7 +172,10 @@ stale, or a decision wait too long, I surface it without being asked.
 `;
 }
 
-export function applyOperatorToConfig(home: ReturnType<typeof ensureAgentHome>, answers: IntakeAnswers): void {
+export function applyOperatorToConfig(
+  home: ReturnType<typeof ensureAgentHome>,
+  answers: IntakeAnswers,
+): void {
   if (!answers.operatorName && !answers.operatorTelegram && !answers.operatorVoice) return;
   const cfgPath = home.configPath;
   if (!existsSync(cfgPath)) return;
@@ -172,9 +209,15 @@ export async function runGuidedInit(
   console.log(colors.ok(`  ${answers.agentName} is configured.`));
   console.log(colors.muted(`  identity: ${identityPath}`));
   if (answers.operatorTelegram || answers.operatorVoice) {
-    console.log(colors.muted(`  operator: ${answers.operatorName} (${[
-      answers.operatorTelegram ? 'telegram' : null,
-      answers.operatorVoice ? 'voice' : null,
-    ].filter(Boolean).join(', ')})`));
+    console.log(
+      colors.muted(
+        `  operator: ${answers.operatorName} (${[
+          answers.operatorTelegram ? 'telegram' : null,
+          answers.operatorVoice ? 'voice' : null,
+        ]
+          .filter(Boolean)
+          .join(', ')})`,
+      ),
+    );
   }
 }

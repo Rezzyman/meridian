@@ -69,7 +69,8 @@ describe('EmbeddedMemoryProvider', () => {
 
   it('respects tokenBudget', async () => {
     const p = provider('budget');
-    for (let i = 0; i < 20; i++) await p.encode(`widget report number ${i} with shared keyword widget`);
+    for (let i = 0; i < 20; i++)
+      await p.encode(`widget report number ${i} with shared keyword widget`);
     const r = await p.recall('widget', { tokenBudget: 40 });
     assert.ok(r.tokenCount <= 40 || r.memories.length === 1);
     assert.ok(r.memories.length < 20);

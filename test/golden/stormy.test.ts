@@ -28,7 +28,14 @@ describe('Stormy golden governed agent', () => {
     assert.equal(config.cortex.provenanceTrust, 'signed');
     assert.equal(config.cortex.memoryLlmJudge, true);
     const prompt = config.vision.prompt?.toLowerCase() ?? '';
-    for (const term of ['observations', 'inferences', 'conclusions', 'confidence', 'limitations', 'causation']) {
+    for (const term of [
+      'observations',
+      'inferences',
+      'conclusions',
+      'confidence',
+      'limitations',
+      'causation',
+    ]) {
       assert.match(prompt, new RegExp(term));
     }
   });
@@ -36,8 +43,12 @@ describe('Stormy golden governed agent', () => {
   it('denies dangerous actions even for a trusted operator', () => {
     for (const toolName of ['bash', 'write', 'edit_file', 'run_code', 'http_request', 'delegate']) {
       const decision = evaluateActionPolicy(config, {
-        agentId: 'stormy', sessionId: 'synthetic', channel: 'cli', senderTrusted: true,
-        toolName, callIndex: 1,
+        agentId: 'stormy',
+        sessionId: 'synthetic',
+        channel: 'cli',
+        senderTrusted: true,
+        toolName,
+        callIndex: 1,
       });
       assert.equal(decision.decision, 'deny', toolName);
       assert.equal(decision.rule, 'denyTools', toolName);
@@ -46,11 +57,18 @@ describe('Stormy golden governed agent', () => {
 
   it('requires scoped approval for outbound messaging', () => {
     const base = {
-      agentId: 'stormy', sessionId: 'synthetic', channel: 'cli' as const,
-      senderTrusted: true, toolName: 'telegram_dm', callIndex: 1,
+      agentId: 'stormy',
+      sessionId: 'synthetic',
+      channel: 'cli' as const,
+      senderTrusted: true,
+      toolName: 'telegram_dm',
+      callIndex: 1,
     };
     assert.equal(evaluateActionPolicy(config, base).rule, 'approvalRequired');
-    assert.equal(evaluateActionPolicy(config, { ...base, approvalGranted: true }).decision, 'allow');
+    assert.equal(
+      evaluateActionPolicy(config, { ...base, approvalGranted: true }).decision,
+      'allow',
+    );
   });
 
   it('contains no obvious credentials or customer data', () => {

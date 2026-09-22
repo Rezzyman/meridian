@@ -54,9 +54,11 @@ describe('GET /v1/weather', () => {
   it('fails closed when unconfigured, unauthorized, or upstream fails', async () => {
     const unconfigured = await boot();
     assert.equal(
-      (await fetch(`${unconfigured}/v1/weather`, {
-        headers: { authorization: 'Bearer device-token' },
-      })).status,
+      (
+        await fetch(`${unconfigured}/v1/weather`, {
+          headers: { authorization: 'Bearer device-token' },
+        })
+      ).status,
       503,
     );
     assert.equal((await fetch(`${unconfigured}/v1/weather`)).status, 401);
@@ -65,9 +67,11 @@ describe('GET /v1/weather', () => {
       throw new Error('offline');
     });
     assert.equal(
-      (await fetch(`${failed}/v1/weather`, {
-        headers: { authorization: 'Bearer device-token' },
-      })).status,
+      (
+        await fetch(`${failed}/v1/weather`, {
+          headers: { authorization: 'Bearer device-token' },
+        })
+      ).status,
       502,
     );
   });
@@ -82,9 +86,12 @@ describe('Open-Meteo weather adapter', () => {
       longitude: -104.9903,
       fetchImpl: (async (input: URL | RequestInfo) => {
         requested = new URL(String(input));
-        return new Response(JSON.stringify({
-          current: { time: '2026-07-29T14:00', temperature_2m: 85.6, weather_code: 2 },
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            current: { time: '2026-07-29T14:00', temperature_2m: 85.6, weather_code: 2 },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }) as typeof fetch,
     });
 

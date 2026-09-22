@@ -38,11 +38,16 @@ export function intervalToCron(every: string): string {
   if (!m) return '0 */2 * * *';
   const n = parseInt(m[1]!, 10);
   switch (m[2]) {
-    case 's': return `*/${Math.max(1, Math.min(59, n))} * * * * *`;
-    case 'm': return `*/${Math.max(1, Math.min(59, n))} * * * *`;
-    case 'h': return `0 */${Math.max(1, Math.min(23, n))} * * *`;
-    case 'd': return `0 0 */${Math.max(1, n)} * *`;
-    default: return '0 */2 * * *';
+    case 's':
+      return `*/${Math.max(1, Math.min(59, n))} * * * * *`;
+    case 'm':
+      return `*/${Math.max(1, Math.min(59, n))} * * * *`;
+    case 'h':
+      return `0 */${Math.max(1, Math.min(23, n))} * * *`;
+    case 'd':
+      return `0 0 */${Math.max(1, n)} * *`;
+    default:
+      return '0 */2 * * *';
   }
 }
 
@@ -51,9 +56,15 @@ export function parseHeartbeatAssessment(text: string): HeartbeatAssessment {
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) throw new Error('heartbeat model did not return JSON');
   const raw = JSON.parse(text.slice(start, end + 1)) as Partial<HeartbeatAssessment>;
-  if (!['quiet', 'actionable', 'degraded'].includes(raw.status ?? '')) throw new Error('invalid heartbeat status');
-  if (typeof raw.confidence !== 'number' || raw.confidence < 0 || raw.confidence > 1) throw new Error('invalid heartbeat confidence');
-  if (typeof raw.summary !== 'string' || !Array.isArray(raw.evidence) || !raw.evidence.every((x) => typeof x === 'string')) {
+  if (!['quiet', 'actionable', 'degraded'].includes(raw.status ?? ''))
+    throw new Error('invalid heartbeat status');
+  if (typeof raw.confidence !== 'number' || raw.confidence < 0 || raw.confidence > 1)
+    throw new Error('invalid heartbeat confidence');
+  if (
+    typeof raw.summary !== 'string' ||
+    !Array.isArray(raw.evidence) ||
+    !raw.evidence.every((x) => typeof x === 'string')
+  ) {
     throw new Error('invalid heartbeat evidence');
   }
   return {
@@ -73,24 +84,39 @@ export interface HeartbeatAssessorOptions {
   logger: Logger;
 }
 
-export function createHeartbeatAssessor(opts: HeartbeatAssessorOptions): () => Promise<HeartbeatAssessment> {
+export function createHeartbeatAssessor(
+  opts: HeartbeatAssessorOptions,
+): () => Promise<HeartbeatAssessment> {
   return async () => {
     let context: string;
     try {
       const recalled = await Promise.race([
-        opts.cortex.recall('current commitments deadlines blockers operational health and relationship follow-ups', {
-          tokenBudget: 1200,
-          sensitivityFilter: ['public', 'internal'],
-          since: new Date(Date.now() - 21 * 24 * 3600 * 1000),
-        }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('heartbeat evidence timeout')), 10_000)),
+        opts.cortex.recall(
+          'current commitments deadlines blockers operational health and relationship follow-ups',
+          {
+            tokenBudget: 1200,
+            sensitivityFilter: ['public', 'internal'],
+            since: new Date(Date.now() - 21 * 24 * 3600 * 1000),
+          },
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('heartbeat evidence timeout')), 10_000),
+        ),
       ]);
       context = recalled.context;
     } catch (error) {
       opts.logger.warn({ msg: 'heartbeat evidence unavailable', error });
-      return { status: 'degraded', confidence: 1, summary: 'Heartbeat evidence source unavailable.', evidence: [], suggestedAction: 'Inspect CORTEX recall health.' };
+      return {
+        status: 'degraded',
+        confidence: 1,
+        summary: 'Heartbeat evidence source unavailable.',
+        evidence: [],
+        suggestedAction: 'Inspect CORTEX recall health.',
+      };
     }
-    const refs = [opts.config.heartbeat.model, ...opts.config.models.fallbacks].filter((v, i, a) => a.indexOf(v) === i);
+    const refs = [opts.config.heartbeat.model, ...opts.config.models.fallbacks].filter(
+      (v, i, a) => a.indexOf(v) === i,
+    );
     for (const ref of refs) {
       try {
         const provider = opts.router.resolve(ref);
@@ -108,7 +134,13 @@ export function createHeartbeatAssessor(opts: HeartbeatAssessorOptions): () => P
         opts.logger.warn({ msg: 'heartbeat provider failed', ref, error });
       }
     }
-    return { status: 'degraded', confidence: 1, summary: 'Heartbeat provider chain exhausted.', evidence: [], suggestedAction: 'Inspect provider availability.' };
+    return {
+      status: 'degraded',
+      confidence: 1,
+      summary: 'Heartbeat provider chain exhausted.',
+      evidence: [],
+      suggestedAction: 'Inspect provider availability.',
+    };
   };
 }
 
@@ -129,7 +161,9 @@ export class HeartbeatScheduler {
     this.controlPlane = opts.controlPlane ?? new AutonomyControlPlane(opts.home);
   }
 
-  get running(): boolean { return this.task !== null; }
+  get running(): boolean {
+    return this.task !== null;
+  }
 
   start(): void {
     if (!this.opts.heartbeat.enabled) {
@@ -140,24 +174,48 @@ export class HeartbeatScheduler {
       this.opts.logger.error({ msg: 'heartbeat run recovered to dead letter', ...recovered });
     }
     const expr = intervalToCron(this.opts.heartbeat.every);
-    this.task = scheduleDeterministic(expr, async (scheduledAt) => { await this.beat(scheduledAt); }, {
-      timezone: process.env.TZ ?? 'America/Chicago',
-      onScheduled: (next) => this.controlPlane.setNextScheduledAt('heartbeat', next),
+    this.task = scheduleDeterministic(
+      expr,
+      async (scheduledAt) => {
+        await this.beat(scheduledAt);
+      },
+      {
+        timezone: process.env.TZ ?? 'America/Chicago',
+        onScheduled: (next) => this.controlPlane.setNextScheduledAt('heartbeat', next),
+      },
+    );
+    this.opts.logger.info({
+      msg: 'heartbeat scheduled',
+      expr,
+      every: this.opts.heartbeat.every,
+      mode: this.opts.heartbeat.mode,
     });
-    this.opts.logger.info({ msg: 'heartbeat scheduled', expr, every: this.opts.heartbeat.every, mode: this.opts.heartbeat.mode });
   }
 
   async beat(now = new Date()): Promise<boolean> {
     const ah = this.opts.heartbeat.activeHours;
     if (!withinActiveHours(now, ah.start, ah.end)) return false;
-    const acquired = this.controlPlane.begin('heartbeat', now, this.opts.heartbeat.leaseMinutes * 60_000);
+    const acquired = this.controlPlane.begin(
+      'heartbeat',
+      now,
+      this.opts.heartbeat.leaseMinutes * 60_000,
+    );
     if (!acquired.acquired || !acquired.run) return false;
     const runId = acquired.run.runId;
     try {
       const assessment = await this.opts.assess();
       const body = this.render(assessment).slice(0, this.opts.heartbeat.ackMaxChars);
-      const actionable = assessment.status === 'actionable' && assessment.confidence >= this.opts.heartbeat.minConfidence;
-      const novel = actionable && this.controlPlane.notificationAllowed('heartbeat', assessment, this.opts.heartbeat.cooldownMinutes * 60_000, now);
+      const actionable =
+        assessment.status === 'actionable' &&
+        assessment.confidence >= this.opts.heartbeat.minConfidence;
+      const novel =
+        actionable &&
+        this.controlPlane.notificationAllowed(
+          'heartbeat',
+          assessment,
+          this.opts.heartbeat.cooldownMinutes * 60_000,
+          now,
+        );
       const shouldPush = this.opts.heartbeat.mode === 'live' && novel;
       let pushed = false;
       if (shouldPush) {
@@ -165,18 +223,33 @@ export class HeartbeatScheduler {
         pushed = delivered !== false && this.opts.onAck !== undefined;
         if (pushed) this.controlPlane.recordNotification('heartbeat', assessment, now);
       }
-      const outcome = assessment.status === 'degraded' ? 'degraded' : this.opts.heartbeat.mode === 'shadow' ? 'shadow' : actionable ? 'success' : 'skipped';
-      this.controlPlane.finish('heartbeat', runId, outcome, { output: assessment, metadata: { actionable, novel, pushed } });
+      const outcome =
+        assessment.status === 'degraded'
+          ? 'degraded'
+          : this.opts.heartbeat.mode === 'shadow'
+            ? 'shadow'
+            : actionable
+              ? 'success'
+              : 'skipped';
+      this.controlPlane.finish('heartbeat', runId, outcome, {
+        output: assessment,
+        metadata: { actionable, novel, pushed },
+      });
       this.opts.logger.info({ msg: 'heartbeat assessed', runId, outcome, assessment, pushed });
       return true;
     } catch (error) {
-      this.controlPlane.finish('heartbeat', runId, 'failed', { reason: error instanceof Error ? error.message : String(error) });
+      this.controlPlane.finish('heartbeat', runId, 'failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
       this.opts.logger.warn({ msg: 'heartbeat failed', runId, error });
       return false;
     }
   }
 
-  stop(): void { this.task?.stop(); this.task = null; }
+  stop(): void {
+    this.task?.stop();
+    this.task = null;
+  }
 
   private render(value: HeartbeatAssessment): string {
     const evidence = value.evidence.length ? `\nEvidence: ${value.evidence.join('; ')}` : '';

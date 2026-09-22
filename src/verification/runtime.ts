@@ -93,7 +93,8 @@ export function runChecks(checks: VerificationCheck[], ctx: VerificationContext)
         break;
       }
       case 'numeric_validation': {
-        const requiredNumbers = (check.config?.must_contain_numbers as boolean | undefined) ?? false;
+        const requiredNumbers =
+          (check.config?.must_contain_numbers as boolean | undefined) ?? false;
         if (requiredNumbers && !/\d/.test(ctx.output)) {
           passed = false;
           note = 'Expected numeric content not found';

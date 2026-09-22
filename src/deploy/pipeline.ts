@@ -47,7 +47,9 @@ export async function runDeploy(opts: { intake: string; allowWrite?: boolean }):
   }
   const intake: Intake = validated.data;
   const slug = slugify(intake.q3_agent_name);
-  console.log(colors.cyan(`Deploying ${intake.q3_agent_name} (${slug}) for ${intake.q1_business_name}`));
+  console.log(
+    colors.cyan(`Deploying ${intake.q3_agent_name} (${slug}) for ${intake.q1_business_name}`),
+  );
 
   // Step 1: agent home
   const home = ensureAgentHome(slug);
@@ -56,7 +58,8 @@ export async function runDeploy(opts: { intake: string; allowWrite?: boolean }):
   // Step 2: config
   const config = defaultAgentConfig(slug, intake.q3_agent_name);
   config.agent.role = intake.q4_agent_role;
-  config.agent.template = intake.q4_agent_role === 'chief_of_staff' ? 'chief_of_staff' : intake.q4_agent_role;
+  config.agent.template =
+    intake.q4_agent_role === 'chief_of_staff' ? 'chief_of_staff' : intake.q4_agent_role;
   if (intake.q5_phone_strategy !== 'no_voice') {
     config.channels.vapi.enabled = true;
     config.channels.vapi.voicePersona = intake.q6_voice_persona;
@@ -117,7 +120,9 @@ ${intake.q7_business_hours}
       .toISOString()
       .slice(0, 10)}\n---\n\n## When to hand off\n${intake.q9_handoff_human.triggers
       .map((t) => `- ${t}`)
-      .join('\n')}\n\n## Where to send the conversation\n- ${intake.q9_handoff_human.name}\n- phone: ${
+      .join(
+        '\n',
+      )}\n\n## Where to send the conversation\n- ${intake.q9_handoff_human.name}\n- phone: ${
       intake.q9_handoff_human.phone
     }\n- email: ${intake.q9_handoff_human.email}\n`,
   );
@@ -152,7 +157,9 @@ ${intake.q7_business_hours}
       await cortex.dream('consolidation_only');
       console.log(colors.ok(`  [8/8] first dream cycle complete`));
     } else {
-      console.log(colors.warn(`  [8/8] CORTEX not reachable; first dream skipped, set NEON_DATABASE_URL`));
+      console.log(
+        colors.warn(`  [8/8] CORTEX not reachable; first dream skipped, set NEON_DATABASE_URL`),
+      );
     }
   } catch (err) {
     console.log(colors.warn(`  [8/8] first dream skipped: ${(err as Error).message}`));

@@ -30,7 +30,11 @@ describe('buildMcpServerEntry', () => {
   });
 
   it('builds an http server from a url', () => {
-    const e = buildMcpServerEntry({ name: 'data', transport: 'http', url: 'https://mcp.example.com/x' });
+    const e = buildMcpServerEntry({
+      name: 'data',
+      transport: 'http',
+      url: 'https://mcp.example.com/x',
+    });
     assert.equal(e.transport, 'http');
     assert.equal(e.url, 'https://mcp.example.com/x');
   });
@@ -64,13 +68,25 @@ describe('upsertMcpServer', () => {
   const bDisabled = { ...buildMcpServerEntry({ name: 'b', command: 'y' }), enabled: false };
 
   it('appends a new server', () => {
-    const out = upsertMcpServer([a as McpServerConfig], buildMcpServerEntry({ name: 'c', command: 'z' }), false);
-    assert.deepEqual(out.map((s) => s.name), ['a', 'c']);
+    const out = upsertMcpServer(
+      [a as McpServerConfig],
+      buildMcpServerEntry({ name: 'c', command: 'z' }),
+      false,
+    );
+    assert.deepEqual(
+      out.map((s) => s.name),
+      ['a', 'c'],
+    );
   });
 
   it('refuses to clobber an existing name without force', () => {
     assert.throws(
-      () => upsertMcpServer([a as McpServerConfig], buildMcpServerEntry({ name: 'a', command: 'q' }), false),
+      () =>
+        upsertMcpServer(
+          [a as McpServerConfig],
+          buildMcpServerEntry({ name: 'a', command: 'q' }),
+          false,
+        ),
       /already exists — pass --force/,
     );
   });
@@ -79,7 +95,11 @@ describe('upsertMcpServer', () => {
     const servers = [a as McpServerConfig, bDisabled as McpServerConfig];
     const replacement = buildMcpServerEntry({ name: 'a', command: 'NEW' });
     const out = upsertMcpServer(servers, replacement, true);
-    assert.deepEqual(out.map((s) => s.name), ['a', 'b'], 'order preserved');
+    assert.deepEqual(
+      out.map((s) => s.name),
+      ['a', 'b'],
+      'order preserved',
+    );
     assert.equal(out[0].command, 'NEW', 'entry replaced');
     assert.equal(out[1].enabled, false, 'a disabled sibling is not dropped');
   });
@@ -98,13 +118,19 @@ describe('removeMcpServer', () => {
   it('removes a matching server and reports removed=true', () => {
     const { servers, removed } = removeMcpServer([a, b] as McpServerConfig[], 'a');
     assert.equal(removed, true);
-    assert.deepEqual(servers.map((s) => s.name), ['b']);
+    assert.deepEqual(
+      servers.map((s) => s.name),
+      ['b'],
+    );
   });
 
   it('reports removed=false when nothing matched (caller treats as error)', () => {
     const { servers, removed } = removeMcpServer([a] as McpServerConfig[], 'nope');
     assert.equal(removed, false);
-    assert.deepEqual(servers.map((s) => s.name), ['a']);
+    assert.deepEqual(
+      servers.map((s) => s.name),
+      ['a'],
+    );
   });
 
   it('does not mutate the input', () => {
@@ -141,4 +167,4 @@ describe('setMcpServerEnabled', () => {
     setMcpServerEnabled(input, 'a', false);
     assert.equal(input[0].enabled, true, 'original untouched');
   });
-})
+});

@@ -72,14 +72,18 @@ export class AutonomyControlPlane {
   }
 
   static digest(value: unknown): string {
-    return createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value ?? null)).digest('hex');
+    return createHash('sha256')
+      .update(typeof value === 'string' ? value : JSON.stringify(value ?? null))
+      .digest('hex');
   }
 
   begin(job: string, scheduledAt: Date, leaseMs: number, now = new Date()): BeginRunResult {
     return this.mutate((state) => {
       const current = this.job(state, job);
       const schedule = scheduledAt.toISOString();
-      const duplicate = current.runs.find((run) => run.scheduledAt === schedule && run.outcome !== 'dead_letter');
+      const duplicate = current.runs.find(
+        (run) => run.scheduledAt === schedule && run.outcome !== 'dead_letter',
+      );
       if (duplicate) return { acquired: false, reason: 'duplicate' };
       if (current.lease && current.lease.until > now.toISOString()) {
         return { acquired: false, reason: 'lease_active' };
@@ -116,12 +120,12 @@ export class AutonomyControlPlane {
       run.outcome = outcome;
       run.finishedAt = now.toISOString();
       run.reason = detail.reason;
-      run.outputDigest = detail.output === undefined ? undefined : AutonomyControlPlane.digest(detail.output);
+      run.outputDigest =
+        detail.output === undefined ? undefined : AutonomyControlPlane.digest(detail.output);
       run.metadata = detail.metadata;
       if (current.lease?.runId === runId) delete current.lease;
-      current.consecutiveFailures = outcome === 'failed' || outcome === 'dead_letter'
-        ? current.consecutiveFailures + 1
-        : 0;
+      current.consecutiveFailures =
+        outcome === 'failed' || outcome === 'dead_letter' ? current.consecutiveFailures + 1 : 0;
       return { ...run };
     });
   }
@@ -143,7 +147,10 @@ export class AutonomyControlPlane {
     return this.mutate((state) => {
       const recovered: AutonomyRun[] = [];
       for (const current of Object.values(state.jobs)) {
-        if (current.lease && (current.lease.ownerId !== this.instanceId || current.lease.until <= now.toISOString())) {
+        if (
+          current.lease &&
+          (current.lease.ownerId !== this.instanceId || current.lease.until <= now.toISOString())
+        ) {
           const run = this.abandonExpiredRun(current, now);
           if (run) recovered.push({ ...run });
         }
@@ -155,12 +162,16 @@ export class AutonomyControlPlane {
   notificationAllowed(job: string, output: unknown, cooldownMs: number, now = new Date()): boolean {
     const digest = AutonomyControlPlane.digest(output);
     const previous = this.snapshot().jobs[job]?.lastNotification;
-    return !(previous?.digest === digest && now.getTime() - new Date(previous.at).getTime() < cooldownMs);
+    return !(
+      previous?.digest === digest && now.getTime() - new Date(previous.at).getTime() < cooldownMs
+    );
   }
 
   recordNotification(job: string, output: unknown, now = new Date()): void {
     const digest = AutonomyControlPlane.digest(output);
-    this.mutate((state) => { this.job(state, job).lastNotification = { digest, at: now.toISOString() }; });
+    this.mutate((state) => {
+      this.job(state, job).lastNotification = { digest, at: now.toISOString() };
+    });
   }
 
   /** Compatibility helper for callers that perform no fallible delivery. */
@@ -183,9 +194,10 @@ export class AutonomyControlPlane {
     if (run?.outcome === 'running') {
       run.outcome = 'dead_letter';
       run.finishedAt = now.toISOString();
-      run.reason = current.lease?.ownerId !== this.instanceId
-        ? 'runtime restarted before a terminal outcome was recorded'
-        : 'lease expired before a terminal outcome was recorded';
+      run.reason =
+        current.lease?.ownerId !== this.instanceId
+          ? 'runtime restarted before a terminal outcome was recorded'
+          : 'lease expired before a terminal outcome was recorded';
       current.consecutiveFailures++;
     }
     delete current.lease;
@@ -207,10 +219,13 @@ export class AutonomyControlPlane {
   private read(): ControlPlaneState {
     try {
       const parsed = JSON.parse(readFileSync(this.statePath, 'utf8')) as ControlPlaneState;
-      if (parsed.version !== 1 || !parsed.jobs) throw new Error('unsupported autonomy state schema');
+      if (parsed.version !== 1 || !parsed.jobs)
+        throw new Error('unsupported autonomy state schema');
       return parsed;
     } catch (error) {
-      throw new Error(`autonomy control-plane state is unreadable: ${this.statePath}`, { cause: error });
+      throw new Error(`autonomy control-plane state is unreadable: ${this.statePath}`, {
+        cause: error,
+      });
     }
   }
 
@@ -223,7 +238,11 @@ export class AutonomyControlPlane {
       return result;
     } finally {
       closeSync(fd);
-      try { unlinkSync(this.lockPath); } catch { /* already released */ }
+      try {
+        unlinkSync(this.lockPath);
+      } catch {
+        /* already released */
+      }
     }
   }
 
@@ -242,7 +261,9 @@ export class AutonomyControlPlane {
             unlinkSync(this.lockPath);
             continue;
           }
-        } catch { /* lock disappeared between checks */ }
+        } catch {
+          /* lock disappeared between checks */
+        }
         throw new Error(`autonomy control-plane lock is busy: ${this.lockPath}`, { cause: error });
       }
     }

@@ -8,7 +8,7 @@
  * is QuartzPipeline in src/memory/quartz-memory-provider.ts; factory.ts casts
  * at the trust line and mismatches surface at first call, not at boot.
  */
-declare module "@aterna/quartz" {
+declare module '@aterna/quartz' {
   export const QuartzMemoryProvider:
     | (new (
         backend: unknown,

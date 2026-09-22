@@ -46,15 +46,9 @@ export function writeLoadoutFile(inputs: LoadoutInputs): string {
 
   lines.push('# Runtime loadout');
   lines.push('');
-  lines.push(
-    'This file is regenerated every time the gateway or REPL starts. It is the',
-  );
-  lines.push(
-    'authoritative list of what I can do RIGHT NOW. If a capability is not on',
-  );
-  lines.push(
-    'this list, I do not have it. I never claim a capability I cannot find here.',
-  );
+  lines.push('This file is regenerated every time the gateway or REPL starts. It is the');
+  lines.push('authoritative list of what I can do RIGHT NOW. If a capability is not on');
+  lines.push('this list, I do not have it. I never claim a capability I cannot find here.');
   lines.push('');
 
   // ── Channels ──

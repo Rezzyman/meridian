@@ -94,7 +94,12 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       ),
     ]);
     if (bootHealth.status === 'ok') {
-      logger.info({ event: 'cortex.health', status: 'ok', url: cortex.baseUrl, msg: 'CORTEX backend reachable' });
+      logger.info({
+        event: 'cortex.health',
+        status: 'ok',
+        url: cortex.baseUrl,
+        msg: 'CORTEX backend reachable',
+      });
     } else {
       logger.warn({
         event: 'cortex.health',
@@ -131,7 +136,15 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
 
   // Tool surface: builtins + v2 skill tools + MCP tools, assembled in one
   // place shared with the REPL (src/agent/tool-surface.ts).
-  const surface = await buildToolSurface({ home, config, env, cortex, logger, router, memory: memorySelection.provider });
+  const surface = await buildToolSurface({
+    home,
+    config,
+    env,
+    cortex,
+    logger,
+    router,
+    memory: memorySelection.provider,
+  });
   const { tools, skillToolNames, skills, vault, verificationChecks, provenanceSigner } = surface;
 
   // Voice session guard — passphrase-gated unlock for the public voice line.
@@ -154,7 +167,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       skills,
       automations: loadAutomationDefs(home),
       builtinToolNames: surface.builtinToolNames,
-      mcpTools: surface.mcpStatus.flatMap((st) => st.tools.map((t) => ({ name: t, server: st.server }))),
+      mcpTools: surface.mcpStatus.flatMap((st) =>
+        st.tools.map((t) => ({ name: t, server: st.server })),
+      ),
       cortexStats: cortexStats ?? undefined,
     });
   } catch (err) {
@@ -196,8 +211,11 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     const convo = new Conversation({
       config,
       cortex: memorySelection.provider,
-      router, logger,
-      systemBase, channel, tools,
+      router,
+      logger,
+      systemBase,
+      channel,
+      tools,
       skillToolNames,
       mcpGate: surface.mcpGate,
       verificationChecks,
@@ -221,7 +239,10 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     return convo;
   }
 
-  function getSession(channel: ChannelKind, from: string): {
+  function getSession(
+    channel: ChannelKind,
+    from: string,
+  ): {
     convo: Conversation;
     sessionId: string;
     operatorLabel: string;
@@ -350,11 +371,12 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       assistantId: env.VAPI_ASSISTANT_ID,
       cortex,
       voiceGuard,
-      telegramDM: telegram && env.TELEGRAM_DEFAULT_CHAT_ID
-        ? async (text: string) => {
-            await telegram!.send({ to: env.TELEGRAM_DEFAULT_CHAT_ID!, text });
-          }
-        : undefined,
+      telegramDM:
+        telegram && env.TELEGRAM_DEFAULT_CHAT_ID
+          ? async (text: string) => {
+              await telegram!.send({ to: env.TELEGRAM_DEFAULT_CHAT_ID!, text });
+            }
+          : undefined,
       executeTool: async (name, args, ctx) => {
         if (!VOICE_TOOL_ALLOW.has(name)) {
           throw new Error(`tool '${name}' is not whitelisted for voice`);
@@ -364,13 +386,23 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
         const callIndex = (voiceToolCalls.get(actionSession) ?? 0) + 1;
         voiceToolCalls.set(actionSession, callIndex);
         const decision = evaluateActionPolicy(config, {
-          agentId: config.agent.slug, sessionId: `voice:${actionSession}`, channel: 'voice',
-          senderTrusted: unlocked, toolName: name, callIndex,
+          agentId: config.agent.slug,
+          sessionId: `voice:${actionSession}`,
+          channel: 'voice',
+          senderTrusted: unlocked,
+          toolName: name,
+          callIndex,
         });
         const receiptBase = {
-          agentId: config.agent.slug, sessionId: `voice:${actionSession}`, channel: 'voice' as const,
-          senderTrusted: unlocked, toolName: name, callIndex, ...decision,
-          receiptId: `act_${randomUUID()}`, ts: new Date().toISOString(),
+          agentId: config.agent.slug,
+          sessionId: `voice:${actionSession}`,
+          channel: 'voice' as const,
+          senderTrusted: unlocked,
+          toolName: name,
+          callIndex,
+          ...decision,
+          receiptId: `act_${randomUUID()}`,
+          ts: new Date().toISOString(),
           argsDigest: store.digestActionArgs(args),
         };
         if (decision.decision === 'deny') {
@@ -381,11 +413,12 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
           // the model loses the ability to surface it to the caller smoothly.
           return {
             error: unlocked ? 'action_denied' : 'voice_session_locked',
-            message: !unlocked && voiceGuard.isConfigured()
-              ? 'This call is in public mode. The caller must speak the passphrase to unlock privileged tools.'
-              : !unlocked
-                ? 'Voice passphrase not configured on this agent. Run `meridian voice passphrase` to set one.'
-                : decision.reason,
+            message:
+              !unlocked && voiceGuard.isConfigured()
+                ? 'This call is in public mode. The caller must speak the passphrase to unlock privileged tools.'
+                : !unlocked
+                  ? 'Voice passphrase not configured on this agent. Run `meridian voice passphrase` to set one.'
+                  : decision.reason,
           };
         }
         const t = (tools as Record<string, { execute?: (a: unknown) => Promise<unknown> }>)[name];
@@ -395,11 +428,17 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
         const started = Date.now();
         try {
           const result = await t.execute(args);
-          store.recordActionReceipt({ ...receiptBase, outcome: 'succeeded', durationMs: Date.now() - started });
+          store.recordActionReceipt({
+            ...receiptBase,
+            outcome: 'succeeded',
+            durationMs: Date.now() - started,
+          });
           return result;
         } catch (error) {
           store.recordActionReceipt({
-            ...receiptBase, outcome: 'failed', durationMs: Date.now() - started,
+            ...receiptBase,
+            outcome: 'failed',
+            durationMs: Date.now() - started,
             errorClass: error instanceof Error ? error.constructor.name : 'UnknownError',
           });
           throw error;
@@ -462,7 +501,12 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
 
   // ── WhatsApp channel — Meta Cloud API webhook (signed), optional allowlist ──
   let whatsapp: WhatsappChannel | undefined;
-  if (env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN) {
+  if (
+    env.WHATSAPP_PHONE_NUMBER_ID &&
+    env.WHATSAPP_ACCESS_TOKEN &&
+    env.WHATSAPP_APP_SECRET &&
+    env.WHATSAPP_VERIFY_TOKEN
+  ) {
     whatsapp = new WhatsappChannel({
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
       accessToken: env.WHATSAPP_ACCESS_TOKEN,
@@ -586,7 +630,6 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     );
   }
 
-
   // ── Inbox watcher — drop a file in MEMORY/inbox/ and the agent ingests it ──
   // Multimodal capability: PDFs, markdown, text, image stubs all flow into
   // memory automatically. After ingest the file is renamed to .processed
@@ -699,10 +742,10 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
         const adapters: LoopAgentAdapterRegistry = {
           meridian: createMeridianLoopAgentAdapter(meridianConversation, config.agent.name),
         };
-        const externalHarness = env.ATERNA_LOOP_HARNESS === 'openclaw' ||
-          env.ATERNA_LOOP_HARNESS === 'hermes'
-          ? env.ATERNA_LOOP_HARNESS
-          : undefined;
+        const externalHarness =
+          env.ATERNA_LOOP_HARNESS === 'openclaw' || env.ATERNA_LOOP_HARNESS === 'hermes'
+            ? env.ATERNA_LOOP_HARNESS
+            : undefined;
         if (externalHarness && env.ATERNA_LOOP_HARNESS_URL && env.ATERNA_LOOP_HARNESS_TOKEN) {
           adapters[externalHarness] = createAttestedHarnessLoopAgentAdapter({
             harness: externalHarness,
@@ -759,12 +802,18 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   if (weather) {
     console.log(colors.ok(`  R1 weather armed for ${env.MERIDIAN_DEVICE_CITY}`));
   }
-  console.log(colors.muted(`  channels: ${[
-    'cli (REPL)',
-    env.TELEGRAM_BOT_TOKEN ? 'telegram (gated)' : null,
-    vapi ? 'voice (VAPI webhook ready)' : null,
-    'http /chat',
-  ].filter(Boolean).join(', ')}`));
+  console.log(
+    colors.muted(
+      `  channels: ${[
+        'cli (REPL)',
+        env.TELEGRAM_BOT_TOKEN ? 'telegram (gated)' : null,
+        vapi ? 'voice (VAPI webhook ready)' : null,
+        'http /chat',
+      ]
+        .filter(Boolean)
+        .join(', ')}`,
+    ),
+  );
 
   // Block forever
   await new Promise(() => {});

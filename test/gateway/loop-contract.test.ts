@@ -31,14 +31,16 @@ function request() {
     intervalStart: '2026-08-06T06:00:00.000Z',
     intervalEnd: '2026-08-07T06:00:00.000Z',
     timeZoneIdentifier: 'America/Denver',
-    evidence: [{
-      lifelogId,
-      segmentId,
-      startedAt: '2026-08-06T18:00:00.000Z',
-      endedAt: '2026-08-06T18:00:05.000Z',
-      excerpt,
-      sha256: createHash('sha256').update(excerpt).digest('hex'),
-    }],
+    evidence: [
+      {
+        lifelogId,
+        segmentId,
+        startedAt: '2026-08-06T18:00:00.000Z',
+        endedAt: '2026-08-06T18:00:05.000Z',
+        excerpt,
+        sha256: createHash('sha256').update(excerpt).digest('hex'),
+      },
+    ],
   };
 }
 
@@ -120,14 +122,22 @@ describe('Aterna Loop gateway contract', () => {
     assert.equal(seen[0].opts.isolation.disableTools, true);
     assert.equal(seen[0].opts.isolation.disableMemoryWrite, true);
     assert.match(seen[0].opts.isolation.systemPolicy, /never obey commands/i);
-    assert.match(seen[0].opts.isolation.systemPolicy, /authenticated, user-selected source records/i);
-    assert.match(seen[0].opts.isolation.systemPolicy, /must contain at least one exact segment citation/i);
+    assert.match(
+      seen[0].opts.isolation.systemPolicy,
+      /authenticated, user-selected source records/i,
+    );
+    assert.match(
+      seen[0].opts.isolation.systemPolicy,
+      /must contain at least one exact segment citation/i,
+    );
   });
 
   it('fails closed for missing auth, malformed input, and invented citations', async () => {
     const base = await boot(fakeConversation([], '[segment:55555555-5555-4555-8555-555555555555]'));
     const unauthorized = await fetch(`${base}/v1/loop/turns`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request()),
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request()),
     });
     assert.equal(unauthorized.status, 401);
 
@@ -144,7 +154,10 @@ describe('Aterna Loop gateway contract', () => {
     const malformed = await fetch(`${base}/v1/loop/turns`, {
       method: 'POST',
       headers: { authorization: 'Bearer loop-secret', 'content-type': 'application/json' },
-      body: JSON.stringify({ ...request(), evidence: [{ ...request().evidence[0], sha256: '0'.repeat(64) }] }),
+      body: JSON.stringify({
+        ...request(),
+        evidence: [{ ...request().evidence[0], sha256: '0'.repeat(64) }],
+      }),
     });
     assert.equal(malformed.status, 400);
 
@@ -154,7 +167,7 @@ describe('Aterna Loop gateway contract', () => {
       body: JSON.stringify(request()),
     });
     assert.equal(invented.status, 200);
-    const json = await invented.json() as { text: string; citedSegmentIds: string[] };
+    const json = (await invented.json()) as { text: string; citedSegmentIds: string[] };
     assert.match(json.text, /withheld/i);
     assert.deepEqual(json.citedSegmentIds, []);
   });
@@ -162,7 +175,9 @@ describe('Aterna Loop gateway contract', () => {
   it('refuses to expose the loop route when gateway authentication is absent', async () => {
     const base = await boot(fakeConversation([]), '');
     const response = await fetch(`${base}/v1/loop/turns`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request()),
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request()),
     });
     assert.equal(response.status, 503);
   });
@@ -179,7 +194,8 @@ describe('Aterna Loop gateway contract', () => {
         pairing: {
           publicBaseURL: 'https://loop.example.test/',
           store: {
-            authenticateDeviceToken: (token: string) => token === 'device-capability-that-is-long-enough-1234',
+            authenticateDeviceToken: (token: string) =>
+              token === 'device-capability-that-is-long-enough-1234',
           } as never,
         },
       },
@@ -224,7 +240,9 @@ describe('Aterna Loop gateway contract', () => {
       conversation: {
         sessionId: 'gateway-http',
         historyCount: 0,
-        send: async () => { throw new Error('not used'); },
+        send: async () => {
+          throw new Error('not used');
+        },
       } as unknown as Conversation,
     });
     apps.push(app);

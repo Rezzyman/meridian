@@ -138,12 +138,11 @@ export async function runDemo(): Promise<void> {
 
     // ── Scene 3: don't take our word for it ──
     rule();
-    line(colors.connections('\n  3 ·  Don\'t take our word for it — the open benchmark\n'));
+    line(colors.connections("\n  3 ·  Don't take our word for it — the open benchmark\n"));
     const b = demoBench();
     if (b.total > 0) {
       line(
-        colors.muted('     MemPoisonBench, ') +
-          colors.muted(`${b.total} targeted poison vectors:`),
+        colors.muted('     MemPoisonBench, ') + colors.muted(`${b.total} targeted poison vectors:`),
       );
       line(
         colors.muted('       defense OFF → ') +
@@ -154,9 +153,7 @@ export async function runDemo(): Promise<void> {
           colors.ok(`${b.on}/${b.total} reach the model (${pct(b.on, b.total)})`) +
           colors.muted(`   · ${b.fp} false positives`),
       );
-      line(
-        colors.cyan(`\n     poisoning success: ${pct(b.off, b.total)} → ${pct(b.on, b.total)}`),
-      );
+      line(colors.cyan(`\n     poisoning success: ${pct(b.off, b.total)} → ${pct(b.on, b.total)}`));
     }
     await sleep(400);
 
@@ -164,11 +161,22 @@ export async function runDemo(): Promise<void> {
     rule();
     line(colors.ok('\n  That is the moat: memory you can give your life to.\n'));
     line(colors.muted('  Keep going — a real agent in under a minute, zero setup:'));
-    line(colors.cyan('     meridian init my-agent --embedded') + colors.muted('   # local memory, no keys'));
-    line(colors.cyan('     meridian') + colors.muted('                              # start chatting'));
+    line(
+      colors.cyan('     meridian init my-agent --embedded') +
+        colors.muted('   # local memory, no keys'),
+    );
+    line(
+      colors.cyan('     meridian') + colors.muted('                              # start chatting'),
+    );
     line();
-    line(colors.muted('  Reproduce the full benchmark (in a clone):  ') + colors.cyan('pnpm tsx scripts/mempoison/mempoisonbench.mts'));
-    line(colors.muted('  Repo + threat model:      ') + colors.cyan('github.com/Rezzyman/meridian  ·  docs/memory-poisoning.md'));
+    line(
+      colors.muted('  Reproduce the full benchmark (in a clone):  ') +
+        colors.cyan('pnpm tsx scripts/mempoison/mempoisonbench.mts'),
+    );
+    line(
+      colors.muted('  Repo + threat model:      ') +
+        colors.cyan('github.com/Rezzyman/meridian  ·  docs/memory-poisoning.md'),
+    );
     line();
   } finally {
     rmSync(dir, { recursive: true, force: true });

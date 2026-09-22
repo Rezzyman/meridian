@@ -52,7 +52,8 @@ describe('AutonomyControlPlane', () => {
     const at = new Date('2026-07-31T14:00:00.000Z');
     assert.equal(plane.begin('brief', at, 60_000, at).acquired, true);
     assert.equal(
-      plane.begin('brief', new Date(at.getTime() + 1_000), 60_000, new Date(at.getTime() + 1_000)).reason,
+      plane.begin('brief', new Date(at.getTime() + 1_000), 60_000, new Date(at.getTime() + 1_000))
+        .reason,
       'lease_active',
     );
   });
@@ -82,14 +83,33 @@ describe('AutonomyControlPlane', () => {
     const at = new Date('2026-07-31T14:00:00.000Z');
     assert.equal(plane.shouldNotify('heartbeat', { summary: 'same' }, 60_000, at), true);
     const restarted = new AutonomyControlPlane(home);
-    assert.equal(restarted.shouldNotify('heartbeat', { summary: 'same' }, 60_000, new Date(at.getTime() + 1_000)), false);
-    assert.equal(restarted.shouldNotify('heartbeat', { summary: 'changed' }, 60_000, new Date(at.getTime() + 2_000)), true);
+    assert.equal(
+      restarted.shouldNotify(
+        'heartbeat',
+        { summary: 'same' },
+        60_000,
+        new Date(at.getTime() + 1_000),
+      ),
+      false,
+    );
+    assert.equal(
+      restarted.shouldNotify(
+        'heartbeat',
+        { summary: 'changed' },
+        60_000,
+        new Date(at.getTime() + 2_000),
+      ),
+      true,
+    );
   });
 
   it('stores the next schedule boundary across process restarts', () => {
     const { home, plane } = fixture();
     const next = new Date('2026-08-01T14:00:00.000Z');
     plane.setNextScheduledAt('brief', next);
-    assert.equal(new AutonomyControlPlane(home).getNextScheduledAt('brief')?.toISOString(), next.toISOString());
+    assert.equal(
+      new AutonomyControlPlane(home).getNextScheduledAt('brief')?.toISOString(),
+      next.toISOString(),
+    );
   });
 });

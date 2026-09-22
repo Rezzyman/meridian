@@ -38,7 +38,10 @@ describe('SessionStore', () => {
     s.appendTurn(turn({ id: 'a', content: 'first' }), 0);
     const loaded = s.loadSession('s1');
     assert.equal(loaded?.agentSlug, 'a');
-    assert.deepEqual(loaded?.turns.map((t) => t.content), ['first', 'second']);
+    assert.deepEqual(
+      loaded?.turns.map((t) => t.content),
+      ['first', 'second'],
+    );
   });
 
   it('replaces a turn with the same id (insert-or-replace)', () => {
@@ -46,14 +49,19 @@ describe('SessionStore', () => {
     s.startSession({ id: 's1', agentSlug: 'a', createdAt: '2026-01-01T00:00:00Z', turns: [] });
     s.appendTurn(turn({ id: 'x', content: 'v1' }), 0);
     s.appendTurn(turn({ id: 'x', content: 'v2' }), 0);
-    assert.deepEqual(s.loadSession('s1')?.turns.map((t) => t.content), ['v2']);
+    assert.deepEqual(
+      s.loadSession('s1')?.turns.map((t) => t.content),
+      ['v2'],
+    );
   });
 
   it('preserves toolCalls/verifications on a turn', () => {
     const s = new SessionStore(homeFor(tmp));
     s.startSession({ id: 's1', agentSlug: 'a', createdAt: '2026-01-01T00:00:00Z', turns: [] });
     s.appendTurn(turn({ id: 't', toolCalls: [{ name: 'web_fetch', args: { url: 'x' } }] }), 0);
-    assert.deepEqual(s.loadSession('s1')?.turns[0].toolCalls, [{ name: 'web_fetch', args: { url: 'x' } }]);
+    assert.deepEqual(s.loadSession('s1')?.turns[0].toolCalls, [
+      { name: 'web_fetch', args: { url: 'x' } },
+    ]);
   });
 
   it('finds the most recent session for an operator, honoring the idle window', () => {
@@ -73,48 +81,96 @@ describe('SessionStore', () => {
 
   it('records and reads back reasoning traces', () => {
     const s = new SessionStore(homeFor(tmp));
-    const tr: TurnTrace = { turnId: 't1', sessionId: 's1', channel: 'cli', userInput: 'q', reply: 'a', ts: '2026-01-01T00:00:01Z' };
+    const tr: TurnTrace = {
+      turnId: 't1',
+      sessionId: 's1',
+      channel: 'cli',
+      userInput: 'q',
+      reply: 'a',
+      ts: '2026-01-01T00:00:01Z',
+    };
     s.recordTrace(tr);
     s.recordTrace({ ...tr, turnId: 't2', ts: '2026-01-01T00:00:02Z' });
     assert.equal(s.loadTrace('t1')?.reply, 'a');
     assert.equal(s.loadTrace('nope'), null);
-    assert.deepEqual(s.listSessionTraces('s1').map((t) => t.turnId), ['t2', 't1']); // latest first
+    assert.deepEqual(
+      s.listSessionTraces('s1').map((t) => t.turnId),
+      ['t2', 't1'],
+    ); // latest first
   });
 
   it('PERSISTS across a fresh store on the same path (JSONL replay)', () => {
     const home = homeFor(tmp);
     const a = new SessionStore(home);
-    a.startSession({ id: 's1', agentSlug: 'a', createdAt: '2026-01-01T00:00:00Z', turns: [], operatorId: 'op1' });
+    a.startSession({
+      id: 's1',
+      agentSlug: 'a',
+      createdAt: '2026-01-01T00:00:00Z',
+      turns: [],
+      operatorId: 'op1',
+    });
     a.appendTurn(turn({ id: 't1', content: 'persisted' }), 0);
-    a.recordTrace({ turnId: 't1', sessionId: 's1', channel: 'cli', userInput: 'q', reply: 'r', ts: '2026-01-01T00:00:01Z' });
+    a.recordTrace({
+      turnId: 't1',
+      sessionId: 's1',
+      channel: 'cli',
+      userInput: 'q',
+      reply: 'r',
+      ts: '2026-01-01T00:00:01Z',
+    });
     a.close();
 
     const b = new SessionStore(home); // re-open — must replay from disk
-    assert.deepEqual(b.loadSession('s1')?.turns.map((t) => t.content), ['persisted']);
+    assert.deepEqual(
+      b.loadSession('s1')?.turns.map((t) => t.content),
+      ['persisted'],
+    );
     assert.equal(b.findRecentByOperator('op1')?.id, 's1');
     assert.equal(b.loadTrace('t1')?.reply, 'r');
-    assert.deepEqual(b.listRecent().map((x) => x.id), ['s1']);
+    assert.deepEqual(
+      b.listRecent().map((x) => x.id),
+      ['s1'],
+    );
   });
 
   it('writes, verifies, chains, and replays signed action receipts', () => {
     const home = homeFor(tmp);
     const store = new SessionStore(home);
     const base = {
-      agentId: 'a', sessionId: 's1', channel: 'cli' as const, senderTrusted: true,
-      toolName: 'calculate', callIndex: 1, decision: 'allow' as const,
-      reason: 'allowed', rule: 'allow', ts: '2026-01-01T00:00:00Z',
-      argsDigest: store.digestActionArgs({ x: 1 }), outcome: 'succeeded' as const,
+      agentId: 'a',
+      sessionId: 's1',
+      channel: 'cli' as const,
+      senderTrusted: true,
+      toolName: 'calculate',
+      callIndex: 1,
+      decision: 'allow' as const,
+      reason: 'allowed',
+      rule: 'allow',
+      ts: '2026-01-01T00:00:00Z',
+      argsDigest: store.digestActionArgs({ x: 1 }),
+      outcome: 'succeeded' as const,
     };
     const first = store.recordActionReceipt({ ...base, receiptId: 'act_1' });
-    const second = store.recordActionReceipt({ ...base, receiptId: 'act_2', callIndex: 2, ts: '2026-01-01T00:00:01Z' });
+    const second = store.recordActionReceipt({
+      ...base,
+      receiptId: 'act_2',
+      callIndex: 2,
+      ts: '2026-01-01T00:00:01Z',
+    });
     assert.equal(store.verifyActionReceipt(first), true);
     assert.equal(second.previousHash, first.hash);
     assert.equal(store.verifyActionReceipt({ ...second, toolName: 'bash' }), false);
 
     const replay = new SessionStore(home);
     const loaded = replay.listActionReceipts('s1');
-    assert.deepEqual(loaded.map((r) => r.receiptId), ['act_2', 'act_1']);
-    assert.equal(loaded.every((r) => replay.verifyActionReceipt(r)), true);
+    assert.deepEqual(
+      loaded.map((r) => r.receiptId),
+      ['act_2', 'act_1'],
+    );
+    assert.equal(
+      loaded.every((r) => replay.verifyActionReceipt(r)),
+      true,
+    );
     assert.equal(replay.verifyActionChain(), true);
   });
 

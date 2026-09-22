@@ -110,7 +110,11 @@ export async function buildToolSurface(inputs: ToolSurfaceInputs): Promise<ToolS
   // process.env onto the typed AgentEnv (loose at runtime by design).
   const vault = openAgentVault({ envPath: home.envPath, vaultPath: home.vaultPath });
   const guard = new PassphraseGuard(vault);
-  const mergedEnv = Object.assign({}, env, collectSkillEnv(prescanManifestEnvKeys(home))) as typeof env;
+  const mergedEnv = Object.assign(
+    {},
+    env,
+    collectSkillEnv(prescanManifestEnvKeys(home)),
+  ) as typeof env;
 
   const skillCtx = {
     cortex,

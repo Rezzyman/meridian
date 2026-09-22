@@ -111,12 +111,17 @@ export class Conversation {
         verificationChecks: this.opts.verificationChecks,
         provenanceSigner: this.opts.provenanceSigner,
         senderTrusted: this.opts.senderTrusted,
-        actionGovernance: this.opts.store ? {
-          agentId: this.opts.config.agent.slug,
-          digestArgs: (args) => this.opts.store!.digestActionArgs(args),
-          consumeApproval: (toolName, argsDigest) => this.opts.store!.consumeApproval(this.sessionId, toolName, argsDigest),
-          record: (receipt) => { this.opts.store!.recordActionReceipt(receipt); },
-        } : undefined,
+        actionGovernance: this.opts.store
+          ? {
+              agentId: this.opts.config.agent.slug,
+              digestArgs: (args) => this.opts.store!.digestActionArgs(args),
+              consumeApproval: (toolName, argsDigest) =>
+                this.opts.store!.consumeApproval(this.sessionId, toolName, argsDigest),
+              record: (receipt) => {
+                this.opts.store!.recordActionReceipt(receipt);
+              },
+            }
+          : undefined,
         isolation: sendOpts?.isolation,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],

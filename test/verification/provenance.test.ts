@@ -108,7 +108,10 @@ describe('signedProvenanceResolver — screen integration', () => {
     };
     const r = screenRecall([signed], `- ${content}`, { provenance: signedProvenanceResolver(s) });
     assert.equal(r.quarantined.length, 0, 'a validly signed first-party rule is kept');
-    assert.deepEqual(r.kept.map((m) => m.id), [1]);
+    assert.deepEqual(
+      r.kept.map((m) => m.id),
+      [1],
+    );
   });
 
   it('quarantines a signed memory whose content was tampered after signing', () => {
@@ -125,7 +128,11 @@ describe('signedProvenanceResolver — screen integration', () => {
     const r = screenRecall([tampered], `- ${tampered.content}`, {
       provenance: signedProvenanceResolver(s),
     });
-    assert.equal(r.quarantined.length, 1, 'stale signature over swapped content → untrusted → screened');
+    assert.equal(
+      r.quarantined.length,
+      1,
+      'stale signature over swapped content → untrusted → screened',
+    );
   });
 
   it('prefix mode (default resolver) still trusts the label — the documented weaker baseline', () => {

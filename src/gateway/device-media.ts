@@ -15,11 +15,9 @@ export interface DeviceLookParts {
 }
 
 /** Local, private speech recognition for the Mac Mini gateway. Audio is deleted after the turn. */
-export function localWhisperTranscriber(opts: {
-  command?: string;
-  model?: string;
-  language?: string;
-} = {}): AudioTranscriber {
+export function localWhisperTranscriber(
+  opts: { command?: string; model?: string; language?: string } = {},
+): AudioTranscriber {
   const command = opts.command ?? 'whisper';
   const model = opts.model ?? 'base.en';
   const language = opts.language ?? 'en';
@@ -31,16 +29,27 @@ export function localWhisperTranscriber(opts: {
     const output = join(directory, 'turn.json');
     try {
       await writeFile(input, audio, { mode: 0o600 });
-      await execFileAsync(command, [
-        input,
-        '--model', model,
-        '--language', language,
-        '--task', 'transcribe',
-        '--output_dir', directory,
-        '--output_format', 'json',
-        '--verbose', 'False',
-        '--fp16', 'False',
-      ], { timeout: 120_000, maxBuffer: 2 * 1024 * 1024 });
+      await execFileAsync(
+        command,
+        [
+          input,
+          '--model',
+          model,
+          '--language',
+          language,
+          '--task',
+          'transcribe',
+          '--output_dir',
+          directory,
+          '--output_format',
+          'json',
+          '--verbose',
+          'False',
+          '--fp16',
+          'False',
+        ],
+        { timeout: 120_000, maxBuffer: 2 * 1024 * 1024 },
+      );
       const decoded = JSON.parse(await readFile(output, 'utf8')) as { text?: unknown };
       const text = typeof decoded.text === 'string' ? decoded.text.trim() : '';
       if (!text) throw new Error('speech recognizer returned no text');
@@ -52,11 +61,9 @@ export function localWhisperTranscriber(opts: {
 }
 
 /** Local Ollama vision adapter. Camera frames stay on the guardian's Mac Mini. */
-export function localOllamaImageDescriber(opts: {
-  baseUrl?: string;
-  model?: string;
-  fetchImpl?: typeof fetch;
-} = {}): ImageDescriber {
+export function localOllamaImageDescriber(
+  opts: { baseUrl?: string; model?: string; fetchImpl?: typeof fetch } = {},
+): ImageDescriber {
   const baseUrl = (opts.baseUrl ?? 'http://127.0.0.1:11434').replace(/\/$/, '');
   const model = opts.model ?? 'gemma4:e4b';
   const fetchImpl = opts.fetchImpl ?? fetch;
@@ -68,11 +75,13 @@ export function localOllamaImageDescriber(opts: {
       body: JSON.stringify({
         model,
         stream: false,
-        messages: [{
-          role: 'user',
-          content: prompt || 'Describe what is visible. Be concise and child-friendly.',
-          images: [image.toString('base64')],
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt || 'Describe what is visible. Be concise and child-friendly.',
+            images: [image.toString('base64')],
+          },
+        ],
       }),
       signal: AbortSignal.timeout(120_000),
     });

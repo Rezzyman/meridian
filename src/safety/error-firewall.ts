@@ -21,7 +21,7 @@
 
 /** Single source of truth for the client-safe replacement message. */
 export const GENERIC_HICCUP_MESSAGE =
-  "Quick hiccup on my end — give me a minute and try that again. " +
+  'Quick hiccup on my end — give me a minute and try that again. ' +
   "If it keeps happening, reply 'reset' and I'll start fresh.";
 
 /**

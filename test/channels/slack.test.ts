@@ -15,7 +15,15 @@ import {
   type FetchLike,
 } from '../../src/channels/slack.js';
 
-const silent = { info() {}, warn() {}, error() {}, debug() {}, child() { return silent; } } as unknown as Logger;
+const silent = {
+  info() {},
+  warn() {},
+  error() {},
+  debug() {},
+  child() {
+    return silent;
+  },
+} as unknown as Logger;
 const SECRET = 'top-secret-signing-key';
 
 function sign(rawBody: string, ts: string, secret = SECRET): string {
@@ -28,14 +36,26 @@ describe('verifySlackSignature', () => {
 
   it('accepts a correctly signed request', () => {
     assert.equal(
-      verifySlackSignature({ signingSecret: SECRET, signature: sign(body, ts), timestamp: ts, rawBody: body, nowSec: 1700000000 }),
+      verifySlackSignature({
+        signingSecret: SECRET,
+        signature: sign(body, ts),
+        timestamp: ts,
+        rawBody: body,
+        nowSec: 1700000000,
+      }),
       true,
     );
   });
 
   it('rejects a wrong signing secret', () => {
     assert.equal(
-      verifySlackSignature({ signingSecret: SECRET, signature: sign(body, ts, 'other'), timestamp: ts, rawBody: body, nowSec: 1700000000 }),
+      verifySlackSignature({
+        signingSecret: SECRET,
+        signature: sign(body, ts, 'other'),
+        timestamp: ts,
+        rawBody: body,
+        nowSec: 1700000000,
+      }),
       false,
     );
   });
@@ -43,22 +63,59 @@ describe('verifySlackSignature', () => {
   it('rejects a tampered body', () => {
     const sig = sign(body, ts);
     assert.equal(
-      verifySlackSignature({ signingSecret: SECRET, signature: sig, timestamp: ts, rawBody: `${body} `, nowSec: 1700000000 }),
+      verifySlackSignature({
+        signingSecret: SECRET,
+        signature: sig,
+        timestamp: ts,
+        rawBody: `${body} `,
+        nowSec: 1700000000,
+      }),
       false,
     );
   });
 
   it('rejects a stale timestamp (replay protection)', () => {
     assert.equal(
-      verifySlackSignature({ signingSecret: SECRET, signature: sign(body, ts), timestamp: ts, rawBody: body, nowSec: 1700000000 + 1000 }),
+      verifySlackSignature({
+        signingSecret: SECRET,
+        signature: sign(body, ts),
+        timestamp: ts,
+        rawBody: body,
+        nowSec: 1700000000 + 1000,
+      }),
       false,
     );
   });
 
   it('rejects missing signature / timestamp / non-numeric ts', () => {
-    assert.equal(verifySlackSignature({ signingSecret: SECRET, signature: undefined, timestamp: ts, rawBody: body }), false);
-    assert.equal(verifySlackSignature({ signingSecret: SECRET, signature: sign(body, ts), timestamp: undefined, rawBody: body }), false);
-    assert.equal(verifySlackSignature({ signingSecret: SECRET, signature: sign(body, 'abc'), timestamp: 'abc', rawBody: body, nowSec: 1700000000 }), false);
+    assert.equal(
+      verifySlackSignature({
+        signingSecret: SECRET,
+        signature: undefined,
+        timestamp: ts,
+        rawBody: body,
+      }),
+      false,
+    );
+    assert.equal(
+      verifySlackSignature({
+        signingSecret: SECRET,
+        signature: sign(body, ts),
+        timestamp: undefined,
+        rawBody: body,
+      }),
+      false,
+    );
+    assert.equal(
+      verifySlackSignature({
+        signingSecret: SECRET,
+        signature: sign(body, 'abc'),
+        timestamp: 'abc',
+        rawBody: body,
+        nowSec: 1700000000,
+      }),
+      false,
+    );
   });
 });
 
@@ -101,7 +158,11 @@ describe('SlackChannel.handleRequest', () => {
   it('runs the turn and posts the reply for a user message', async () => {
     const { ch, calls, seen } = makeChannel();
     const r = ch.handleRequest(
-      JSON.stringify({ type: 'event_callback', event_id: 'Ev1', event: { type: 'message', user: 'U1', text: 'hello', channel: 'C1' } }),
+      JSON.stringify({
+        type: 'event_callback',
+        event_id: 'Ev1',
+        event: { type: 'message', user: 'U1', text: 'hello', channel: 'C1' },
+      }),
     );
     assert.equal(r.status, 200);
     await r.done;
@@ -113,8 +174,20 @@ describe('SlackChannel.handleRequest', () => {
 
   it("ignores the bot's own messages and edits (no turn, no post)", async () => {
     const { ch, calls, seen } = makeChannel();
-    const a = ch.handleRequest(JSON.stringify({ type: 'event_callback', event_id: 'b', event: { type: 'message', bot_id: 'B9', text: 'i am a bot', channel: 'C1' } }));
-    const b = ch.handleRequest(JSON.stringify({ type: 'event_callback', event_id: 'e', event: { type: 'message', subtype: 'message_changed', text: 'edited', channel: 'C1' } }));
+    const a = ch.handleRequest(
+      JSON.stringify({
+        type: 'event_callback',
+        event_id: 'b',
+        event: { type: 'message', bot_id: 'B9', text: 'i am a bot', channel: 'C1' },
+      }),
+    );
+    const b = ch.handleRequest(
+      JSON.stringify({
+        type: 'event_callback',
+        event_id: 'e',
+        event: { type: 'message', subtype: 'message_changed', text: 'edited', channel: 'C1' },
+      }),
+    );
     await Promise.all([a.done, b.done]);
     assert.deepEqual(seen, []);
     assert.equal(calls.length, 0);
@@ -122,17 +195,33 @@ describe('SlackChannel.handleRequest', () => {
 
   it('honors the channel allowlist', async () => {
     const { ch, seen } = makeChannel({ allowedChannels: ['CALLOWED'] });
-    const blocked = ch.handleRequest(JSON.stringify({ type: 'event_callback', event_id: '1', event: { type: 'message', user: 'U', text: 'hi', channel: 'COTHER' } }));
+    const blocked = ch.handleRequest(
+      JSON.stringify({
+        type: 'event_callback',
+        event_id: '1',
+        event: { type: 'message', user: 'U', text: 'hi', channel: 'COTHER' },
+      }),
+    );
     await blocked.done;
     assert.deepEqual(seen, [], 'non-allowlisted channel ignored');
-    const ok = ch.handleRequest(JSON.stringify({ type: 'event_callback', event_id: '2', event: { type: 'message', user: 'U', text: 'hi', channel: 'CALLOWED' } }));
+    const ok = ch.handleRequest(
+      JSON.stringify({
+        type: 'event_callback',
+        event_id: '2',
+        event: { type: 'message', user: 'U', text: 'hi', channel: 'CALLOWED' },
+      }),
+    );
     await ok.done;
     assert.deepEqual(seen, ['U:hi']);
   });
 
   it('dedups Slack retries by event_id', async () => {
     const { ch, seen } = makeChannel();
-    const ev = JSON.stringify({ type: 'event_callback', event_id: 'SAME', event: { type: 'message', user: 'U', text: 'once', channel: 'C1' } });
+    const ev = JSON.stringify({
+      type: 'event_callback',
+      event_id: 'SAME',
+      event: { type: 'message', user: 'U', text: 'once', channel: 'C1' },
+    });
     const r1 = ch.handleRequest(ev);
     const r2 = ch.handleRequest(ev);
     await Promise.all([r1.done, r2.done]);

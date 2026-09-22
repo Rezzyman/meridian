@@ -49,7 +49,11 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function fetchDay(apiKey: string, dayIso: string, cursor?: string): Promise<{
+async function fetchDay(
+  apiKey: string,
+  dayIso: string,
+  cursor?: string,
+): Promise<{
   lifelogs: Array<{ id: string; title?: string; markdown?: string; startTime?: string }>;
   nextCursor?: string;
 }> {
@@ -60,7 +64,9 @@ async function fetchDay(apiKey: string, dayIso: string, cursor?: string): Promis
   const r = await fetch(url, { headers: { 'X-API-Key': apiKey, Accept: 'application/json' } });
   if (!r.ok) throw new Error(`Limitless ${r.status}: ${(await r.text()).slice(0, 160)}`);
   const j = (await r.json()) as {
-    data?: { lifelogs?: Array<{ id: string; title?: string; markdown?: string; startTime?: string }> };
+    data?: {
+      lifelogs?: Array<{ id: string; title?: string; markdown?: string; startTime?: string }>;
+    };
     meta?: { lifelogs?: { nextCursor?: string } };
   };
   return { lifelogs: j.data?.lifelogs ?? [], nextCursor: j.meta?.lifelogs?.nextCursor };
@@ -71,7 +77,12 @@ async function sleep(ms: number): Promise<void> {
 }
 
 const args = parseArgs();
-const home = ensureAgentHome(process.env.MERIDIAN_AGENT ?? (() => { throw new Error('MERIDIAN_AGENT env not set'); })());
+const home = ensureAgentHome(
+  process.env.MERIDIAN_AGENT ??
+    (() => {
+      throw new Error('MERIDIAN_AGENT env not set');
+    })(),
+);
 const env = loadAgentEnv(home);
 const cortex = bindCortex(env.CORTEX_AGENT_ID, env.MERIDIAN_CORTEX_URL);
 const vault = openAgentVault({ envPath: home.envPath, vaultPath: home.vaultPath });
@@ -83,14 +94,22 @@ const ingestedIds = new Set<string>(vault.get<string[]>('skill.limitless.ingeste
 const initialCount = ingestedIds.size;
 
 const lastSync = vault.get<string>('skill.limitless.last_sync_at');
-const since = args.since ? new Date(args.since) : lastSync ? new Date(lastSync) : new Date(Date.now() - args.batchDays * 24 * 3600 * 1000);
+const since = args.since
+  ? new Date(args.since)
+  : lastSync
+    ? new Date(lastSync)
+    : new Date(Date.now() - args.batchDays * 24 * 3600 * 1000);
 const until = args.until ? new Date(args.until) : new Date();
 
-console.log(`[backfill] agent=${env.CORTEX_AGENT_ID} since=${isoDate(since)} until=${isoDate(until)} batch=${args.batchDays}d throttle=${args.throttleMs}ms dry=${args.dryRun}`);
+console.log(
+  `[backfill] agent=${env.CORTEX_AGENT_ID} since=${isoDate(since)} until=${isoDate(until)} batch=${args.batchDays}d throttle=${args.throttleMs}ms dry=${args.dryRun}`,
+);
 console.log(`[backfill] already-ingested ids: ${initialCount}`);
 
 const totalDays = Math.ceil((until.getTime() - since.getTime()) / (24 * 3600 * 1000));
-console.log(`[backfill] ${totalDays} day(s) to process in ${Math.ceil(totalDays / args.batchDays)} batch(es)`);
+console.log(
+  `[backfill] ${totalDays} day(s) to process in ${Math.ceil(totalDays / args.batchDays)} batch(es)`,
+);
 
 const t0 = Date.now();
 let totalSeen = 0;
@@ -99,12 +118,16 @@ let totalSkippedDuplicate = 0;
 const errors: string[] = [];
 
 for (let cursor = new Date(since); cursor <= until; ) {
-  const batchEnd = new Date(Math.min(cursor.getTime() + args.batchDays * 24 * 3600 * 1000, until.getTime() + 1));
-  console.log(`\n[backfill] batch ${isoDate(cursor)} → ${isoDate(new Date(batchEnd.getTime() - 1))}`);
+  const batchEnd = new Date(
+    Math.min(cursor.getTime() + args.batchDays * 24 * 3600 * 1000, until.getTime() + 1),
+  );
+  console.log(
+    `\n[backfill] batch ${isoDate(cursor)} → ${isoDate(new Date(batchEnd.getTime() - 1))}`,
+  );
 
   for (let day = new Date(cursor); day < batchEnd; day.setDate(day.getDate() + 1)) {
     const dayIso = isoDate(day);
-    let pageCursor: string | undefined ;
+    let pageCursor: string | undefined;
     let _dayPagesProcessed = 0;
     let dayLifelogs = 0;
     let dayEncoded = 0;
@@ -163,9 +186,7 @@ for (let cursor = new Date(since); cursor <= until; ) {
     if (dayLifelogs === 0) {
       console.log(`  ${dayIso}: 0 lifelogs (empty day)`);
     } else {
-      console.log(
-        `  ${dayIso}: ${dayLifelogs} seen / ${dayEncoded} encoded / ${dayDup} skipped`,
-      );
+      console.log(`  ${dayIso}: ${dayLifelogs} seen / ${dayEncoded} encoded / ${dayDup} skipped`);
     }
   }
 

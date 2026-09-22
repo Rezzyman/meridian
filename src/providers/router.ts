@@ -34,7 +34,11 @@ const routexorFetch: typeof globalThis.fetch = async (input, init) => {
     if (body.model === 'claude-sonnet-5' && body.temperature === 0) {
       delete body.temperature;
     }
-    if (typeof body.model === 'string' && body.model.startsWith('gpt-') && Array.isArray(body.tools)) {
+    if (
+      typeof body.model === 'string' &&
+      body.model.startsWith('gpt-') &&
+      Array.isArray(body.tools)
+    ) {
       const stripFormats = (value: unknown): void => {
         if (!value || typeof value !== 'object') return;
         if (Array.isArray(value)) {

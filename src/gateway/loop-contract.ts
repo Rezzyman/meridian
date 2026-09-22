@@ -78,8 +78,9 @@ function exactKeys(value: Record<string, unknown>, expected: readonly string[]):
 function isIsoDate(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 40) return false;
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value);
+  return (
+    Number.isFinite(parsed) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)
+  );
 }
 
 function validEvidence(value: unknown): value is LoopEvidence {
@@ -89,14 +90,20 @@ function validEvidence(value: unknown): value is LoopEvidence {
     return false;
   }
   if (
-    typeof item.lifelogId !== 'string' || !UUID.test(item.lifelogId) ||
-    typeof item.segmentId !== 'string' || !UUID.test(item.segmentId) ||
-    !isIsoDate(item.startedAt) || !isIsoDate(item.endedAt) ||
+    typeof item.lifelogId !== 'string' ||
+    !UUID.test(item.lifelogId) ||
+    typeof item.segmentId !== 'string' ||
+    !UUID.test(item.segmentId) ||
+    !isIsoDate(item.startedAt) ||
+    !isIsoDate(item.endedAt) ||
     Date.parse(item.endedAt) < Date.parse(item.startedAt) ||
-    typeof item.excerpt !== 'string' || item.excerpt.length === 0 ||
+    typeof item.excerpt !== 'string' ||
+    item.excerpt.length === 0 ||
     Buffer.byteLength(item.excerpt, 'utf8') > MAX_EXCERPT_BYTES ||
-    typeof item.sha256 !== 'string' || !SHA256.test(item.sha256)
-  ) return false;
+    typeof item.sha256 !== 'string' ||
+    !SHA256.test(item.sha256)
+  )
+    return false;
   const digest = createHash('sha256').update(item.excerpt, 'utf8').digest('hex');
   return timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(item.sha256, 'hex'));
 }
@@ -104,28 +111,51 @@ function validEvidence(value: unknown): value is LoopEvidence {
 export function parseLoopTurnRequest(value: unknown): LoopTurnRequest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
-  if (!exactKeys(body, [
-    'schemaVersion', 'requestId', 'threadId', 'question', 'sourceCorpusSha256',
-    'intervalStart', 'intervalEnd', 'timeZoneIdentifier', 'evidence',
-  ])) return null;
+  if (
+    !exactKeys(body, [
+      'schemaVersion',
+      'requestId',
+      'threadId',
+      'question',
+      'sourceCorpusSha256',
+      'intervalStart',
+      'intervalEnd',
+      'timeZoneIdentifier',
+      'evidence',
+    ])
+  )
+    return null;
   if (
     body.schemaVersion !== LOOP_TURN_SCHEMA ||
-    typeof body.requestId !== 'string' || !UUID.test(body.requestId) ||
-    typeof body.threadId !== 'string' || !UUID.test(body.threadId) ||
-    typeof body.question !== 'string' || body.question.trim() !== body.question ||
-    body.question.length === 0 || Buffer.byteLength(body.question, 'utf8') > MAX_QUESTION_BYTES ||
-    typeof body.sourceCorpusSha256 !== 'string' || !SHA256.test(body.sourceCorpusSha256) ||
-    !isIsoDate(body.intervalStart) || !isIsoDate(body.intervalEnd) ||
+    typeof body.requestId !== 'string' ||
+    !UUID.test(body.requestId) ||
+    typeof body.threadId !== 'string' ||
+    !UUID.test(body.threadId) ||
+    typeof body.question !== 'string' ||
+    body.question.trim() !== body.question ||
+    body.question.length === 0 ||
+    Buffer.byteLength(body.question, 'utf8') > MAX_QUESTION_BYTES ||
+    typeof body.sourceCorpusSha256 !== 'string' ||
+    !SHA256.test(body.sourceCorpusSha256) ||
+    !isIsoDate(body.intervalStart) ||
+    !isIsoDate(body.intervalEnd) ||
     Date.parse(body.intervalEnd) <= Date.parse(body.intervalStart) ||
     Date.parse(body.intervalEnd) - Date.parse(body.intervalStart) > 26 * 60 * 60 * 1000 ||
-    typeof body.timeZoneIdentifier !== 'string' || body.timeZoneIdentifier.length === 0 ||
+    typeof body.timeZoneIdentifier !== 'string' ||
+    body.timeZoneIdentifier.length === 0 ||
     Buffer.byteLength(body.timeZoneIdentifier, 'utf8') > 64 ||
-    !Array.isArray(body.evidence) || body.evidence.length > MAX_EVIDENCE_ITEMS ||
+    !Array.isArray(body.evidence) ||
+    body.evidence.length > MAX_EVIDENCE_ITEMS ||
     !body.evidence.every(validEvidence)
-  ) return null;
+  )
+    return null;
   const evidence = body.evidence as LoopEvidence[];
-  if (new Set(evidence.map((item) => item.segmentId.toLowerCase())).size !== evidence.length) return null;
-  if (evidence.reduce((sum, item) => sum + Buffer.byteLength(item.excerpt, 'utf8'), 0) > MAX_EVIDENCE_BYTES) {
+  if (new Set(evidence.map((item) => item.segmentId.toLowerCase())).size !== evidence.length)
+    return null;
+  if (
+    evidence.reduce((sum, item) => sum + Buffer.byteLength(item.excerpt, 'utf8'), 0) >
+    MAX_EVIDENCE_BYTES
+  ) {
     return null;
   }
   return body as unknown as LoopTurnRequest;
@@ -140,9 +170,14 @@ export function sourceEvidenceSha256(evidence: readonly LoopEvidence[]): string 
   const hash = createHash('sha256');
   for (const item of evidence) {
     for (const value of [
-      item.lifelogId.toLowerCase(), item.segmentId.toLowerCase(), item.startedAt,
-      item.endedAt, item.excerpt, item.sha256,
-    ]) hash.update(evidenceFrame(value));
+      item.lifelogId.toLowerCase(),
+      item.segmentId.toLowerCase(),
+      item.startedAt,
+      item.endedAt,
+      item.excerpt,
+      item.sha256,
+    ])
+      hash.update(evidenceFrame(value));
   }
   return hash.digest('hex');
 }
@@ -162,11 +197,16 @@ If the supplied evidence and recalled memory do not support an answer, state the
 </aterna_loop_policy>`;
 
 function renderTurn(request: LoopTurnRequest): string {
-  const evidence = request.evidence.map((item) =>
-    `<evidence segment="${item.segmentId}" lifelog="${item.lifelogId}" start="${item.startedAt}" end="${item.endedAt}">\n${item.excerpt}\n</evidence>`,
-  ).join('\n');
-  return `<owner_question>\n${request.question}\n</owner_question>\n\n` +
-    `<untrusted_loop_evidence source_corpus_sha256="${request.sourceCorpusSha256}">\n${evidence}\n</untrusted_loop_evidence>`;
+  const evidence = request.evidence
+    .map(
+      (item) =>
+        `<evidence segment="${item.segmentId}" lifelog="${item.lifelogId}" start="${item.startedAt}" end="${item.endedAt}">\n${item.excerpt}\n</evidence>`,
+    )
+    .join('\n');
+  return (
+    `<owner_question>\n${request.question}\n</owner_question>\n\n` +
+    `<untrusted_loop_evidence source_corpus_sha256="${request.sourceCorpusSha256}">\n${evidence}\n</untrusted_loop_evidence>`
+  );
 }
 
 function citedSegmentIds(text: string, allowed: ReadonlySet<string>): string[] | null {
@@ -184,9 +224,9 @@ function citedSegmentIds(text: string, allowed: ReadonlySet<string>): string[] |
 }
 
 export function registerLoopRoute(app: FastifyInstance, opts: LoopRouteOptions): void {
-  const agent = opts.agent ?? (
-    opts.conversation ? createMeridianLoopAgentAdapter(opts.conversation) : undefined
-  );
+  const agent =
+    opts.agent ??
+    (opts.conversation ? createMeridianLoopAgentAdapter(opts.conversation) : undefined);
   app.post<{ Body: unknown; Headers: { authorization?: string } }>(
     '/v1/loop/turns',
     async (req, reply) => {
@@ -195,10 +235,10 @@ export function registerLoopRoute(app: FastifyInstance, opts: LoopRouteOptions):
         return { error: 'loop transport requires gateway authentication' };
       }
       const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-      const authorized = typeof got === 'string' && (
-        (typeof opts.token === 'string' && sameSecret(opts.token, got)) ||
-        (opts.authorizeToken?.(got) ?? false)
-      );
+      const authorized =
+        typeof got === 'string' &&
+        ((typeof opts.token === 'string' && sameSecret(opts.token, got)) ||
+          (opts.authorizeToken?.(got) ?? false));
       if (!authorized) {
         reply.code(401);
         return { error: 'unauthorized' };
@@ -229,9 +269,10 @@ export function registerLoopRoute(app: FastifyInstance, opts: LoopRouteOptions):
         });
         const allowed = new Set(request.evidence.map((item) => item.segmentId.toLowerCase()));
         const citations = citedSegmentIds(turn.text, allowed);
-        const text = citations === null
-          ? 'Your agent withheld this reply because it cited evidence outside the authenticated request.'
-          : turn.text;
+        const text =
+          citations === null
+            ? 'Your agent withheld this reply because it cited evidence outside the authenticated request.'
+            : turn.text;
         const response: LoopTurnResponse = {
           schemaVersion: LOOP_REPLY_SCHEMA,
           requestId: request.requestId,

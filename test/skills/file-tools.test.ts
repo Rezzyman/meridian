@@ -118,10 +118,10 @@ describe('search_files', () => {
   });
 
   it('reports an invalid regex as data, not a throw', async () => {
-    const res = (await search.execute(
-      { query: '(', cwd: root, isRegex: true },
-      TOOL_OPTS,
-    )) as { ok: boolean; error: string };
+    const res = (await search.execute({ query: '(', cwd: root, isRegex: true }, TOOL_OPTS)) as {
+      ok: boolean;
+      error: string;
+    };
     assert.equal(res.ok, false);
     assert.match(res.error, /invalid regex/);
   });

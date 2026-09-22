@@ -54,7 +54,8 @@ function bindWith(routes: Record<string, RouteHandler>, agentId = 'iso-a') {
 test('authenticates every CORTEX request with the scoped service token', async () => {
   const { impl, calls } = fakeFetch({
     'POST /api/v1/recall': () => jsonResponse(recallPayload),
-    'GET /api/v1/artifacts': () => jsonResponse({ agentId: 'iso-a', sinceHours: 48, cutoff: '', count: 0, artifacts: [] }),
+    'GET /api/v1/artifacts': () =>
+      jsonResponse({ agentId: 'iso-a', sinceHours: 48, cutoff: '', count: 0, artifacts: [] }),
   });
   const bind = new CortexBind({
     agentId: 'iso-a',
@@ -163,8 +164,16 @@ test('two binds with different agentIds send their own agentId in every body', a
   const { impl, calls } = fakeFetch({
     'POST /api/v1/recall': () => jsonResponse(recallPayload),
   });
-  const bindA = new CortexBind({ agentId: 'iso-a', baseUrl: 'http://cortex.test', fetchImpl: impl });
-  const bindB = new CortexBind({ agentId: 'iso-b', baseUrl: 'http://cortex.test', fetchImpl: impl });
+  const bindA = new CortexBind({
+    agentId: 'iso-a',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+  });
+  const bindB = new CortexBind({
+    agentId: 'iso-b',
+    baseUrl: 'http://cortex.test',
+    fetchImpl: impl,
+  });
 
   await bindA.recall('shared query');
   await bindB.recall('shared query');
