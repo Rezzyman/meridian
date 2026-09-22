@@ -4,6 +4,17 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Consolidation and hardening pass (2026-09-22)
+
+- **One main again.** Merged the governance branch, the VPS-only autonomy control plane and Routexor compatibility fixes, the Loop harness adapters, and two fixes recovered from a dist-only production build. Disposition per source in `docs/consolidation-2026-09.md`.
+- **Automations distinguish a failed recall from an empty one** (`<cortex_recall status="unavailable">`) and no longer print memory ids in briefs. Recovered from the 2026-08-18 Arlo build.
+- **Turn loop allows 24 steps** (was 3). Three starved fetch-and-summarize turns into the "no final summary" fallback in nine Arlo incidents, 2026-08-01 to 08-07. Governance `maxToolCallsPerTurn` and the empty-result breaker remain the brakes.
+- **Crash safety.** The gateway installs `unhandledRejection` (log, keep serving) and `uncaughtException` (log fatal, exit 1 for the supervisor) handlers, and every fire-and-forget webhook turn is supervised by `settle()` so a rejected background turn is logged with its route instead of lost.
+- **Brand redaction is gated by sender trust.** The outbound firewall rewrote the operator's own name to "our team" in replies to the operator. Leak masking stays on for everyone; name redaction now applies only to untrusted senders.
+- **Recall budget and timeout are config** (`cortex.recallTokenBudget`, `cortex.recallTimeoutMs`). Large corpora should run 900 tokens; Arlo's CORTEX takes about 1s there and 10 to 16s at 2000.
+- **Live model ids.** Defaults are `routexor/claude-haiku-4.5` and `routexor/claude-sonnet-5`; the old `claude-4-haiku` id does not exist on ROUTEXOR and failed a fresh agent's first turn.
+- **CI tells the truth.** Tests are typechecked (`pnpm typecheck:test`, 16 latent errors fixed), `biome format --check` runs, and the Node 22 leg reports coverage. README badge, ROADMAP header, and the test README were corrected; `voice-receptionist` has a SKILL.md and loads.
+
 Switch from Hermes in one command, honest ROUTEXOR onboarding, and a web chat
 that serves itself.
 

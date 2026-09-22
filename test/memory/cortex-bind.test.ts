@@ -21,7 +21,10 @@ type RouteHandler = (call: RecordedCall) => Response;
 /** Fake fetch keyed on `${method} ${pathname}`; records {url, method, parsed body}. */
 function fakeFetch(routes: Record<string, RouteHandler>) {
   const calls: RecordedCall[] = [];
-  const impl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const impl = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: RequestInit,
+  ): Promise<Response> => {
     const url = String(input);
     const method = init?.method ?? 'GET';
     const body =
@@ -339,7 +342,7 @@ async function keepingLoopAlive<T>(fn: () => Promise<T>): Promise<T> {
  *  Records the signal each call received so tests can assert on wiring. */
 function hangingFetch() {
   const signals: (AbortSignal | null | undefined)[] = [];
-  const impl = ((_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const impl = ((_input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
     const sig = init?.signal;
     signals.push(sig);
     return new Promise<Response>((_resolve, reject) => {
@@ -391,7 +394,7 @@ test('health() degrades to down fast (no hang) when CORTEX never answers', async
 
 test('timeoutMs: 0 opts out — no signal is attached', async () => {
   const seen: (AbortSignal | null | undefined)[] = [];
-  const impl = ((_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const impl = ((_input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
     seen.push(init?.signal);
     return Promise.resolve(jsonResponse({ status: 'ok', database: 'connected' }));
   }) as typeof fetch;

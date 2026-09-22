@@ -26,7 +26,8 @@ function toolReturning(sequence: unknown[]): { tool: ToolSet; calls: () => numbe
 }
 
 async function run(tool: ToolSet, name: string, times: number): Promise<unknown[]> {
-  const exec = (tool[name] as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute;
+  const exec = (tool[name] as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> })
+    .execute;
   const out: unknown[] = [];
   for (let n = 0; n < times; n++) out.push(await exec({}, OPTS));
   return out;

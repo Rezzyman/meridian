@@ -6,7 +6,7 @@ This file lives at the repo root because the OSS framework and the upcoming mana
 
 ---
 
-## Working today (`v1.2`)
+## Working today (`v1.4`)
 
 ### Core runtime
 

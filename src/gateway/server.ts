@@ -27,6 +27,7 @@ import type { ProactiveSentinel } from '../proactive/sentinel.js';
 import type { AutomationManager } from '../automations/manager.js';
 import { readWaitlist, recordWaitlist } from '../hosted/waitlist.js';
 import { sanitizeUserFacingError } from '../safety/error-firewall.js';
+import { settle } from './crash-safety.js';
 import type { WeatherProvider } from './weather.js';
 import { parseDeviceLookMultipart } from './device-media.js';
 import type { AudioTranscriber, ImageDescriber } from './device-media.js';
@@ -538,7 +539,7 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       return { error: 'invalid slack signature' };
     }
     const result = opts.slack.handleRequest(rawBody);
-    void result.done; // fire-and-forget the async turn + reply
+    settle(result.done, opts.logger, { route: req.url, channel: 'slack' });
     reply.code(result.status);
     return result.body;
   });
@@ -563,7 +564,7 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       return { error: 'invalid request signature' };
     }
     const result = opts.discord.handleRequest(rawBody);
-    void result.done; // fire-and-forget the async turn + follow-up
+    settle(result.done, opts.logger, { route: req.url, channel: 'discord' });
     reply.code(result.status);
     return result.body;
   });
@@ -603,7 +604,7 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
         return { error: 'invalid signature' };
       }
       const result = opts.whatsapp.handleRequest(rawBody);
-      void result.done; // fire-and-forget the async turn + reply
+      settle(result.done, opts.logger, { route: req.url, channel: 'whatsapp' });
       reply.code(result.status);
       return result.body;
     },
@@ -622,7 +623,7 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       return { error: 'invalid twilio signature' };
     }
     const result = opts.sms.handleRequest(rawBody);
-    void result.done; // fire-and-forget the async turn + reply
+    settle(result.done, opts.logger, { route: req.url, channel: 'sms' });
     reply.code(result.status).header('content-type', result.contentType);
     return result.body;
   });

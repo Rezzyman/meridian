@@ -141,20 +141,20 @@ export const ProviderRefSchema = z.object({
 export type ProviderRef = z.infer<typeof ProviderRefSchema>;
 
 export const ModelChainSchema = z.object({
-  primary: z.string(), // e.g. "routexor/claude-4-haiku"
+  primary: z.string(), // e.g. "routexor/claude-haiku-4.5"
   fallbacks: z.array(z.string()).default([]),
   smartRouting: z
     .object({
       enabled: z.boolean().default(true),
       maxSimpleChars: z.number().default(200),
       maxSimpleWords: z.number().default(35),
-      cheapModel: z.string().default('routexor/claude-4-haiku'),
+      cheapModel: z.string().default('routexor/claude-haiku-4.5'),
     })
     .default({
       enabled: true,
       maxSimpleChars: 200,
       maxSimpleWords: 35,
-      cheapModel: 'routexor/claude-4-haiku',
+      cheapModel: 'routexor/claude-haiku-4.5',
     }),
 });
 export type ModelChain = z.infer<typeof ModelChainSchema>;
@@ -170,7 +170,7 @@ export const HeartbeatSchema = z.object({
     start: z.string().default('06:00'),
     end: z.string().default('23:30'),
   }),
-  model: z.string().default('routexor/claude-4-haiku'),
+  model: z.string().default('routexor/claude-haiku-4.5'),
   target: z.string().default('last'),
   ackMaxChars: z.number().default(500),
   minConfidence: z.number().min(0).max(1).default(0.75),
@@ -487,6 +487,14 @@ export const AgentConfigSchema = z.object({
   cortex: z.object({
     agentId: z.string(),
     recallTopK: z.number().int().default(8),
+    /**
+     * Recall context budget in tokens and the hard cap on how long a recall
+     * may take before the turn proceeds memory-less. Measured on Arlo's
+     * CORTEX (2026-09-22): about 1s at <= 900 tokens, 10 to 16s at 2000. Big
+     * corpora should run 900; the 8s cap keeps every channel responsive.
+     */
+    recallTokenBudget: z.number().int().min(100).max(8000).default(1500),
+    recallTimeoutMs: z.number().int().min(1000).max(60000).default(8000),
     encodeOnTurn: z.boolean().default(true),
     valenceInference: z.boolean().default(true),
     /**
@@ -678,17 +686,17 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     reasoningEffort: 'medium',
   },
   models: {
-    primary: 'routexor/claude-4-haiku',
+    primary: 'routexor/claude-haiku-4.5',
     // The ollama fallback tag MUST match what onboarding tells users to pull
     // (`ollama pull qwen2.5` → the `qwen2.5:latest` tag). The old `:14b`/
     // `hermes3:8b` refs pointed at tags no documented step ever pulls, so the
     // keyless local path 404'd the moment the fallback fired.
-    fallbacks: ['routexor/claude-sonnet-4.6', 'ollama/qwen2.5'],
+    fallbacks: ['routexor/claude-sonnet-5', 'ollama/qwen2.5'],
     smartRouting: {
       enabled: true,
       maxSimpleChars: 200,
       maxSimpleWords: 35,
-      cheapModel: 'routexor/claude-4-haiku',
+      cheapModel: 'routexor/claude-haiku-4.5',
     },
   },
   channels: {
@@ -707,7 +715,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     mode: 'shadow',
     every: '2h',
     activeHours: { start: '06:00', end: '23:30' },
-    model: 'routexor/claude-4-haiku',
+    model: 'routexor/claude-haiku-4.5',
     target: 'last',
     ackMaxChars: 500,
     minConfidence: 0.75,
@@ -731,6 +739,8 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
   cortex: {
     agentId: slug,
     recallTopK: 8,
+    recallTokenBudget: 1500,
+    recallTimeoutMs: 8000,
     encodeOnTurn: true,
     valenceInference: true,
     memoryLlmJudge: false,

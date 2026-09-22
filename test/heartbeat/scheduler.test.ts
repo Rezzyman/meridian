@@ -69,6 +69,7 @@ describe('heartbeat governance', () => {
       assess: async () => actionable,
       onAck: (text) => {
         pushed.push(text);
+        return undefined;
       },
     });
     assert.equal(await hb.beat(new Date()), true);
@@ -86,6 +87,7 @@ describe('heartbeat governance', () => {
       assess: async () => actionable,
       onAck: (text) => {
         pushed.push(text);
+        return undefined;
       },
     });
     const now = new Date();
@@ -104,6 +106,7 @@ describe('heartbeat governance', () => {
       assess: async () => quiet,
       onAck: (text) => {
         pushed.push(text);
+        return undefined;
       },
     });
     assert.equal(await hb.beat(), true);

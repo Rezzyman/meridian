@@ -117,7 +117,7 @@ export class TelegramChannel implements ChannelAdapter {
         stopTyping();
         // Last-mile RULE ZERO net (defense-in-depth; turn.ts already sanitizes,
         // but a non-turn onInbound or future caller is covered here too).
-        for (const chunk of splitForTelegram(sanitizeOutbound(reply))) {
+        for (const chunk of splitForTelegram(sanitizeOutbound(reply, { trusted: true }))) {
           await ctx.reply(chunk);
         }
       } catch (err) {
@@ -251,7 +251,7 @@ export class TelegramChannel implements ChannelAdapter {
       });
       stopTyping();
       // Same last-mile RULE ZERO net as the text path.
-      for (const chunk of splitForTelegram(sanitizeOutbound(reply))) {
+      for (const chunk of splitForTelegram(sanitizeOutbound(reply, { trusted: true }))) {
         await ctx.reply(chunk);
       }
     } catch (err) {

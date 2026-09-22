@@ -38,7 +38,7 @@ describe('McpServerConfigSchema', () => {
   it('default channels exclude voice', () => {
     const r = McpServerConfigSchema.parse({ name: 'x', transport: 'stdio', command: 'true' });
     assert.deepEqual(r.channels, [...MCP_DEFAULT_CHANNELS]);
-    assert.ok(!r.channels.includes('voice'));
+    assert.ok(!(r.channels as string[]).includes('voice'));
   });
 
   it('voice must be armed explicitly and survives parsing', () => {

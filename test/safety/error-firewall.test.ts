@@ -90,3 +90,12 @@ test('ProviderChainError message is client-safe; raw detail kept internal', () =
   assert.equal(isLeaky(e.message), false);
   assert.match(e.internalDetail, /401 unauthorized/);
 });
+
+test('sanitizeOutbound: trusted operator keeps names, still masks leaks', () => {
+  const draft = 'Rez, I drafted the note to Atanasio and used cortex_recall to check.';
+  const untrusted = sanitizeOutbound(draft);
+  assert.ok(!/\bRez\b/.test(untrusted), 'client path redacts the operator name');
+  assert.equal(sanitizeOutbound(draft, { trusted: true }), draft);
+  const leaked = 'Traceback at /root/meridian/src/agent/turn.ts while calling the tool';
+  assert.equal(sanitizeOutbound(leaked, { trusted: true }), GENERIC_HICCUP_MESSAGE);
+});

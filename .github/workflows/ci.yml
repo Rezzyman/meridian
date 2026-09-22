@@ -34,11 +34,19 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Typecheck tests
+        run: pnpm typecheck:test
+
+      - name: Format check
+        run: pnpm format:check
+
       - name: Lint
         run: pnpm lint
 
       - name: Test
         run: pnpm test
+        env:
+          COVERAGE: ${{ matrix.node == 22 && '1' || '' }}
 
       - name: Build
         run: pnpm build
