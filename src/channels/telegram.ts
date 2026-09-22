@@ -29,6 +29,31 @@ export interface TelegramVisionDeps {
   analyze: (path: string, caption?: string) => Promise<{ description: string; model: string }>;
 }
 
+export interface TelegramIngestDeps {
+  ingest(path: string): Promise<{ chunks: number; type: string; warnings?: string[] }>;
+}
+
+/** Document types the ingest pipeline understands (mirrors file-ingest). */
+export const INGESTABLE_EXT = new Set([
+  '.pdf',
+  '.txt',
+  '.md',
+  '.markdown',
+  '.csv',
+  '.tsv',
+  '.json',
+  '.log',
+  '.yml',
+  '.yaml',
+]);
+
+export function isIngestableDocument(doc: { file_name?: string; mime_type?: string }): boolean {
+  const ext = extname(doc.file_name ?? '').toLowerCase();
+  if (INGESTABLE_EXT.has(ext)) return true;
+  const mime = doc.mime_type ?? '';
+  return mime === 'application/pdf' || mime.startsWith('text/') || mime === 'application/json';
+}
+
 /** Structural slice of the grammy context the media handler needs — kept
  *  minimal so tests can drive it without a live Bot. */
 export interface TelegramMediaContext {
@@ -67,6 +92,10 @@ export class TelegramChannel implements ChannelAdapter {
       maxMediaBytes?: number;
       /** Vision runtime hook; absent = images are saved + noted, not analyzed. */
       vision?: TelegramVisionDeps;
+      /** Document ingest hook (defect (d)): pdf, text, markdown, csv, json go
+       *  through the same pipeline as `meridian ingest`. Absent = documents are
+       *  saved and the operator is told how to ingest them. */
+      ingest?: TelegramIngestDeps;
       /** Injectable downloader (tests). Defaults to fetch(). */
       fetchFile?: (url: string) => Promise<Buffer>;
     },
@@ -150,6 +179,89 @@ export class TelegramChannel implements ChannelAdapter {
   }
 
   /**
+   * Inbound document handler (defect (d), July 2026: Telegram handled images
+   * but not documents). Downloads under the same size cap, ingests through
+   * the runtime's file-ingest pipeline when wired, and hands the model a turn
+   * that says exactly what landed in memory. Never silently drops a file.
+   */
+  private async handleDocumentMessage(
+    ctx: TelegramMediaContext,
+    onInbound: ChannelStartOptions['onInbound'],
+    doc: NonNullable<TelegramMediaContext['message']['document']>,
+  ): Promise<void> {
+    const fromChatId = String(ctx.chat.id);
+    if (!this.opts.mediaDir) {
+      await ctx.reply('I received the file, but media handling is not configured on this agent.');
+      return;
+    }
+    const maxBytes = this.opts.maxMediaBytes ?? 25 * 1024 * 1024;
+    if (doc.file_size && doc.file_size > maxBytes) {
+      await ctx.reply(
+        `That file is too large for me to take (limit ${Math.floor(maxBytes / (1024 * 1024))} MB).`,
+      );
+      return;
+    }
+    const stopTyping = this.startTyping(ctx);
+    try {
+      const file = await ctx.getFile();
+      if (!file.file_path) throw new Error('telegram returned no file_path');
+      const data = await this.fetchFile(
+        `https://api.telegram.org/file/bot${this.opts.token}/${file.file_path}`,
+      );
+      if (data.byteLength > maxBytes) {
+        stopTyping();
+        await ctx.reply(
+          `That file is too large for me to take (limit ${Math.floor(maxBytes / (1024 * 1024))} MB).`,
+        );
+        return;
+      }
+      mkdirSync(this.opts.mediaDir, { recursive: true });
+      const safeName = (doc.file_name ?? basename(file.file_path)).replace(/[^\w.\-]+/g, '_');
+      const filename = `tg-${Date.now().toString(36)}-${file.file_unique_id}-${safeName}`;
+      const savedPath = join(this.opts.mediaDir, filename);
+      writeFileSync(savedPath, data);
+      const caption = ctx.message.caption?.trim() || '';
+
+      let ingestBlock: string;
+      if (this.opts.ingest) {
+        try {
+          const r = await this.opts.ingest.ingest(savedPath);
+          const warn = r.warnings?.length ? ` Notes: ${r.warnings.join('; ')}` : '';
+          ingestBlock = `[Attached document "${doc.file_name ?? filename}" (${r.type}) was ingested into memory as ${r.chunks} chunk(s).${warn} Answer from what was ingested; do not claim to have read parts that did not land.]`;
+        } catch (err) {
+          this.opts.logger.warn({ msg: 'telegram document ingest failed', err });
+          ingestBlock = `[Attached document "${doc.file_name ?? filename}" was saved to ${savedPath} but ingest failed, so its contents are NOT in memory. Say so plainly.]`;
+        }
+      } else {
+        ingestBlock = `[Attached document "${doc.file_name ?? filename}" was saved to ${savedPath}. Ingest is not wired on this agent; the operator can run \`meridian ingest ${savedPath}\`.]`;
+      }
+      const turnText = [
+        caption || '(The user sent a document with no caption.)',
+        '',
+        ingestBlock,
+      ].join('\n');
+      const reply = await onInbound({
+        channel: 'telegram',
+        from: fromChatId,
+        text: turnText,
+        meta: {
+          username: ctx.from?.username,
+          trusted: true,
+          media: { path: savedPath, kind: 'document' },
+        },
+      });
+      stopTyping();
+      for (const chunk of splitForTelegram(sanitizeOutbound(reply, { trusted: true }))) {
+        await ctx.reply(chunk);
+      }
+    } catch (err) {
+      stopTyping();
+      this.opts.logger.error({ msg: 'telegram document inbound error', err });
+      await ctx.reply('I could not process that file. I have logged the issue.');
+    }
+  }
+
+  /**
    * Inbound photo / image-document handler. Public so tests can drive it with
    * a structural mock context — no live Bot required.
    */
@@ -163,12 +275,17 @@ export class TelegramChannel implements ChannelAdapter {
     const doc = ctx.message.document;
     const isPhoto = (ctx.message.photo?.length ?? 0) > 0;
     const isImageDoc = !!doc?.mime_type?.startsWith('image/');
-    if (!isPhoto && !isImageDoc) {
+    const isIngestableDoc = !!doc && !isImageDoc && isIngestableDocument(doc);
+    if (!isPhoto && !isImageDoc && !isIngestableDoc) {
       if (doc) {
         await ctx.reply(
-          'I can only view images over chat right now. For documents, drop the file in my ingest inbox or run `meridian ingest <path>`.',
+          `I can read images, PDFs, and text files (${[...INGESTABLE_EXT].join(', ')}) over chat. That file type is not one I can take yet.`,
         );
       }
+      return;
+    }
+    if (isIngestableDoc) {
+      await this.handleDocumentMessage(ctx, onInbound, doc);
       return;
     }
     if (!this.opts.mediaDir) {

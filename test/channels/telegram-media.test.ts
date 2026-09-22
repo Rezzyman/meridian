@@ -230,7 +230,7 @@ describe('telegram media — caps and non-images', () => {
     assert.ok(media.path.endsWith('.png'), 'extension comes from the document file name');
   });
 
-  it('politely declines non-image documents', async () => {
+  it('a PDF without an ingest hook is saved and the model is told how to ingest it', async () => {
     const h = makeChannel({ vision: 'default' });
     const replies: string[] = [];
     const ctx: TelegramMediaContext = {
@@ -245,8 +245,9 @@ describe('telegram media — caps and non-images', () => {
       replyWithChatAction: async () => {},
     };
     await run(h, ctx);
-    assert.equal(h.inbound.length, 0);
-    assert.ok(replies[0].includes('only view images'));
+    assert.equal(h.inbound.length, 1);
+    assert.ok(h.inbound[0]?.text.includes('Ingest is not wired on this agent'));
+    assert.equal(replies.length, 1);
   });
 });
 
@@ -286,5 +287,93 @@ describe('telegram multi-chat trust', () => {
     const second = photoCtx({ chatId: '999' });
     await run(h, second.ctx);
     assert.equal(h.inbound.length, 1, 'later stranger refused');
+  });
+});
+
+describe('telegram documents (defect d: documents were refused)', () => {
+  function docCtx(name: string, mime: string, caption?: string) {
+    const replies: string[] = [];
+    const ctx: TelegramMediaContext = {
+      chat: { id: '42' },
+      from: { username: 'aj' },
+      message: {
+        caption,
+        document: { file_id: 'd1', file_name: name, mime_type: mime, file_size: PNG_BYTES.length },
+      },
+      getFile: async () => ({
+        file_unique_id: 'u9',
+        file_size: PNG_BYTES.length,
+        file_path: `documents/${name}`,
+      }),
+      reply: async (text: string) => {
+        replies.push(text);
+      },
+      replyWithChatAction: async () => {},
+    };
+    return { ctx, replies };
+  }
+
+  it('ingests a PDF through the wired pipeline and tells the model what landed', async () => {
+    const mediaDir = mkdtempSync(join(tmpdir(), 'meridian-tg-doc-'));
+    const inbound: InboundMessage[] = [];
+    const ingested: string[] = [];
+    const channel = new TelegramChannel({
+      token: 'tg-test-token',
+      defaultChatId: '42',
+      logger: silent,
+      mediaDir,
+      fetchFile: async () => PNG_BYTES,
+      ingest: {
+        ingest: async (path: string) => {
+          ingested.push(path);
+          return { chunks: 7, type: 'pdf', warnings: ['truncated at 50 pages'] };
+        },
+      },
+    });
+    const { ctx, replies } = docCtx('survey.pdf', 'application/pdf', 'Summarize this');
+    await channel.handleMediaMessage(ctx, async (m) => {
+      inbound.push(m);
+      return 'Seven chunks in, here is the gist.';
+    });
+    assert.equal(ingested.length, 1);
+    assert.ok(existsSync(ingested[0] ?? ''));
+    assert.equal(inbound.length, 1);
+    assert.ok(inbound[0]?.text.includes('Summarize this'));
+    assert.ok(inbound[0]?.text.includes('ingested into memory as 7 chunk(s)'));
+    assert.ok(inbound[0]?.text.includes('truncated at 50 pages'));
+    assert.equal((inbound[0]?.meta as { media: { kind: string } }).media.kind, 'document');
+    assert.deepEqual(replies, ['Seven chunks in, here is the gist.']);
+  });
+
+  it('when ingest fails the model is told the file is NOT in memory', async () => {
+    const mediaDir = mkdtempSync(join(tmpdir(), 'meridian-tg-doc-'));
+    const inbound: InboundMessage[] = [];
+    const channel = new TelegramChannel({
+      token: 'tg-test-token',
+      defaultChatId: '42',
+      logger: silent,
+      mediaDir,
+      fetchFile: async () => PNG_BYTES,
+      ingest: {
+        ingest: async () => {
+          throw new Error('no backend');
+        },
+      },
+    });
+    const { ctx } = docCtx('notes.md', 'text/markdown');
+    await channel.handleMediaMessage(ctx, async (m) => {
+      inbound.push(m);
+      return 'ok';
+    });
+    assert.ok(inbound[0]?.text.includes('NOT in memory'));
+  });
+
+  it('a type the pipeline cannot read gets a plain refusal, not silence', async () => {
+    const h = makeChannel();
+    const { ctx, replies } = docCtx('deck.pptx', 'application/vnd.ms-powerpoint');
+    await run(h, ctx);
+    assert.equal(h.inbound.length, 0);
+    assert.equal(replies.length, 1);
+    assert.match(replies[0] ?? '', /PDFs, and text files/);
   });
 });

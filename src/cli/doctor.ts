@@ -52,7 +52,7 @@ function printRow(r: CheckRow): void {
   console.log(`${tag} ${r.name}${detail}`);
 }
 
-export async function runDoctor(): Promise<number> {
+export async function runDoctor(opts: { providerVerbose?: boolean } = {}): Promise<number> {
   console.log(colors.cyan('Meridian doctor'));
   console.log(colors.muted('Checking foundation...'));
   const rows: CheckRow[] = [];
@@ -369,6 +369,9 @@ export async function runDoctor(): Promise<number> {
       );
     } else {
       let replied = false;
+      // Defect (c): a provider that rejects a parameter or a base URL used to
+      // vanish into "did not respond". Keep the sanitized reason per ref.
+      const providerErrors: string[] = [];
       for (const provider of chain) {
         try {
           const stream = streamText({
@@ -385,9 +388,15 @@ export async function runDoctor(): Promise<number> {
             rows.push(row('LLM chain dry-run', 'ok', `${provider.ref} responded`));
             break;
           }
-        } catch {
-          /* try next */
+        } catch (err) {
+          const raw = err instanceof Error ? err.message : String(err);
+          providerErrors.push(
+            `${provider.ref}: ${raw.replace(/\s+/g, ' ').slice(0, opts.providerVerbose ? 600 : 160)}`,
+          );
         }
+      }
+      if (providerErrors.length > 0 && (opts.providerVerbose || !replied)) {
+        rows.push(row('Provider errors', replied ? 'warn' : 'fail', providerErrors.join(' | ')));
       }
       // If none answered, the severity depends on whether the operator actually
       // configured a model. A present cloud key that fails is a real failure. But

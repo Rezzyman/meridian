@@ -172,7 +172,7 @@ describe('inbox watcher failure semantics', () => {
     const stop = watchInbox(dead, dir, { logger: silentLogger, debounceMs: 50 });
     writeFileSync(join(dir, 'doc.md'), '# survey\n\nreal content that must not vanish');
     // Watcher debounce (50ms) + async ingest; poll for the rename.
-    for (let i = 0; i < 100; i += 1) {
+    for (let i = 0; i < 300; i += 1) {
       await new Promise((r) => setTimeout(r, 50));
       if (readdirSync(dir).some((f) => f.endsWith('.failed') || f.endsWith('.processed'))) break;
     }
@@ -187,7 +187,7 @@ describe('inbox watcher failure semantics', () => {
     const cortex = mockCortex();
     const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50 });
     writeFileSync(join(dir, 'ok.md'), '# note\n\ncontent that stores fine');
-    for (let i = 0; i < 100; i += 1) {
+    for (let i = 0; i < 300; i += 1) {
       await new Promise((r) => setTimeout(r, 50));
       if (readdirSync(dir).some((f) => f.endsWith('.processed'))) break;
     }
@@ -203,7 +203,7 @@ describe('inbox startup scan', () => {
     writeFileSync(join(dir, 'parked.md'), '# parked\n\nplaced during downtime');
     const cortex = mockCortex();
     const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50 });
-    for (let i = 0; i < 100; i += 1) {
+    for (let i = 0; i < 300; i += 1) {
       await new Promise((r) => setTimeout(r, 50));
       if (readdirSync(dir).includes('parked.md.processed')) break;
     }

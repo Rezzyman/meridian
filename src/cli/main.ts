@@ -241,8 +241,9 @@ mcp
 program
   .command('doctor')
   .description('Run end-to-end health checks across the AgentOS')
-  .action(async () => {
-    const exit = await runDoctor();
+  .option('--provider', 'print the full provider error for every ref in the chain')
+  .action(async (o: { provider?: boolean }) => {
+    const exit = await runDoctor({ providerVerbose: !!o.provider });
     process.exit(exit);
   });
 

@@ -48,7 +48,7 @@ import { SessionStore } from '../session/store.js';
 import { ProactiveSentinel } from '../proactive/sentinel.js';
 import { AutomationManager } from '../automations/manager.js';
 import { armHeartbeat, createHeartbeatAssessor } from '../heartbeat/scheduler.js';
-import { watchInbox } from '../ingest/file-ingest.js';
+import { ingestFile, watchInbox } from '../ingest/file-ingest.js';
 import { analyzeImage } from '../vision/analyze.js';
 import { mkdirSync } from 'node:fs';
 import type { ChannelKind } from '../agent/operator.js';
@@ -360,6 +360,16 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       mediaDir: join(home.layer('MEMORY'), 'media'),
       maxMediaBytes: config.vision.maxBytes,
       vision: visionAnalyze ? { analyze: visionAnalyze } : undefined,
+      ingest: {
+        ingest: async (path: string) => {
+          const r = await ingestFile(memorySelection.provider, path, {
+            logger,
+            vision: { enabled: config.vision.enabled, analyze: visionAnalyze },
+            pdf: { maxPages: config.pdf.maxPages, maxBytesMb: config.pdf.maxBytesMb },
+          });
+          return { chunks: r.chunks, type: r.type, warnings: r.warnings };
+        },
+      },
     });
     await telegram.start(undefined, {
       onInbound: async (m) => turn('telegram', m.from, m.text),
