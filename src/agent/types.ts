@@ -23,7 +23,8 @@ export interface MeridianTurn {
     | 'discord'
     | 'whatsapp'
     | 'matrix'
-    | 'sms';
+    | 'sms'
+    | 'imessage';
   ts: string; // ISO
   /** CORTEX memory id assigned post-encode */
   memoryId?: number;

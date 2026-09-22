@@ -161,6 +161,39 @@ export async function runDoctor(opts: { providerVerbose?: boolean } = {}): Promi
       ),
     );
   }
+  // iMessage relay (WS5c): configured means it must answer a ping.
+  {
+    const e = readEnvFile(home.envPath);
+    if (e.BLUEBUBBLES_URL) {
+      const missing = [
+        !e.BLUEBUBBLES_PASSWORD ? 'BLUEBUBBLES_PASSWORD' : null,
+        !e.BLUEBUBBLES_WEBHOOK_SECRET || e.BLUEBUBBLES_WEBHOOK_SECRET.length < 16
+          ? 'BLUEBUBBLES_WEBHOOK_SECRET (16+ chars)'
+          : null,
+      ].filter(Boolean);
+      if (missing.length) {
+        rows.push(row('iMessage relay', 'fail', `configured but missing ${missing.join(', ')}`));
+      } else {
+        try {
+          const res = await fetch(
+            `${e.BLUEBUBBLES_URL.replace(/\/$/, '')}/api/v1/ping?password=${encodeURIComponent(e.BLUEBUBBLES_PASSWORD ?? '')}`,
+            { signal: AbortSignal.timeout(5000) },
+          );
+          rows.push(
+            res.ok
+              ? row('iMessage relay', 'ok', `${e.BLUEBUBBLES_URL} answers ping`)
+              : row('iMessage relay', 'fail', `${e.BLUEBUBBLES_URL} HTTP ${res.status}`),
+          );
+        } catch (err) {
+          rows.push(
+            row('iMessage relay', 'fail', `${e.BLUEBUBBLES_URL}: ${(err as Error).message}`),
+          );
+        }
+      }
+    } else {
+      rows.push(row('iMessage relay', 'skip', 'not configured (docs/imessage-setup.md)'));
+    }
+  }
   // Spend (WS4): what today cost and whether any cap is set.
   {
     const t = new SpendLedger(home).today();

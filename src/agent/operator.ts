@@ -74,6 +74,8 @@ function operatorChannelList(
       return channels.whatsapp;
     case 'sms':
       return channels.sms;
+    case 'imessage':
+      return channels.imessage;
     case 'cli':
       return channels.cli;
     default:
@@ -88,6 +90,16 @@ function channelMatches(
   from: string,
 ): boolean {
   if (channel === 'cli') return isCliMatch(registered, from);
+  if (channel === 'imessage') {
+    // A handle is a phone or an email. Phones compare normalized, emails
+    // case-folded; never mix the two forms.
+    const isPhone = /^\+?[\d\s().-]{7,}$/.test(from);
+    if (isPhone) {
+      const fromNorm = normPhone(from);
+      return registered.some((h) => /^\+?[\d\s().-]{7,}$/.test(h) && normPhone(h) === fromNorm);
+    }
+    return registered.some((h) => h.trim().toLowerCase() === from.trim().toLowerCase());
+  }
   if (PHONE_CHANNELS.has(channel)) {
     const fromNorm = normPhone(from);
     return registered.some((num) => normPhone(num) === fromNorm);

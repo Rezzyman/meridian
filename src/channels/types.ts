@@ -16,7 +16,8 @@ export interface InboundMessage {
     | 'discord'
     | 'whatsapp'
     | 'matrix'
-    | 'sms';
+    | 'sms'
+    | 'imessage';
   from: string; // user id, phone, chat id, etc.
   text: string;
   meta?: Record<string, unknown>;

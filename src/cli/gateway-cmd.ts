@@ -25,6 +25,7 @@ import { installCrashHandlers } from '../gateway/crash-safety.js';
 import { checkProviderPosture } from '../providers/preflight.js';
 import { dispatchChannelCommand, isChannelCommand } from '../gateway/slash.js';
 import { SpendLedger } from '../spend/ledger.js';
+import { ImessageChannel } from '../channels/imessage.js';
 import { HealthState } from '../gateway/health.js';
 import { createOpsAlerter } from '../ops/alerts.js';
 import { PricingCatalog } from '../providers/pricing.js';
@@ -316,6 +317,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     convo: Conversation;
     sessionId: string;
     operatorLabel: string;
+    trusted: boolean;
   } {
     const op = resolveOperator(config, channel, from);
     const sessionId = op.source === 'config' ? operatorSessionId(op.id) : `op:${op.id}`;
@@ -324,7 +326,12 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     const existing = sessions.get(sessionId);
     if (existing && now - existing.lastSeen < IDLE_MS) {
       existing.lastSeen = now;
-      return { convo: existing.convo, sessionId, operatorLabel: existing.opLabel };
+      return {
+        convo: existing.convo,
+        sessionId,
+        operatorLabel: existing.opLabel,
+        trusted: op.source === 'config',
+      };
     }
     const convo = buildConvo(channel, sessionId, opLabel, op.source === 'config');
     sessions.set(sessionId, { convo, lastSeen: now, opLabel });
@@ -333,7 +340,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     } else {
       logger.info({ msg: 'unknown caller', channel, from, sessionId });
     }
-    return { convo, sessionId, operatorLabel: opLabel };
+    return { convo, sessionId, operatorLabel: opLabel, trusted: op.source === 'config' };
   }
 
   // Persist each turn so cross-channel resume works after restart.
@@ -346,12 +353,15 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     text: string,
     sendOpts?: Parameters<Conversation['send']>[1],
   ): Promise<string> {
-    const { convo, sessionId } = getSession(channel, from);
+    const { convo, sessionId, trusted } = getSession(channel, from);
     // WS3: slash commands from the resolved operator on a trusted channel are
     // commands, not prose. Telegram only reaches here for trusted chats; the
     // CLI and token-authed gateway are operator surfaces by construction.
     if (
-      (channel === 'telegram' || channel === 'cli' || channel === 'gateway') &&
+      (channel === 'telegram' ||
+        channel === 'cli' ||
+        channel === 'gateway' ||
+        (channel === 'imessage' && trusted)) &&
       isChannelCommand(text)
     ) {
       const out = await dispatchChannelCommand(text, {
@@ -681,6 +691,44 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     console.log(colors.ok('sms channel started (POST /twilio/sms)'));
   }
 
+  // ── iMessage via BlueBubbles (WS5c) ──
+  let imessage: ImessageChannel | undefined;
+  if (env.BLUEBUBBLES_URL && env.BLUEBUBBLES_PASSWORD && env.BLUEBUBBLES_WEBHOOK_SECRET) {
+    imessage = new ImessageChannel({
+      serverUrl: env.BLUEBUBBLES_URL,
+      password: env.BLUEBUBBLES_PASSWORD,
+      webhookSecret: env.BLUEBUBBLES_WEBHOOK_SECRET,
+      allowedHandles: config.channels.imessage?.allowedHandles ?? [],
+      logger,
+      textStyle: config.textStyle,
+      mediaDir: join(home.layer('MEMORY'), 'media'),
+      maxMediaBytes: config.vision.maxBytes,
+      sendMethod: env.BLUEBUBBLES_SEND_METHOD,
+      smsFallback: sms
+        ? { send: (to, text) => sms!.send({ channel: 'sms', to, text }) }
+        : undefined,
+    });
+    imessage.start(undefined, {
+      onInbound: async (m) => turn('imessage', m.from, m.text),
+    });
+    channelMap.set('imessage', imessage as unknown as ChannelAdapter);
+    void imessage
+      .probeRelay()
+      .then((ok) =>
+        ok
+          ? console.log(
+              colors.ok('imessage channel started (POST /imessage/webhook), relay reachable'),
+            )
+          : console.log(colors.warn('imessage channel started; relay NOT reachable yet')),
+      );
+    const relayProbe = setInterval(() => void imessage?.probeRelay(), 120_000);
+    relayProbe.unref();
+  } else if (env.BLUEBUBBLES_URL || env.BLUEBUBBLES_PASSWORD) {
+    logger.warn({
+      msg: 'imessage not started: BLUEBUBBLES_URL, BLUEBUBBLES_PASSWORD and BLUEBUBBLES_WEBHOOK_SECRET (16+ chars) are all required',
+    });
+  }
+
   // ── Proactive sentinel — morning brief + optional nudges ──
   // The thing that makes a Meridian agent a partner instead of a chatbot.
   // Scheduled CORTEX recalls compose a brief and push it to the operator's
@@ -952,6 +1000,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     sentinel,
     automations,
     provider: posture,
+    imessage,
     health,
     breaker: () => router.breakerSnapshot(),
     spend: spendLedger,
