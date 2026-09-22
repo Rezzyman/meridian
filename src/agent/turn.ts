@@ -694,6 +694,20 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         // a side effect. Stop safely with an honest summary instead.
         out = 'The tool completed, but the model produced no final summary.';
       }
+      // Multi-step turns: text written BEFORE a tool call ("Let me check the
+      // clock first.") is planning, not the answer. With continueSteps the
+      // stream glues every step's text together, which is what the bench judge
+      // saw ("What's up?Real-world clock: Monday..."). Keep the final step's
+      // text when the turn took more than one step and that text is non-empty.
+      if (toolCallTrace.length > toolTraceStart) {
+        try {
+          const steps = await stream.steps;
+          const finalText = steps.at(-1)?.text?.trim();
+          if (steps.length > 1 && finalText) out = finalText;
+        } catch {
+          /* keep the streamed text */
+        }
+      }
       reply = out;
       providerUsed = provider.ref;
       try {
