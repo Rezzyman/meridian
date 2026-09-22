@@ -58,6 +58,15 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Runtime health state (WS5): cortex probe, last-hour inference, uptime. */
+  health?: import('./health.js').HealthState;
+  /** Provider breaker snapshot (WS5). */
+  breaker?: () => Array<{
+    ref: string;
+    state: string;
+    consecutiveFailures: number;
+    openUntil: string | null;
+  }>;
   /** Spend totals (WS4) for /health.spend. */
   spend?: {
     today(): { usd: number; tokens: number; calls: number };
@@ -131,15 +140,33 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     },
   );
 
-  app.get('/health', async () => ({
-    ok: opts.provider ? opts.provider.ok : true,
-    agent: opts.conversation.agentSlug,
-    sessionId: opts.conversation.sessionId,
-    ts: new Date().toISOString(),
-    provider: opts.provider ?? null,
-    automations: opts.automations ? opts.automations.status() : [],
-    spend: opts.spend ? { today: opts.spend.today(), month: opts.spend.month() } : null,
-  }));
+  app.get('/health', async () => {
+    const automations = opts.automations ? opts.automations.status() : [];
+    const lastProactiveDelivery =
+      automations
+        .map((a) => a.lastDeliveredAt)
+        .filter((x): x is string => !!x)
+        .sort()
+        .at(-1) ?? null;
+    const cortex = opts.health?.cortex ?? { status: 'unknown', checkedAt: null };
+    const providerOk = opts.provider ? opts.provider.ok : true;
+    return {
+      ok: providerOk && cortex.status !== 'down',
+      agent: opts.conversation.agentSlug,
+      sessionId: opts.conversation.sessionId,
+      ts: new Date().toISOString(),
+      version: opts.health?.version ?? null,
+      startedAt: opts.health?.startedAt ?? null,
+      uptimeSec: opts.health?.uptimeSec() ?? null,
+      provider: opts.provider ?? null,
+      cortex,
+      breaker: opts.breaker ? opts.breaker() : [],
+      lastHourInference: opts.health?.lastHourInference() ?? null,
+      automations,
+      lastProactiveDelivery,
+      spend: opts.spend ? { today: opts.spend.today(), month: opts.spend.month() } : null,
+    };
+  });
 
   // First-party Aterna AI Loop channel. The route imposes a stricter contract
   // than generic chat: exact request shape, mandatory bearer auth, no tools,

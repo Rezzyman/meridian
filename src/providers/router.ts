@@ -157,6 +157,29 @@ export class ProviderRouter {
     this.breaker.delete(ref);
   }
 
+  /** Observability (WS5): every ref the breaker has an opinion about. */
+  breakerSnapshot(): Array<{
+    ref: string;
+    state: 'closed' | 'open' | 'half-open';
+    consecutiveFailures: number;
+    openUntil: string | null;
+  }> {
+    const now = Date.now();
+    return [...this.breaker.entries()].map(([ref, st]) => ({
+      ref,
+      state:
+        st.openUntil === 0
+          ? st.consecutiveFailures > 0
+            ? 'half-open'
+            : 'closed'
+          : now >= st.openUntil
+            ? 'half-open'
+            : 'open',
+      consecutiveFailures: st.consecutiveFailures,
+      openUntil: st.openUntil ? new Date(st.openUntil).toISOString() : null,
+    }));
+  }
+
   /** A ref is open while its cooldown is in the future. Expiry closes it
    *  to half-open: the next attempt either resets (success) or re-opens
    *  immediately (failure at threshold). */

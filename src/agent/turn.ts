@@ -830,6 +830,24 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     verifications: verifications.length > 0 ? verifications : undefined,
   };
 
+  // WS5: one structured line per turn with the fields every dashboard needs.
+  ctx.logger.info({
+    msg: 'turn complete',
+    agentId: ctx.config.agent.slug,
+    channel: ctx.channel,
+    turnId: turn.id,
+    sessionId: ctx.sessionId,
+    model: providerUsed,
+    promptTokens: usage?.promptTokens,
+    completionTokens: usage?.completionTokens,
+    usd: usd ?? null,
+    durationMs: Date.now() - started,
+    toolCalls: toolCallTrace.length,
+    recallMemories: recallMemoryIds.length,
+    quarantined: quarantinedMemories.length,
+    outcome: 'ok',
+  });
+
   return {
     turn,
     reply,
