@@ -91,3 +91,63 @@ describe('per-turn prompt-token ceiling (found on the bench: 241k-token turns)',
     assert.ok((r.trace.usage?.promptTokens ?? 0) >= 120_000);
   });
 });
+
+describe('multi-step text: only the final step is the answer (bench finding)', () => {
+  it('drops pre-tool planning text and keeps the final step text', async () => {
+    let step = 0;
+    const model = new MockLanguageModelV1({
+      doStream: async () => {
+        step += 1;
+        const chunks: LanguageModelV1StreamPart[] =
+          step === 1
+            ? [
+                { type: 'text-delta', textDelta: 'Let me get the real-time context first.' },
+                {
+                  type: 'tool-call',
+                  toolCallType: 'function',
+                  toolCallId: 'c1',
+                  toolName: 'clock',
+                  args: '{}',
+                },
+                {
+                  type: 'finish',
+                  finishReason: 'tool-calls',
+                  usage: { promptTokens: 100, completionTokens: 10 },
+                },
+              ]
+            : [
+                { type: 'text-delta', textDelta: "Yeah, I'm here. What's up?" },
+                {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { promptTokens: 100, completionTokens: 10 },
+                },
+              ];
+        return {
+          stream: simulateReadableStream({ chunks }),
+          rawCall: { rawPrompt: null, rawSettings: {} },
+        };
+      },
+    });
+    const ctx: TurnContext = {
+      sessionId: 's',
+      config: makeConfig({ tools: { cli: ['clock'] } }),
+      cortex: mockCortex(),
+      router: mockRouter(model),
+      logger: silentLogger,
+      history: [],
+      channel: 'cli',
+      systemBase: 'persona',
+      tools: {
+        clock: tool({
+          description: 'clock',
+          parameters: z.object({}),
+          execute: async () => ({ now: 'Monday' }),
+        }),
+      },
+    };
+    const r = await runTurn(ctx, 'hey');
+    assert.equal(r.reply, "Yeah, I'm here. What's up?");
+    assert.equal(r.trace.toolCalls.length, 1);
+  });
+});
