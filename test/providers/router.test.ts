@@ -4,7 +4,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ProviderRouter } from '../../src/providers/router.js';
+import { ProviderRouter, withoutTemperature } from '../../src/providers/router.js';
 import type { ModelChain } from '../../src/config/schema.js';
 import { makeEnv } from '../helpers/fixtures.js';
 
@@ -114,6 +114,41 @@ describe('ProviderRouter.resolve', () => {
   it('throws on unknown provider name', () => {
     const router = new ProviderRouter(makeEnv(ALL_KEYS));
     assert.throws(() => router.resolve('nosuch/model-x'), /unknown provider: nosuch/);
+  });
+});
+
+describe('Routexor Claude 5 compatibility', () => {
+  it('removes AI SDK 4 implicit temperature from generate and stream calls', async () => {
+    const seen: Array<{ kind: string; temperature: unknown }> = [];
+    const model = withoutTemperature({
+      specificationVersion: 'v1',
+      provider: 'test',
+      modelId: 'claude-sonnet-5',
+      defaultObjectGenerationMode: undefined,
+      doGenerate: async (options: { temperature?: number }) => {
+        seen.push({ kind: 'generate', temperature: options.temperature });
+        return {
+          text: 'ok',
+          finishReason: 'stop',
+          usage: { promptTokens: 1, completionTokens: 1 },
+          rawCall: { rawPrompt: null, rawSettings: {} },
+        } as never;
+      },
+      doStream: async (options: { temperature?: number }) => {
+        seen.push({ kind: 'stream', temperature: options.temperature });
+        return {
+          stream: new ReadableStream(),
+          rawCall: { rawPrompt: null, rawSettings: {} },
+        } as never;
+      },
+    } as never);
+
+    await model.doGenerate({ temperature: 0 } as never);
+    await model.doStream({ temperature: 0 } as never);
+    assert.deepEqual(seen, [
+      { kind: 'generate', temperature: undefined },
+      { kind: 'stream', temperature: undefined },
+    ]);
   });
 });
 

@@ -79,7 +79,14 @@ export class Conversation {
 
   async send(
     userInput: string,
-    sendOpts?: { onStreamEvent?: (ev: TurnStreamEvent) => void },
+    sendOpts?: {
+      onStreamEvent?: (ev: TurnStreamEvent) => void;
+      isolation?: {
+        disableTools?: boolean;
+        disableMemoryWrite?: boolean;
+        systemPolicy?: string;
+      };
+    },
   ): Promise<MeridianTurn> {
     const userTurn: MeridianTurn = {
       id: `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
@@ -104,6 +111,7 @@ export class Conversation {
         verificationChecks: this.opts.verificationChecks,
         provenanceSigner: this.opts.provenanceSigner,
         senderTrusted: this.opts.senderTrusted,
+        isolation: sendOpts?.isolation,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,

@@ -42,6 +42,28 @@ function hybridOllama(live: LanguageModel, sim: LanguageModel): LanguageModel {
   });
 }
 
+/**
+ * AI SDK 4 defaults an omitted temperature to zero before invoking a model.
+ * New Routexor Claude 5 endpoints reject the parameter entirely, so removing
+ * it at the model boundary is the only place that works without weakening the
+ * rest of Meridian's provider behavior.
+ */
+export function withoutTemperature(model: LanguageModel): LanguageModel {
+  return new Proxy(model, {
+    get(target, prop, receiver) {
+      if (prop === 'doGenerate') {
+        return (options: Parameters<LanguageModel['doGenerate']>[0]) =>
+          target.doGenerate({ ...options, temperature: undefined });
+      }
+      if (prop === 'doStream') {
+        return (options: Parameters<LanguageModel['doStream']>[0]) =>
+          target.doStream({ ...options, temperature: undefined });
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+}
+
 function parseRef(ref: string): { provider: ProviderName; modelId: string } {
   const slash = ref.indexOf('/');
   if (slash === -1) throw new Error(`invalid model ref: ${ref}`);
@@ -174,7 +196,10 @@ export class ProviderRouter {
           baseURL: this.env.ROUTEXOR_BASE_URL ?? 'https://api.routexor.com/v1',
           name: 'routexor',
         });
-        return rx(modelId);
+        const model = rx(modelId);
+        return /^claude-(?:haiku|sonnet|opus)-5(?:$|[.-])/i.test(modelId)
+          ? withoutTemperature(model)
+          : model;
       }
       case 'groq': {
         if (!this.env.GROQ_API_KEY) {

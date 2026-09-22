@@ -66,7 +66,20 @@ export const AgentEnvSchema = z
 
   // Gateway
   MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
+  // Least-privilege credential used only by the first-party Aterna Loop
+  // evidence route. Never give a wearable client the operator gateway token.
+  MERIDIAN_LOOP_TOKEN: z.string().min(32).optional(),
+  MERIDIAN_LOOP_BASE_URL: z.string().url().optional(),
+  MERIDIAN_LOOP_STATE_PATH: z.string().regex(/^\//).optional(),
+  // Stable Loop API, swappable server-side agent runtime. Existing installs
+  // default to Meridian until an OpenClaw/Hermes bridge is explicitly armed.
+  ATERNA_LOOP_HARNESS: z.enum(['openclaw', 'hermes', 'meridian']).default('meridian'),
+  ATERNA_LOOP_HARNESS_URL: z.string().url().optional(),
+  ATERNA_LOOP_HARNESS_TOKEN: z.string().min(32).optional(),
   MERIDIAN_GATEWAY_PORT: z.coerce.number().int().default(18889),
+  MERIDIAN_DEVICE_CITY: z.string().min(1).optional(),
+  MERIDIAN_DEVICE_LATITUDE: z.coerce.number().min(-90).max(90).optional(),
+  MERIDIAN_DEVICE_LONGITUDE: z.coerce.number().min(-180).max(180).optional(),
 
   // CORTEX server URL (used by CortexBind)
   MERIDIAN_CORTEX_URL: z.string().url().optional(),
@@ -95,6 +108,22 @@ export const AgentEnvSchema = z
           code: z.ZodIssueCode.custom,
           path: ['VOYAGE_API_KEY'],
           message: 'Voyage AI key required (or set MERIDIAN_MEMORY_PROVIDER=embedded)',
+        });
+      }
+    }
+    if (env.ATERNA_LOOP_HARNESS !== 'meridian') {
+      if (!env.ATERNA_LOOP_HARNESS_URL) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ATERNA_LOOP_HARNESS_URL'],
+          message: 'External Loop harness requires an attested bridge URL',
+        });
+      }
+      if (!env.ATERNA_LOOP_HARNESS_TOKEN) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ATERNA_LOOP_HARNESS_TOKEN'],
+          message: 'External Loop harness requires a dedicated bridge token',
         });
       }
     }

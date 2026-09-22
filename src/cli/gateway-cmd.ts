@@ -30,6 +30,15 @@ import { MatrixChannel } from '../channels/matrix.js';
 import { SmsChannel } from '../channels/sms.js';
 import { VoiceSessionGuard } from '../voice/session-guard.js';
 import { startGateway } from '../gateway/server.js';
+import { openMeteoWeatherProvider } from '../gateway/weather.js';
+import { localOllamaImageDescriber, localWhisperTranscriber } from '../gateway/device-media.js';
+import { LoopPairingStore } from '../gateway/loop-pairing.js';
+import {
+  createAttestedHarnessLoopAgentAdapter,
+  createMeridianLoopAgentAdapter,
+  selectLoopAgentAdapter,
+  type LoopAgentAdapterRegistry,
+} from '../gateway/loop-agent-adapter.js';
 import { colors } from '../utils/truecolor.js';
 import { resolveOperator, operatorSessionId } from '../agent/operator.js';
 import { SessionStore } from '../session/store.js';
@@ -527,6 +536,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // conversation as their voice + Telegram threads.
   const httpConvoFacade = {
     sessionId: 'gateway-http',
+    agentSlug: home.agentSlug,
     historyCount: 0,
     send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) => {
       const reply = await turn('gateway', 'http', text, sendOpts);
@@ -559,9 +569,83 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
           ),
         }
       : undefined;
+  const weather =
+    env.MERIDIAN_DEVICE_CITY !== undefined &&
+    env.MERIDIAN_DEVICE_LATITUDE !== undefined &&
+    env.MERIDIAN_DEVICE_LONGITUDE !== undefined
+      ? openMeteoWeatherProvider({
+          city: env.MERIDIAN_DEVICE_CITY,
+          latitude: env.MERIDIAN_DEVICE_LATITUDE,
+          longitude: env.MERIDIAN_DEVICE_LONGITUDE,
+        })
+      : undefined;
+  // Loop is an interactive voice/mobile surface. Its public wire contract is
+  // independent of the selected agent harness. The embedded Meridian adapter
+  // keeps the previous behavior; production can select an attested OpenClaw
+  // or Hermes bridge without changing the phone app or rotating device tokens.
+  const loopConfig = {
+    ...config,
+    agent: { ...config.agent, gatewayTimeoutSec: 20 },
+    models: {
+      ...config.models,
+      fallbacks: [],
+      smartRouting: { ...config.models.smartRouting, enabled: false },
+    },
+  };
+  const loop = env.MERIDIAN_LOOP_TOKEN
+    ? (() => {
+        // A fresh, store-free conversation per request preserves the embedded
+        // Meridian option without adding Loop excerpts to persistent history.
+        const meridianConversation = {
+          sessionId: 'loop-ephemeral',
+          agentSlug: home.agentSlug,
+          historyCount: 0,
+          send: async (text: string, sendOpts?: Parameters<Conversation['send']>[1]) =>
+            new Conversation({
+              config: loopConfig,
+              cortex: memorySelection.provider,
+              router,
+              logger,
+              systemBase,
+              channel: 'gateway',
+              verificationChecks,
+              provenanceSigner,
+              senderTrusted: true,
+            }).send(text, sendOpts),
+        } as Conversation;
+        const adapters: LoopAgentAdapterRegistry = {
+          meridian: createMeridianLoopAgentAdapter(meridianConversation, config.agent.name),
+        };
+        const externalHarness = env.ATERNA_LOOP_HARNESS === 'openclaw' ||
+          env.ATERNA_LOOP_HARNESS === 'hermes'
+          ? env.ATERNA_LOOP_HARNESS
+          : undefined;
+        if (externalHarness && env.ATERNA_LOOP_HARNESS_URL && env.ATERNA_LOOP_HARNESS_TOKEN) {
+          adapters[externalHarness] = createAttestedHarnessLoopAgentAdapter({
+            harness: externalHarness,
+            identity: { slug: home.agentSlug, displayName: config.agent.name },
+            url: env.ATERNA_LOOP_HARNESS_URL,
+            token: env.ATERNA_LOOP_HARNESS_TOKEN,
+          });
+        }
+        return {
+          token: env.MERIDIAN_LOOP_TOKEN,
+          agent: selectLoopAgentAdapter(env.ATERNA_LOOP_HARNESS, adapters),
+          pairing: env.MERIDIAN_LOOP_BASE_URL
+            ? {
+                store: new LoopPairingStore(
+                  env.MERIDIAN_LOOP_STATE_PATH ?? join(home.agentRoot, 'loop-pairings.json'),
+                ),
+                publicBaseURL: env.MERIDIAN_LOOP_BASE_URL,
+              }
+            : undefined,
+        };
+      })()
+    : undefined;
   await startGateway({
     port,
     token: env.MERIDIAN_GATEWAY_TOKEN,
+    loop,
     logger,
     conversation: httpConvoFacade,
     vapi,
@@ -573,6 +657,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     automations,
     waitlist,
     web,
+    weather,
+    transcribeAudio: localWhisperTranscriber(),
+    describeImage: localOllamaImageDescriber({ baseUrl: env.OLLAMA_BASE_URL }),
   });
 
   console.log(colors.ok(`Meridian gateway live on :${port} for agent ${slug}`));
@@ -581,6 +668,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   }
   if (web) {
     console.log(colors.ok(`  web chat at http://127.0.0.1:${port}/ (same-origin autoconfig)`));
+  }
+  if (weather) {
+    console.log(colors.ok(`  R1 weather armed for ${env.MERIDIAN_DEVICE_CITY}`));
   }
   console.log(colors.muted(`  channels: ${[
     'cli (REPL)',

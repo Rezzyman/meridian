@@ -23,10 +23,30 @@ import type { TurnStreamEvent } from '../agent/turn.js';
 import type { ProactiveSentinel } from '../proactive/sentinel.js';
 import type { AutomationManager } from '../automations/manager.js';
 import { readWaitlist, recordWaitlist } from '../hosted/waitlist.js';
+import type { WeatherProvider } from './weather.js';
+import { parseDeviceLookMultipart } from './device-media.js';
+import type { AudioTranscriber, ImageDescriber } from './device-media.js';
+import { registerLoopRoute } from './loop-contract.js';
+import { registerLoopPairingRoute, type LoopPairingStore } from './loop-pairing.js';
+import {
+  createMeridianLoopAgentAdapter,
+  type LoopAgentAdapter,
+} from './loop-agent-adapter.js';
 
 export interface GatewayOptions {
   port: number;
   token?: string;
+  /** Dedicated first-party Loop capability and ephemeral conversation factory.
+   *  The wearable client never receives `token`, and its submitted evidence
+   *  never joins the operator's persistent cross-channel session. */
+  loop?: {
+    token: string;
+    /** Stable runtime boundary used by OpenClaw, Hermes, or Meridian. */
+    agent?: LoopAgentAdapter;
+    /** @deprecated Existing embedded-Meridian configuration remains valid. */
+    conversation?: Conversation;
+    pairing?: { store: LoopPairingStore; publicBaseURL: string };
+  };
   logger: Logger;
   conversation: Conversation;
   vapi?: VapiChannel;
@@ -44,6 +64,12 @@ export interface GatewayOptions {
    *  auto-configures against THIS origin, so self-host web chat needs no
    *  manual URL/token paste. */
   web?: { htmlPath: string };
+  /** Optional current-conditions adapter for the R1 lock screen. */
+  weather?: WeatherProvider;
+  /** Optional private speech-to-text adapter for hold-to-talk turns. */
+  transcribeAudio?: AudioTranscriber;
+  /** Optional local vision adapter for one-shot camera turns. */
+  describeImage?: ImageDescriber;
 }
 
 export async function startGateway(opts: GatewayOptions): Promise<FastifyInstance> {
@@ -64,6 +90,16 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       done(err as Error, undefined);
     }
   });
+  app.addContentTypeParser(
+    ['audio/wav', 'audio/x-wav', 'application/octet-stream'],
+    { parseAs: 'buffer' },
+    (_req, body, done) => done(null, body),
+  );
+  app.addContentTypeParser(
+    /^multipart\/form-data/i,
+    { parseAs: 'buffer' },
+    (_req, body, done) => done(null, body),
+  );
 
   // Twilio posts application/x-www-form-urlencoded; its signature is computed
   // over the URL + the raw params, so keep the raw body here too.
@@ -82,6 +118,52 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     sessionId: opts.conversation.sessionId,
     ts: new Date().toISOString(),
   }));
+
+  // First-party Aterna AI Loop channel. The route imposes a stricter contract
+  // than generic chat: exact request shape, mandatory bearer auth, no tools,
+  // no durable memory write, and request-bound evidence identifiers.
+  const loopAgent = opts.loop?.agent ?? createMeridianLoopAgentAdapter(
+    opts.loop?.conversation ?? opts.conversation,
+  );
+  registerLoopRoute(app, {
+    token: opts.loop?.token,
+    authorizeToken: opts.loop?.pairing
+      ? (token) => opts.loop!.pairing!.store.authenticateDeviceToken(token)
+      : undefined,
+    logger: opts.logger,
+    agent: loopAgent,
+  });
+  if (opts.loop?.pairing) {
+    registerLoopPairingRoute(app, {
+      store: opts.loop.pairing.store,
+      publicBaseURL: opts.loop.pairing.publicBaseURL,
+      // The generic HTTP facade may deliberately omit agent identity. Pairing
+      // is a Loop capability, so bind the receipt to the selected adapter.
+      agentSlug: loopAgent.identity.slug,
+      agentDisplayName: loopAgent.identity.displayName,
+    });
+  }
+
+  app.get<{ Headers: { authorization?: string } }>('/v1/weather', async (req, reply) => {
+    if (opts.token) {
+      const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (got !== opts.token) {
+        reply.code(401);
+        return { error: 'unauthorized' };
+      }
+    }
+    if (!opts.weather) {
+      reply.code(503);
+      return { error: 'weather not configured' };
+    }
+    try {
+      return await opts.weather();
+    } catch (err) {
+      opts.logger.warn({ err }, 'weather provider failed');
+      reply.code(502);
+      return { error: 'weather unavailable' };
+    }
+  });
 
   // ── Web chat (opt-in) ──
   // Cached at boot: the file ships in the package and doesn't change at
@@ -196,6 +278,109 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       }
       const turn = await opts.conversation.send(input);
       return { reply: turn.content, turnId: turn.id, memoryId: turn.memoryId };
+    },
+  );
+
+  // Native Meridian device contract. Keep /chat stable for web/CLI clients while the
+  // child-safe Android shell gets a deliberately narrow, typed endpoint. Device identity,
+  // session and memory controls arrive in X-Meridian-* headers; the gateway's operator-keyed
+  // conversation facade remains the authority for recall and persistence.
+  app.post<{ Body: { text?: string }; Headers: { authorization?: string } }>(
+    '/v1/turns/text',
+    async (req, reply) => {
+      if (opts.token) {
+        const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+        if (got !== opts.token) {
+          reply.code(401);
+          return { error: 'unauthorized' };
+        }
+      }
+      const text = req.body?.text;
+      if (!text || typeof text !== 'string') {
+        reply.code(400);
+        return { error: 'text required' };
+      }
+      const turn = await opts.conversation.send(text);
+      return {
+        text: turn.content,
+        turnId: turn.id,
+        memoryId: turn.memoryId,
+      };
+    },
+  );
+
+  app.post<{ Body: Buffer; Headers: { authorization?: string; 'content-type'?: string } }>(
+    '/v1/turns/ptt',
+    async (req, reply) => {
+      if (opts.token) {
+        const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+        if (got !== opts.token) {
+          reply.code(401);
+          return { error: 'unauthorized' };
+        }
+      }
+      if (!opts.transcribeAudio) {
+        reply.code(503);
+        return { error: 'speech recognition not configured' };
+      }
+      if (!Buffer.isBuffer(req.body) || req.body.length < 44) {
+        reply.code(400);
+        return { error: 'audio required' };
+      }
+      try {
+        const transcript = await opts.transcribeAudio(
+          req.body,
+          req.headers['content-type']?.split(';')[0] ?? 'audio/wav',
+        );
+        const turn = await opts.conversation.send(transcript);
+        return {
+          text: turn.content,
+          transcript,
+          turnId: turn.id,
+          memoryId: turn.memoryId,
+        };
+      } catch (err) {
+        opts.logger.warn({ err }, 'R1 push-to-talk turn failed');
+        reply.code(502);
+        return { error: 'speech turn unavailable' };
+      }
+    },
+  );
+
+  app.post<{ Body: Buffer; Headers: { authorization?: string; 'content-type'?: string } }>(
+    '/v1/turns/look',
+    async (req, reply) => {
+      if (opts.token) {
+        const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+        if (got !== opts.token) {
+          reply.code(401);
+          return { error: 'unauthorized' };
+        }
+      }
+      if (!opts.describeImage) {
+        reply.code(503);
+        return { error: 'vision not configured' };
+      }
+      try {
+        const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(
+          req.headers['content-type'] ?? '',
+        );
+        const parts = parseDeviceLookMultipart(req.body, boundary?.[1] ?? boundary?.[2] ?? '');
+        const observation = await opts.describeImage(parts.frame, parts.prompt);
+        const turn = await opts.conversation.send(
+          `${parts.prompt}\n\nVisual observation from the R1 camera:\n${observation}`,
+        );
+        return {
+          text: turn.content,
+          observation,
+          turnId: turn.id,
+          memoryId: turn.memoryId,
+        };
+      } catch (err) {
+        opts.logger.warn({ err }, 'R1 camera turn failed');
+        reply.code(502);
+        return { error: 'vision turn unavailable' };
+      }
     },
   );
 
