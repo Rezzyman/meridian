@@ -59,6 +59,9 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Force every /v1/chat/completions turn into Loop isolation (no tools, no
+   *  memory writes). Set on a gateway that serves only the Loop sidecar. */
+  completionsIsolation?: 'loop';
   /** iMessage over BlueBubbles (WS5c). Route exists only when configured. */
   imessage?: ImessageChannel;
   /** Runtime health state (WS5): cortex probe, last-hour inference, uptime. */
@@ -390,6 +393,80 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       return { reply: turn.content, turnId: turn.id, memoryId: turn.memoryId };
     },
   );
+
+  // OpenAI-compatible chat completions (WS5d). The Loop sidecar and any
+  // OpenAI-shaped client (including the parity bench) reach Meridian exactly
+  // as they reach the other harness: bearer token, messages in, one
+  // completion out. Non-streaming only. `x-meridian-isolation: loop` makes
+  // the turn tool-free and memory-write-free and folds system messages into
+  // a per-turn policy, which is the Loop contract's requirement.
+  app.post<{
+    Body: {
+      model?: string;
+      messages?: Array<{ role: string; content: string | Array<{ type: string; text?: string }> }>;
+      stream?: boolean;
+    };
+    Headers: { authorization?: string; 'x-meridian-isolation'?: string };
+  }>('/v1/chat/completions', async (req, reply) => {
+    if (opts.token) {
+      const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (got !== opts.token) {
+        reply.code(401);
+        return { error: { message: 'unauthorized', type: 'invalid_request_error' } };
+      }
+    }
+    const body = req.body ?? {};
+    if (body.stream) {
+      reply.code(400);
+      return {
+        error: {
+          message: 'stream is not supported on this endpoint; use /chat/stream',
+          type: 'invalid_request_error',
+        },
+      };
+    }
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const textOf = (c: string | Array<{ type: string; text?: string }>): string =>
+      typeof c === 'string' ? c : c.map((p) => (p.type === 'text' ? (p.text ?? '') : '')).join('');
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    if (!lastUser) {
+      reply.code(400);
+      return {
+        error: { message: 'messages must include a user message', type: 'invalid_request_error' },
+      };
+    }
+    const input = textOf(lastUser.content).trim();
+    if (!input) {
+      reply.code(400);
+      return { error: { message: 'user message is empty', type: 'invalid_request_error' } };
+    }
+    const systemPolicy = messages
+      .filter((m) => m.role === 'system')
+      .map((m) => textOf(m.content))
+      .filter(Boolean)
+      .join('\n\n');
+    const isolated =
+      opts.completionsIsolation === 'loop' ||
+      (req.headers['x-meridian-isolation'] ?? '').toLowerCase() === 'loop';
+    const started = Date.now();
+    const isolation = isolated
+      ? { disableTools: true, disableMemoryWrite: true, systemPolicy: systemPolicy || undefined }
+      : systemPolicy
+        ? { systemPolicy }
+        : undefined;
+    const turn = await opts.conversation.send(input, isolation ? { isolation } : undefined);
+    return {
+      id: `chatcmpl-${turn.id}`,
+      object: 'chat.completion',
+      created: Math.floor(started / 1000),
+      model: body.model ?? 'meridian',
+      choices: [
+        { index: 0, message: { role: 'assistant', content: turn.content }, finish_reason: 'stop' },
+      ],
+      usage: { prompt_tokens: null, completion_tokens: null, total_tokens: null },
+      meridian: { turnId: turn.id, isolated, durationMs: Date.now() - started },
+    };
+  });
 
   // Native Meridian device contract. Keep /chat stable for web/CLI clients while the
   // child-safe Android shell gets a deliberately narrow, typed endpoint. Device identity,

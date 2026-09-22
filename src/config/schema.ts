@@ -34,6 +34,9 @@ export const AgentEnvSchema = z
     // Telegram
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_DEFAULT_CHAT_ID: z.string().optional(),
+    /** WS5d: a gateway that serves only the Loop sidecar forces isolation on
+     *  every OpenAI-compatible completion. */
+    MERIDIAN_COMPLETIONS_ISOLATION: z.enum(['loop']).optional(),
     /** Ops alert chat (WS5): infra and health notices go here, never to the
      *  operator's own agent thread. */
     MERIDIAN_OPS_CHAT_ID: z.string().optional(),

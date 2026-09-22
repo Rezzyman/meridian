@@ -539,11 +539,18 @@ export function createTools(ctx: SkillToolContext): Record<string, unknown> {
                   continue;
                 }
                 try {
-                  await ctx.cortex.encode(lg.body, {
-                    source: `wearables:${provider.id}:${lg.capturedDate}:${lg.id}`,
-                    priority: 2,
-                    sensitivity: 'internal',
-                  });
+                  // Per-encode timeout (WS5d): one hung encode used to hang the
+                  // whole pull. 90s is generous for a long transcript chunk.
+                  await Promise.race([
+                    ctx.cortex.encode(lg.body, {
+                      source: `wearables:${provider.id}:${lg.capturedDate}:${lg.id}`,
+                      priority: 2,
+                      sensitivity: 'internal',
+                    }),
+                    new Promise<never>((_, reject) =>
+                      setTimeout(() => reject(new Error('encode timed out after 90s')), 90_000).unref?.(),
+                    ),
+                  ]);
                   ingestedIds.add(lg.id);
                   newIds.push(lg.id);
                   perProvider[provider.id]!.encoded++;
