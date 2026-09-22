@@ -28,6 +28,7 @@ import { SpendLedger } from '../spend/ledger.js';
 import { ImessageChannel } from '../channels/imessage.js';
 import { HealthState } from '../gateway/health.js';
 import { createOpsAlerter } from '../ops/alerts.js';
+import { measurePromptBudget } from '../agent/prompt-budget.js';
 import { PricingCatalog } from '../providers/pricing.js';
 import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 import { TelegramChannel } from '../channels/telegram.js';
@@ -247,6 +248,19 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   }
 
   const systemBase = readSystemBase(home, config.agent.name);
+  // Prompt budget (found on the bench): say at boot what every turn will cost
+  // before a single token is spent. Ceiling per turn lives in config.spend.
+  const promptBudget = measurePromptBudget(systemBase, surface.tools);
+  logger.info({
+    msg: 'prompt budget',
+    ...promptBudget,
+    largestTools: promptBudget.largestTools.slice(0, 5),
+  });
+  console.log(
+    colors.muted(
+      `prompt budget: ~${promptBudget.totalStaticTokens} static tokens per step (identity+context ${promptBudget.systemBaseTokens}, ${promptBudget.toolCount} tools ${promptBudget.toolSchemaTokens}); per-turn ceiling ${config.spend.maxPromptTokensPerTurn}`,
+    ),
+  );
 
   // DreamWeaver consolidates CORTEX memory; the embedded provider has no
   // consolidation pipeline, so skip it in zero-config mode.
@@ -1044,6 +1058,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     conversation: httpConvoFacade,
     completions,
     textStylePolicy: config.textStyle,
+    promptBudget,
     vapi,
     slack,
     discord,

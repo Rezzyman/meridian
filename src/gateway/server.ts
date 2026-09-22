@@ -60,6 +60,8 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Static prompt measurement from boot (identity+context, tool schemas). */
+  promptBudget?: import('../agent/prompt-budget.js').PromptBudgetReport;
   /** Text-style policy for shaped completions (`x-meridian-text-style`). */
   textStylePolicy?: import('../agent/text-style.js').TextStylePolicy;
   /** Stateless completion (WS5d): a fresh conversation per request seeded
@@ -179,6 +181,7 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       cortex,
       breaker: opts.breaker ? opts.breaker() : [],
       lastHourInference: opts.health?.lastHourInference() ?? null,
+      promptBudget: opts.promptBudget ?? null,
       channels: {
         imessage: opts.imessage ? opts.imessage.relayHealth() : null,
       },

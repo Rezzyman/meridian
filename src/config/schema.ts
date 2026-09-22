@@ -492,9 +492,13 @@ export const SpendConfigSchema = z
     perRunUsd: z.number().positive().optional(),
     dailyUsd: z.number().positive().optional(),
     monthlyUsd: z.number().positive().optional(),
+    /** Cumulative prompt tokens one turn may send across all its steps before
+     *  the turn is aborted with what it has (multi-step turns resend the whole
+     *  prompt every step). Default 150k. */
+    maxPromptTokensPerTurn: z.number().int().positive().default(150_000),
     onExceed: z.enum(['block', 'degrade']).default('block'),
   })
-  .default({ onExceed: 'block' });
+  .default({ onExceed: 'block', maxPromptTokensPerTurn: 150_000 });
 export type SpendConfig = z.infer<typeof SpendConfigSchema>;
 
 /** Human texting shape (WS5b): how replies are shaped on text channels. */
@@ -799,7 +803,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     requireApprovalTools: [],
     maxToolCallsPerTurn: 8,
   },
-  spend: { onExceed: 'block' },
+  spend: { onExceed: 'block', maxPromptTokensPerTurn: 150_000 },
   textStyle: {
     enabled: true,
     maxBubbleChars: 500,
