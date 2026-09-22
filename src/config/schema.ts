@@ -462,6 +462,21 @@ export const OperatorConfigSchema = z.object({
 export type OperatorConfig = z.infer<typeof OperatorConfigSchema>;
 
 // ─── Top-level agent config (config.yaml) ──────────────────────────────────────
+/**
+ * Spend caps (WS4). Undefined = no cap. Checked before every provider call
+ * and settled after with real usage from the ledger.
+ */
+export const SpendConfigSchema = z
+  .object({
+    perTurnUsd: z.number().positive().optional(),
+    perRunUsd: z.number().positive().optional(),
+    dailyUsd: z.number().positive().optional(),
+    monthlyUsd: z.number().positive().optional(),
+    onExceed: z.enum(['block', 'degrade']).default('block'),
+  })
+  .default({ onExceed: 'block' });
+export type SpendConfig = z.infer<typeof SpendConfigSchema>;
+
 export const AgentConfigSchema = z.object({
   agent: z.object({
     slug: z.string().min(1),
@@ -487,6 +502,7 @@ export const AgentConfigSchema = z.object({
   tools: ToolsConfigSchema.optional(),
   governance: GovernanceConfigSchema,
   delegation: DelegationConfigSchema.optional(),
+  spend: SpendConfigSchema,
   cortex: z.object({
     agentId: z.string(),
     recallTopK: z.number().int().default(8),
@@ -739,6 +755,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     requireApprovalTools: [],
     maxToolCallsPerTurn: 8,
   },
+  spend: { onExceed: 'block' },
   cortex: {
     agentId: slug,
     recallTopK: 8,

@@ -58,6 +58,11 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Spend totals (WS4) for /health.spend. */
+  spend?: {
+    today(): { usd: number; tokens: number; calls: number };
+    month(): { usd: number; tokens: number; calls: number };
+  };
   /** Boot-time provider posture (defect (h)); surfaced verbatim on /health. */
   provider?: {
     ok: boolean;
@@ -133,6 +138,7 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     ts: new Date().toISOString(),
     provider: opts.provider ?? null,
     automations: opts.automations ? opts.automations.status() : [],
+    spend: opts.spend ? { today: opts.spend.today(), month: opts.spend.month() } : null,
   }));
 
   // First-party Aterna AI Loop channel. The route imposes a stricter contract
