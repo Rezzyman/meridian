@@ -4,6 +4,13 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Prompt budget: measure the static prompt, cap tokens per turn (2026-09-22)
+
+- **Found on the bench:** on Arlo's real home a turn averaged 57k prompt tokens (33.7k minimum, 241k maximum) because identity, context, and every tool schema ride along on every step and a tool loop resends them each step. The runtime could not say where the tokens went.
+- **`/health.promptBudget`** and the boot log now report the static prompt: identity+context tokens, tool schema tokens, tool count, and the ten largest tools.
+- **`spend.maxPromptTokensPerTurn`** (default 150k) aborts further steps once a turn's cumulative prompt tokens pass the ceiling; the turn answers with what it has and never retries through a fallback. Tools refuse to run past the ceiling as a second guard.
+- **Bench harnesses are pinned to the same model** for cost and latency fairness.
+
 ### Production cutover tooling (2026-09-22)
 
 - **`scripts/ops/arlo-cutover.sh`** snapshots both configs, dry-runs the rollback, stops the incumbent unit fully, starts the Meridian unit, polls the port bind, checks `/health` and one authenticated turn, verifies the voice webhook and Loop sidecar were untouched, and rolls back on any failure. **`arlo-rollback.sh`** restores the retained incumbent unit in under 20 seconds. **`arlo-soak-check.sh`** reads `/health` and the journal and exits non-zero on a hard failure so a timer or loop can trigger the rollback.

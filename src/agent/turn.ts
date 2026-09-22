@@ -296,6 +296,31 @@ export interface TurnResult {
   };
 }
 
+/** Once a turn's prompt-token ceiling is reached, tools return a stop notice
+ *  instead of running, so a provider that ignores the abort cannot keep the
+ *  loop alive. */
+function withBudgetGuard(tools: ToolSet, exceeded: () => boolean): ToolSet {
+  const out: ToolSet = {};
+  for (const [name, t] of Object.entries(tools)) {
+    const orig = (t as { execute?: (a: unknown, o: unknown) => Promise<unknown> }).execute;
+    if (typeof orig !== 'function') {
+      out[name] = t;
+      continue;
+    }
+    out[name] = {
+      ...t,
+      execute: async (args: unknown, o: unknown) =>
+        exceeded()
+          ? {
+              error:
+                'Per-turn budget reached. Stop calling tools and answer now with what you have.',
+            }
+          : orig.call(t, args, o),
+    } as ToolSet[string];
+  }
+  return out;
+}
+
 export async function runTurn(ctx: TurnContext, userInput: string): Promise<TurnResult> {
   const started = Date.now();
 
@@ -480,14 +505,18 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // the gateway/REPL after the turn completes for /why + /trace queries.
   const toolCallTrace: Array<{ name: string; stepType: string; ts: string }> = [];
   const toolDiagnostics: ToolCallDiagnostic[] = [];
+  let budgetExceeded = false;
   const turnTools = governedTools
     ? withEmptyResultBreaker(
-        diagnoseToolSet(governedTools, {
-          logger: ctx.logger,
-          onCall: (d) => {
-            toolDiagnostics.push(d);
+        diagnoseToolSet(
+          withBudgetGuard(governedTools, () => budgetExceeded),
+          {
+            logger: ctx.logger,
+            onCall: (d) => {
+              toolDiagnostics.push(d);
+            },
           },
-        }),
+        ),
         {
           threshold: 2,
           onTrip: (name) => {
@@ -554,6 +583,9 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   }
 
   for (const provider of spendChain) {
+    const budgetAbort = new AbortController();
+    let promptTokensThisTurn = 0;
+    let out = '';
     try {
       const toolTraceStart = toolCallTrace.length;
       // streamText (ai@4.x) does NOT throw on provider failure: errors are
@@ -578,9 +610,30 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         // 08-07). Governance maxToolCallsPerTurn (default 8) and the
         // empty-result breaker remain the per-agent cost brakes.
         maxSteps: 24,
-        abortSignal: AbortSignal.timeout(ctx.config.agent.gatewayTimeoutSec * 1000),
+        abortSignal: AbortSignal.any([
+          AbortSignal.timeout(ctx.config.agent.gatewayTimeoutSec * 1000),
+          budgetAbort.signal,
+        ]),
         experimental_continueSteps: true,
-        onStepFinish: ({ stepType, toolCalls, toolResults }) => {
+        onStepFinish: ({ stepType, toolCalls, toolResults, usage: stepUsage }) => {
+          // Per-turn prompt-token ceiling (WS4 follow-up, found on the bench):
+          // every step resends the whole prompt, so a tool loop multiplies
+          // cost. Past the ceiling the turn is cut and answers with what it has.
+          if (stepUsage && Number.isFinite(stepUsage.promptTokens)) {
+            promptTokensThisTurn += stepUsage.promptTokens;
+            if (
+              promptTokensThisTurn > ctx.config.spend.maxPromptTokensPerTurn &&
+              !budgetAbort.signal.aborted
+            ) {
+              ctx.logger.warn({
+                msg: 'turn prompt-token ceiling reached; aborting further steps',
+                promptTokensThisTurn,
+                ceiling: ctx.config.spend.maxPromptTokensPerTurn,
+              });
+              budgetExceeded = true;
+              budgetAbort.abort(new Error('prompt token ceiling'));
+            }
+          }
           if (toolCalls && toolCalls.length > 0) {
             ctx.logger.info({
               msg: 'tool step',
@@ -612,13 +665,23 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
           }
         },
       });
-      let out = '';
       for await (const delta of stream.textStream) {
         out += delta;
         if (delta) {
           deltasEmittedThisAttempt++;
           ctx.onStreamEvent?.({ type: 'delta', text: delta });
         }
+      }
+      if (budgetAbort.signal.aborted) {
+        // Soft stop: the turn spent its prompt-token ceiling. Keep whatever
+        // was written, never retry through a fallback (that would spend again).
+        reply =
+          out.trim() ||
+          'I stopped this one early: it was taking more tool steps than my per-turn budget allows. Here is where I got to, and I can continue if you want.';
+        providerUsed = provider.ref;
+        usage = { promptTokens: promptTokensThisTurn, completionTokens: 0 };
+        ctx.router.reportSuccess(provider.ref);
+        break;
       }
       if (streamError !== undefined) {
         throw streamError instanceof Error ? streamError : new Error(String(streamError));
@@ -655,6 +718,16 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       ctx.router.reportSuccess?.(provider.ref);
       break;
     } catch (err) {
+      if (budgetAbort.signal.aborted) {
+        // The abort surfaced as a thrown error (a real provider refuses the
+        // next call). Same soft stop: keep what we have, no fallback.
+        reply =
+          out.trim() ||
+          'I stopped this one early: it was taking more tool steps than my per-turn budget allows. Here is where I got to, and I can continue if you want.';
+        providerUsed = provider.ref;
+        usage = { promptTokens: promptTokensThisTurn, completionTokens: 0 };
+        break;
+      }
       const message = err instanceof Error ? err.message : String(err);
       providerErrors.push({ ref: provider.ref, message: message || '(no message)' });
       ctx.logger.warn({ msg: 'provider failed; trying fallback', provider: provider.ref, err });
