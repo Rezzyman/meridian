@@ -5,6 +5,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import type { SpendLedger } from '../spend/ledger.js';
+import type { PricingCatalog } from '../providers/pricing.js';
 import type { CoreMessage, ToolSet } from 'ai';
 import type { MemoryProvider } from '../memory/provider.js';
 import type { ProviderRouter } from '../providers/router.js';
@@ -43,6 +45,8 @@ export interface ConversationOptions {
   /** When set, every turn's reasoning trace is persisted to this store
    *  so /why and /trace can answer "what backed that claim?" later. */
   store?: SessionStore;
+  /** Spend accounting (WS4): ledger + pricing catalog. */
+  spend?: { ledger: SpendLedger; pricing?: PricingCatalog };
 }
 
 // Keep at most this many user/assistant entries in the in-memory history
@@ -123,6 +127,7 @@ export class Conversation {
             }
           : undefined,
         isolation: sendOpts?.isolation,
+        spend: this.opts.spend,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],
         channel: this.opts.channel,
@@ -150,6 +155,8 @@ export class Conversation {
           recallArtifactIds: result.trace.recallArtifactIds,
           recallTokenCount: result.trace.recallTokenCount,
           toolCalls: result.trace.toolCalls,
+          usage: result.trace.usage,
+          usd: result.trace.usd,
           userInput,
           reply: result.reply,
           durationMs: result.durationMs,

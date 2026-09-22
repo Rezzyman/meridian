@@ -71,3 +71,32 @@ describe('tool diagnostics (defect g: tool failures had no structured record)', 
     assert.ok(!d.includes('hunter2'));
   });
 });
+
+describe('repeated identical tool-call quarantine (WS4 runaway brake)', () => {
+  it('quarantines the same tool + same args past the limit and tells the model to stop', async () => {
+    let executions = 0;
+    const tools = diagnoseToolSet(
+      {
+        probe: tool({
+          description: 'probe',
+          parameters: z.object({ q: z.string() }),
+          execute: async () => {
+            executions += 1;
+            return { ok: true };
+          },
+        }),
+      },
+      { logger: quiet, repeatLimit: 2 },
+    );
+    const exec = (
+      tools.probe as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }
+    ).execute;
+    await exec({ q: 'same' }, {});
+    await exec({ q: 'same' }, {});
+    const third = (await exec({ q: 'same' }, {})) as { error?: string };
+    assert.equal(executions, 2);
+    assert.match(third.error ?? '', /Quarantined/);
+    const different = (await exec({ q: 'other' }, {})) as { ok?: boolean };
+    assert.equal(different.ok, true, 'different args are not quarantined');
+  });
+});

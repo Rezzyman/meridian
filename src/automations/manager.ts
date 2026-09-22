@@ -17,6 +17,9 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolveTimezone } from '../config/timezone.js';
 import { NARRATION_RULE, stripNarration } from './narration.js';
+import { checkSpend } from '../spend/guard.js';
+import type { SpendLedger } from '../spend/ledger.js';
+import type { PricingCatalog } from '../providers/pricing.js';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { streamText, type ToolSet } from 'ai';
@@ -76,6 +79,8 @@ export interface AutomationManagerOptions {
   tools?: ToolSet;
   store: SessionStore;
   controlPlane?: AutonomyControlPlane;
+  /** Spend accounting (WS4): per-run and daily caps apply to automations too. */
+  spend?: { ledger: SpendLedger; pricing?: PricingCatalog };
 }
 
 export interface AutomationStatus {
@@ -487,6 +492,28 @@ export class AutomationManager {
       .filter(Boolean)
       .join('\n');
 
+    // Spend cap (WS4): a scheduled job must never run the account dry.
+    const jobId = `automation:${def.name}`;
+    if (this.opts.spend) {
+      const verdict = checkSpend(this.opts.spend.ledger, this.opts.config.spend, { jobId });
+      if (verdict.action === 'block') {
+        this.opts.logger.warn({
+          msg: 'automation skipped: spend cap',
+          name,
+          reason: verdict.reason,
+        });
+        await this.notifyOperator(def, `did not run: ${verdict.reason}.`, `spend-cap:${def.name}`);
+        return this.terminal(
+          def,
+          runId,
+          started,
+          'skipped',
+          '',
+          [],
+          `spend cap: ${verdict.reason}`,
+        );
+      }
+    }
     const chain = this.opts.router.chainFor(def.name, this.opts.config.models);
     let reply = '';
     for (const provider of chain) {
@@ -506,6 +533,25 @@ export class AutomationManager {
         });
         let out = '';
         for await (const delta of stream.textStream) out += delta;
+        if (this.opts.spend) {
+          try {
+            const u = await stream.usage;
+            if (u && Number.isFinite(u.promptTokens)) {
+              const usage = { promptTokens: u.promptTokens, completionTokens: u.completionTokens };
+              this.opts.spend.ledger.record({
+                agentId: this.opts.config.agent.slug,
+                scope: 'automation',
+                jobId,
+                model: provider.ref,
+                promptTokens: usage.promptTokens,
+                completionTokens: usage.completionTokens,
+                usd: this.opts.spend.pricing?.price(provider.ref, usage) ?? null,
+              });
+            }
+          } catch (err) {
+            this.opts.logger.warn({ msg: 'automation spend record failed', name, err });
+          }
+        }
         if (out.trim()) {
           reply = out.trim();
           break;

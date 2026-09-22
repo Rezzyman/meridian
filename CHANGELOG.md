@@ -4,6 +4,15 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Spend accounting and caps inside the harness (2026-09-22)
+
+- **Every model call is on the ledger.** `LEDGER/spend-YYYY-MM-DD.jsonl` per agent home records model, tokens, and USD (null when unpriced, never guessed) for turns and automation runs. Totals survive restarts; `/health.spend`, `/trace`, and `meridian doctor` show them.
+- **Prices come from the ROUTEXOR catalog** once at boot; a failed fetch degrades to tokens-only accounting.
+- **Caps:** `spend.perTurnUsd`, `perRunUsd`, `dailyUsd`, `monthlyUsd`, `onExceed: block | degrade`. A capped chat turn answers in plain language and makes no provider call; a capped automation is skipped and the operator is told once; degrade mode keeps answering on the cheap model only.
+- **Runaway brake:** the same tool with identical arguments more than four times in one turn is quarantined and the model is told to answer with what it has.
+- **Restart ceiling:** `skeleton/systemd/meridian-gateway@.service` ships `StartLimitIntervalSec=300` and `StartLimitBurst=5`.
+- `docs/spend-controls.md` documents all of it.
+
 ### Safety config that was parsed and ignored now works (2026-09-22)
 
 - **Slash commands on chat channels.** `/approve`, `/reject`, `/approvals`, `/drafts`, `/automations`, and `/help` are honored from the resolved operator over Telegram, the CLI, and the token-authed gateway. Before this, `/approve` existed only in the local REPL, so an automation that asked for approval over Telegram could never receive it.

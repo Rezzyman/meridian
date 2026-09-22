@@ -349,6 +349,9 @@ export interface TurnTrace {
   recallArtifactIds?: number[];
   recallTokenCount?: number;
   toolCalls?: Array<{ name: string; stepType: string; ts: string }>;
+  /** WS4: provider usage and priced cost for the winning attempt. */
+  usage?: { promptTokens: number; completionTokens: number };
+  usd?: number | null;
   userInput: string;
   reply: string;
   durationMs?: number;

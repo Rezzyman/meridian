@@ -27,6 +27,7 @@ import { ProviderRouter } from '../providers/router.js';
 import { streamText } from 'ai';
 import { colors } from '../utils/truecolor.js';
 import { checkProviderPosture } from '../providers/preflight.js';
+import { SpendLedger } from '../spend/ledger.js';
 import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 
 interface CheckRow {
@@ -157,6 +158,26 @@ export async function runDoctor(opts: { providerVerbose?: boolean } = {}): Promi
         'Timezone',
         'warn',
         'none configured; schedulers run in UTC. Set agent.timezone in config.yaml',
+      ),
+    );
+  }
+  // Spend (WS4): what today cost and whether any cap is set.
+  {
+    const t = new SpendLedger(home).today();
+    const caps = config.spend;
+    const capText = [
+      caps.perTurnUsd !== undefined ? `turn $${caps.perTurnUsd}` : null,
+      caps.perRunUsd !== undefined ? `run $${caps.perRunUsd}` : null,
+      caps.dailyUsd !== undefined ? `day $${caps.dailyUsd}` : null,
+      caps.monthlyUsd !== undefined ? `month $${caps.monthlyUsd}` : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    rows.push(
+      row(
+        'Spend',
+        capText ? 'ok' : 'warn',
+        `today $${t.usd.toFixed(4)} over ${t.calls} call(s), ${t.tokens} tokens${t.unpricedTokens ? ` (${t.unpricedTokens} unpriced)` : ''}; caps: ${capText || 'none set (spend.dailyUsd recommended)'}`,
       ),
     );
   }

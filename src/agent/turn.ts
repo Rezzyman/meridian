@@ -25,6 +25,9 @@ import type { MeridianTurn } from './types.js';
 import { sanitizeOutbound, ProviderChainError } from '../safety/error-firewall.js';
 import { governToolSet, type ActionReceiptInput } from '../governance/action-policy.js';
 import { diagnoseToolSet, type ToolCallDiagnostic } from './tool-diagnostics.js';
+import { checkSpend, spendRefusal } from '../spend/guard.js';
+import type { SpendLedger } from '../spend/ledger.js';
+import type { PricingCatalog } from '../providers/pricing.js';
 
 /**
  * Framework-enforced behavioral rules prepended to every system prompt.
@@ -158,6 +161,9 @@ export interface TurnContext {
     /** Framework-authored policy appended to the system prompt for this turn. */
     systemPolicy?: string;
   };
+  /** Spend accounting (WS4): ledger + pricing. Absent = usage is still on the
+   *  trace but nothing is recorded or capped. */
+  spend?: { ledger: SpendLedger; pricing?: PricingCatalog };
   history: CoreMessage[];
   channel: MeridianTurn['channel'];
   /** System prompt without recall; recall is injected per turn */
@@ -274,6 +280,9 @@ export interface TurnResult {
     toolCalls: Array<{ name: string; stepType: string; ts: string }>;
     /** Per-call wall time, outcome, error class, args digest (never args). */
     toolDiagnostics: ToolCallDiagnostic[];
+    /** Provider-reported usage for the winning attempt and its USD (null = unpriced). */
+    usage?: { promptTokens: number; completionTokens: number };
+    usd?: number | null;
     model?: string;
     modelTraceIds: string[];
     /** Memories pulled from the model's view by the integrity screen. */
@@ -487,8 +496,57 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // dies mid-stream and a fallback takes over, the observer gets a reset
   // so it can discard the partial buffer (hazard: double emission).
   let deltasEmittedThisAttempt = 0;
+  let usage: { promptTokens: number; completionTokens: number } | undefined;
 
-  for (const provider of chain) {
+  // Spend cap (WS4): decided before the first provider call, from the ledger.
+  let spendChain = chain;
+  if (ctx.spend) {
+    const verdict = checkSpend(ctx.spend.ledger, ctx.config.spend, {});
+    if (verdict.action === 'block') {
+      ctx.logger.warn({
+        msg: 'spend cap reached; turn refused before any provider call',
+        reason: verdict.reason,
+        todayUsd: verdict.todayUsd,
+      });
+      const refusal = spendRefusal(verdict);
+      return {
+        turn: {
+          id: `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+          sessionId: ctx.sessionId,
+          role: 'assistant',
+          content: refusal,
+          channel: ctx.channel,
+          ts: new Date().toISOString(),
+        },
+        reply: refusal,
+        recallSummary,
+        encodeOk: false,
+        durationMs: Date.now() - started,
+        trace: {
+          recallQuery: userInput,
+          recallMemoryIds,
+          recallArtifactIds,
+          recallTokenCount,
+          toolCalls: [],
+          toolDiagnostics: [],
+          modelTraceIds: [],
+          quarantinedMemories,
+          verifications: [],
+        },
+      };
+    }
+    if (verdict.action === 'degrade') {
+      ctx.logger.warn({
+        msg: 'spend cap reached; degrading to the cheapest configured model',
+        reason: verdict.reason,
+      });
+      const cheap = ctx.config.models.smartRouting?.cheapModel;
+      const cheapOnly = cheap ? chain.filter((p) => p.ref === cheap) : [];
+      spendChain = cheapOnly.length > 0 ? cheapOnly : chain.slice(-1);
+    }
+  }
+
+  for (const provider of spendChain) {
     try {
       const toolTraceStart = toolCallTrace.length;
       // streamText (ai@4.x) does NOT throw on provider failure: errors are
@@ -568,6 +626,14 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       }
       reply = out;
       providerUsed = provider.ref;
+      try {
+        const u = await stream.usage;
+        if (u && Number.isFinite(u.promptTokens) && Number.isFinite(u.completionTokens)) {
+          usage = { promptTokens: u.promptTokens, completionTokens: u.completionTokens };
+        }
+      } catch {
+        /* usage is best-effort; the reply already landed */
+      }
       if (provider.provider === 'routexor') {
         const steps = await stream.steps;
         modelTraceIds = steps.flatMap((step) => {
@@ -693,6 +759,30 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // Voyage embed + synapse formation can take 3-10s; users shouldn't wait.
   // If it fails the warning lands in the log, but the user already has
   // their reply.
+  // Spend settlement (WS4): price the winning attempt and append to the ledger.
+  const usd: number | null | undefined =
+    usage && providerUsed ? (ctx.spend?.pricing?.price(providerUsed, usage) ?? null) : undefined;
+  if (ctx.spend && usage && providerUsed) {
+    try {
+      ctx.spend.ledger.record({
+        agentId: ctx.config.agent.slug,
+        scope: 'turn',
+        sessionId: ctx.sessionId,
+        channel: ctx.channel,
+        model: providerUsed,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        usd: usd ?? null,
+      });
+      const cap = ctx.config.spend.perTurnUsd;
+      if (cap !== undefined && typeof usd === 'number' && usd > cap) {
+        ctx.logger.warn({ msg: 'turn exceeded perTurnUsd', usd, cap, model: providerUsed });
+      }
+    } catch (err) {
+      ctx.logger.warn({ msg: 'spend record failed', err });
+    }
+  }
+
   const memoryId: number | undefined = undefined;
   const encodeOk = false;
   if (ctx.config.cortex.encodeOnTurn && !ctx.isolation?.disableMemoryWrite) {
@@ -753,6 +843,8 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       recallTokenCount,
       toolCalls: toolCallTrace,
       toolDiagnostics,
+      usage,
+      usd,
       model: providerUsed,
       modelTraceIds,
       quarantinedMemories,

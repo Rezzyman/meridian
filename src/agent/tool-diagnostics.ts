@@ -46,9 +46,17 @@ export function classifyError(err: unknown): string {
 
 export function diagnoseToolSet(
   tools: ToolSet,
-  opts: { logger: Logger; onCall?: (d: ToolCallDiagnostic) => void },
+  opts: {
+    logger: Logger;
+    onCall?: (d: ToolCallDiagnostic) => void;
+    /** Runaway brake (WS4): the same tool with the same arguments more than
+     *  this many times in one turn is quarantined (default 4). */
+    repeatLimit?: number;
+  },
 ): ToolSet {
   const out: ToolSet = {};
+  const repeatLimit = opts.repeatLimit ?? 4;
+  const seen = new Map<string, number>();
   for (const [name, tool] of Object.entries(tools)) {
     const t = tool as { execute?: (args: unknown, o: unknown) => Promise<unknown> };
     if (typeof t.execute !== 'function') {
@@ -61,6 +69,24 @@ export function diagnoseToolSet(
       execute: async (args: unknown, o: unknown) => {
         const started = Date.now();
         const argsDigest = digestArgs(args);
+        const key = `${name}:${argsDigest}`;
+        const count = (seen.get(key) ?? 0) + 1;
+        seen.set(key, count);
+        if (count > repeatLimit) {
+          const d: ToolCallDiagnostic = {
+            name,
+            ts: new Date(started).toISOString(),
+            durationMs: 0,
+            ok: false,
+            errorClass: 'repeat_quarantined',
+            argsDigest,
+          };
+          opts.onCall?.(d);
+          opts.logger.warn({ msg: 'repeated identical tool call quarantined', ...d, count });
+          return {
+            error: `Quarantined: ${name} was called ${count} times with identical arguments this turn. Stop and answer with what you have.`,
+          };
+        }
         try {
           const result = await original(args, o);
           const d: ToolCallDiagnostic = {

@@ -24,6 +24,8 @@ import { createLogger } from '../logger/pino.js';
 import { installCrashHandlers } from '../gateway/crash-safety.js';
 import { checkProviderPosture } from '../providers/preflight.js';
 import { dispatchChannelCommand, isChannelCommand } from '../gateway/slash.js';
+import { SpendLedger } from '../spend/ledger.js';
+import { PricingCatalog } from '../providers/pricing.js';
 import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
@@ -106,6 +108,33 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
 
   const cortex = bindCortex(env.CORTEX_AGENT_ID, env.MERIDIAN_CORTEX_URL);
   const router = new ProviderRouter(env);
+
+  // Spend accounting (WS4): the ledger is per agent home; prices come from the
+  // ROUTEXOR catalog once at boot. A failed catalog fetch degrades to
+  // tokens-only accounting (usd null), never to a guessed price.
+  const spendLedger = new SpendLedger(home);
+  let pricing: PricingCatalog | undefined;
+  try {
+    pricing = await PricingCatalog.fromRoutexor({
+      baseUrl: env.ROUTEXOR_BASE_URL,
+      apiKey: env.ROUTEXOR_API_KEY,
+      timeoutMs: 8000,
+    });
+    logger.info({ msg: 'pricing catalog loaded', models: pricing.size });
+  } catch (err) {
+    logger.warn({ msg: 'pricing catalog unavailable; recording tokens without USD', err });
+  }
+  const spend = { ledger: spendLedger, pricing };
+  {
+    const t = spendLedger.today();
+    logger.info({
+      msg: 'spend today',
+      usd: t.usd,
+      tokens: t.tokens,
+      calls: t.calls,
+      caps: config.spend,
+    });
+  }
 
   // Boot-time CORTEX health check. If the backend is unreachable at start,
   // log a clear warning so the operator knows recall + encode will fail
@@ -249,6 +278,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       // Only the resolved operator's turns are signed as first-party; an
       // unknown external caller's memories stay unsigned so recall screens them.
       senderTrusted,
+      spend,
       resume,
       store,
     });
@@ -640,6 +670,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // composes a turn against CORTEX, encodes the output as memory, and
   // optionally pushes to the operator's primary channel.
   const automations = new AutomationManager({
+    spend,
     home,
     config,
     cortex,
@@ -822,6 +853,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
               verificationChecks,
               provenanceSigner,
               senderTrusted: true,
+              spend,
             }).send(text, sendOpts),
         } as Conversation;
         const adapters: LoopAgentAdapterRegistry = {
@@ -867,6 +899,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     sentinel,
     automations,
     provider: posture,
+    spend: spendLedger,
     waitlist,
     web,
     ingest,

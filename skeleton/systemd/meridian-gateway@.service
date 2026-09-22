@@ -1,0 +1,37 @@
+# Meridian gateway unit template (WS4). Install as
+#   /etc/systemd/system/meridian-gateway-<agent>.service
+# and replace <agent>, <user>, and <release>. The restart ceiling is the
+# point: a crash loop restarts at most 5 times in 5 minutes, then stops and
+# stays stopped until an operator looks. Two sibling agents once burned
+# hundreds of dollars in a Restart=always loop with no ceiling.
+[Unit]
+Description=Meridian Gateway (<agent>)
+After=network-online.target cortex-<agent>.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=<user>
+Group=<user>
+WorkingDirectory=<release>
+EnvironmentFile=/root/.meridian/<agent>/.env
+EnvironmentFile=-/root/.meridian/<agent>/.env.meridian
+Environment=MERIDIAN_AGENT=<agent>
+Environment=TZ=America/Denver
+ExecStart=<release>/bin/meridian gateway --port 18889
+Restart=on-failure
+RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
