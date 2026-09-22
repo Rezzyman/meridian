@@ -19,6 +19,25 @@ digest-only revocation tombstone both return `204`; unknown, malformed, and
 operator/bootstrap credentials receive the same generic `401`. The server
 never stores or logs the raw bearer.
 
+## Meridian as the Loop upstream
+
+The sidecar reaches its harness over OpenAI-compatible
+`POST /v1/chat/completions` on loopback. Meridian's gateway serves that route
+(bearer = `MERIDIAN_GATEWAY_TOKEN`), so switching Loop from OpenClaw to
+Meridian is a configuration change, not a code change:
+
+1. Run a Meridian gateway for the Loop lane with
+   `MERIDIAN_COMPLETIONS_ISOLATION=loop` in its environment. Every completion
+   on that gateway is then tool-free and memory-write-free, which is the Loop
+   contract's requirement regardless of what the sidecar sends.
+2. Point the sidecar at it: `LOOP_UPSTREAM_URL=http://127.0.0.1:<port>`.
+3. Run `scripts/ops/loop-canary.mjs` against the public sidecar and confirm
+   `CANARY PASS`.
+
+A shared gateway can serve both operator chat and Loop by having the sidecar
+send `x-meridian-isolation: loop`; the dedicated-gateway form above needs no
+sidecar change and is the recommended production shape.
+
 ## Server configuration
 
 Existing deployments remain on the embedded Meridian adapter unless explicitly

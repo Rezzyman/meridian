@@ -1000,6 +1000,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     sentinel,
     automations,
     provider: posture,
+    completionsIsolation: env.MERIDIAN_COMPLETIONS_ISOLATION,
     imessage,
     health,
     breaker: () => router.breakerSnapshot(),

@@ -4,6 +4,12 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### IRL ears and mouth: Loop, wearables, voice (2026-09-22)
+
+- **OpenAI-compatible `POST /v1/chat/completions`** on the gateway (bearer token, non-streaming). The Loop sidecar reaches its harness over exactly this route, so switching Loop to Meridian is `LOOP_UPSTREAM_URL` plus `MERIDIAN_COMPLETIONS_ISOLATION=loop` on a dedicated gateway; the parity bench drives both harnesses through the same shape. `x-meridian-isolation: loop` (or the env) makes the turn tool-free and memory-write-free and folds system messages into a per-turn policy.
+- **Wearables pulls time out per encode** (90s) in the skill and the backfill script, so one hung encode cannot hang a whole pull.
+- **`scripts/ops/loop-canary.mjs`** posts a synthetic `aterna.loop.turn.v1` and checks the full reply contract; **`scripts/ops/continuity-check.mjs`** encodes one marker and asks for it back. Both are the shadow-phase gates before the Arlo cutover. The voice line stays on its own service and is verified untouched by the cutover script.
+
 ### iMessage through a BlueBubbles relay (2026-09-22)
 
 - **New channel: iMessage.** `src/channels/imessage.ts` speaks to a BlueBubbles relay: inbound text and attachments over `POST /imessage/webhook` (shared secret required, fails closed), replies as blue bubbles with a typing indicator and a human pause between them, tapback reactions, and SMS fallback for phone handles when the relay cannot deliver. The operator is matched by handle (phone normalized, email case-folded); slash commands work from the operator's handle.

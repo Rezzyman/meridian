@@ -163,11 +163,16 @@ for (let cursor = new Date(since); cursor <= until; ) {
           continue;
         }
         try {
-          await cortex.encode(body, {
-            source: `limitless:${dayIso}:${lg.id}`,
-            priority: 2,
-            sensitivity: 'internal',
-          });
+          await Promise.race([
+            cortex.encode(body, {
+              source: `limitless:${dayIso}:${lg.id}`,
+              priority: 2,
+              sensitivity: 'internal',
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('encode timed out after 90s')), 90_000).unref?.(),
+            ),
+          ]);
           ingestedIds.add(lg.id);
           dayEncoded++;
           totalEncoded++;
