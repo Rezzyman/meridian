@@ -15,6 +15,8 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { resolveTimezone } from '../config/timezone.js';
+import { NARRATION_RULE, stripNarration } from './narration.js';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { streamText, type ToolSet } from 'ai';
@@ -71,6 +73,30 @@ export interface AutomationManagerOptions {
   tools?: ToolSet;
   store: SessionStore;
   controlPlane?: AutonomyControlPlane;
+}
+
+export interface AutomationStatus {
+  name: string;
+  schedule: string;
+  timezone: string;
+  pushTo: string;
+  delivers: boolean;
+  nextFireAt: string | null;
+  lastRunAt: string | null;
+  lastOutcome: string | null;
+  lastDeliveredAt: string | null;
+  armedAt: string | null;
+  /** ms since the later of armedAt / lastDeliveredAt; null when never armed. */
+  silentForMs: number | null;
+}
+
+function silentFor(now: Date, armedAt?: Date, lastDeliveredAt?: string): number | null {
+  const anchor = Math.max(
+    armedAt ? armedAt.getTime() : 0,
+    lastDeliveredAt ? new Date(lastDeliveredAt).getTime() : 0,
+  );
+  if (!anchor) return null;
+  return Math.max(0, now.getTime() - anchor);
 }
 
 export interface AutomationRunResult {
@@ -174,6 +200,7 @@ export class AutomationManager {
   private lastRuns = new Map<string, AutomationRunResult>();
   private defs: AutomationDef[] = [];
   private readonly controlPlane: AutonomyControlPlane;
+  private armedAt: Date | undefined;
 
   constructor(private opts: AutomationManagerOptions) {
     this.controlPlane = opts.controlPlane ?? new AutonomyControlPlane(opts.home);
@@ -185,6 +212,7 @@ export class AutomationManager {
       this.opts.logger.error({ msg: 'automation run recovered to dead letter', ...recovered });
     }
     this.defs = loadAutomationDefs(this.opts.home);
+    this.armedAt = now;
     for (const def of this.defs) {
       const missedAt = this.controlPlane.getNextScheduledAt(def.name);
       const task = scheduleDeterministic(
@@ -195,7 +223,7 @@ export class AutomationManager {
           );
         },
         {
-          timezone: def.timezone ?? process.env.TZ ?? 'America/Chicago',
+          timezone: resolveTimezone(def.timezone, this.opts.config.agent.timezone, process.env.TZ),
           onScheduled: (next) => this.controlPlane.setNextScheduledAt(def.name, next),
         },
       );
@@ -230,6 +258,43 @@ export class AutomationManager {
 
   lastRun(name: string): AutomationRunResult | undefined {
     return this.lastRuns.get(name);
+  }
+
+  /**
+   * Operator-visible status for /health and doctor: what is armed, when it
+   * fires next, when it last ran, and when it last delivered. Defect (a):
+   * agents that were "healthy but silent" had no surface that showed this.
+   */
+  status(now = new Date()): AutomationStatus[] {
+    return this.defs.map((def) => {
+      const next = this.controlPlane.getNextScheduledAt(def.name);
+      const last = this.lastRuns.get(def.name);
+      const job = this.controlPlane.snapshot().jobs[def.name];
+      return {
+        name: def.name,
+        schedule: def.schedule,
+        timezone: resolveTimezone(def.timezone, this.opts.config.agent.timezone, process.env.TZ),
+        pushTo: def.pushTo ?? 'none',
+        delivers: def.autonomyMode === 'live' && def.mode === 'direct' && def.pushTo === 'telegram',
+        nextFireAt: next ? next.toISOString() : null,
+        lastRunAt: last?.ts ?? null,
+        lastOutcome: last?.outcome ?? null,
+        lastDeliveredAt: job?.lastNotification?.at ?? null,
+        armedAt: this.armedAt ? this.armedAt.toISOString() : null,
+        silentForMs: silentFor(now, this.armedAt, job?.lastNotification?.at),
+      };
+    });
+  }
+
+  /**
+   * Delivering automations that have not delivered anything within `windowMs`
+   * of being armed (or since their last delivery). The gateway logs these on
+   * a timer so a parked proactive layer is visible within a day, not a week.
+   */
+  silentAutomations(windowMs: number, now = new Date()): AutomationStatus[] {
+    return this.status(now).filter(
+      (st) => st.delivers && st.silentForMs !== null && st.silentForMs > windowMs,
+    );
   }
 
   async fire(name: string, scheduledAt = new Date()): Promise<AutomationRunResult | null> {
@@ -349,6 +414,7 @@ export class AutomationManager {
       'Compose the output of this automation. Direct, no preamble. If recall did',
       "not pull anything actionable, follow the automation's no-update instruction.",
       'Do not invent and do not expose internal memory or message ids.',
+      NARRATION_RULE,
       '',
       recallAvailable
         ? recallContext
@@ -393,6 +459,12 @@ export class AutomationManager {
     }
     if (!reply) {
       reply = `(${def.name} produced no output — provider chain exhausted)`;
+    } else {
+      const cleaned = stripNarration(reply);
+      if (cleaned !== reply) {
+        this.opts.logger.warn({ msg: 'automation narration stripped', name });
+        reply = cleaned;
+      }
     }
 
     const silent = automationRunIsSilent(reply, def.name);

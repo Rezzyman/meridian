@@ -4,6 +4,17 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Eight July production defects, reproduce-first (2026-09-22)
+
+- **(a) Silent agents.** `AutomationManager.status()` exposes schedule, timezone, next fire, last run, last delivery on `/health.automations`; boot logs the armed count and next fire; an hourly silence detector warns when a delivering automation has been quiet longer than `MERIDIAN_SILENCE_ALERT_HOURS` (default 26).
+- **(b) Narration and timezone.** Every automation prompt carries the narration rule and `stripNarration()` removes leaked planning lines before delivery. Four hard-coded `America/Chicago` defaults are gone: `resolveTimezone()` takes `agent.timezone`, then `TZ`, then UTC, and doctor warns when nothing is set.
+- **(c) Provider errors are visible.** `meridian doctor` keeps the sanitized error per provider ref (`--provider` prints the long form) instead of "did not respond".
+- **(d) Telegram documents.** PDFs, text, markdown, csv, json, yaml, and log files sent over Telegram are downloaded under the media cap and ingested through the same pipeline as `meridian ingest`; the model is told exactly how many chunks landed, or that ingest failed and the file is not in memory.
+- **(e) Google tool names.** `gmail_recent` is back as an alias so v0.1 automations resolve, and a manifest-parity test asserts every bundled skill's manifest matches its `createTools()` exports.
+- **(f) Doctor.** Only directories with `config.yaml` count as agent homes; new rows for timezone and provider posture.
+- **(g) Tool diagnostics.** Every tool call records duration, outcome, error class, and an argument digest to the log and to `trace.toolDiagnostics`; errors are rethrown unchanged.
+- **(h) Provider posture preflight.** The gateway refuses to boot when a `routexor/*` primary points at a native provider host (the 2026-08-18 outage) and `/health.provider` reports the posture.
+
 ### Consolidation and hardening pass (2026-09-22)
 
 - **One main again.** Merged the governance branch, the VPS-only autonomy control plane and Routexor compatibility fixes, the Loop harness adapters, and two fixes recovered from a dist-only production build. Disposition per source in `docs/consolidation-2026-09.md`.

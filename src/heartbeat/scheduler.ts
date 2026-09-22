@@ -1,6 +1,7 @@
 /** Evidence-driven heartbeat governed by the durable autonomy control plane. */
 
 import { generateText } from 'ai';
+import { resolveTimezone } from '../config/timezone.js';
 import type { AgentConfig, Heartbeat } from '../config/schema.js';
 import type { MeridianHome } from '../config/home.js';
 import type { Logger } from 'pino';
@@ -180,7 +181,7 @@ export class HeartbeatScheduler {
         await this.beat(scheduledAt);
       },
       {
-        timezone: process.env.TZ ?? 'America/Chicago',
+        timezone: resolveTimezone(process.env.TZ),
         onScheduled: (next) => this.controlPlane.setNextScheduledAt('heartbeat', next),
       },
     );

@@ -5,6 +5,7 @@
  */
 
 import { schedule as cronSchedule, type ScheduledTask } from 'node-cron';
+import { resolveTimezone } from '../config/timezone.js';
 import type { MemoryProvider } from '../memory/provider.js';
 import type { DreamConfig } from '../config/schema.js';
 import type { Logger } from 'pino';
@@ -36,7 +37,7 @@ export class DreamWeaver {
           this.opts.logger.error({ err, msg: 'dream cycle failed' });
         });
       },
-      { timezone: process.env.TZ ?? 'America/Chicago' },
+      { timezone: resolveTimezone(process.env.TZ) },
     );
     this.opts.logger.info({
       msg: 'dream weaver scheduled',

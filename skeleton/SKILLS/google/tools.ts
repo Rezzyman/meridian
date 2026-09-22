@@ -246,6 +246,38 @@ export function createTools(ctx: SkillToolContext): Record<string, unknown> {
       },
     }),
 
+    // Compatibility alias (defect (e)): the v0.1 google skill exposed
+    // gmail_recent and Arlo's inbox automation still calls it. Same engine
+    // as gmail_search with a time window instead of a raw query.
+    gmail_recent: tool({
+      description:
+        'List recent Gmail messages from the last N hours (default 24). ' +
+        'Alias for gmail_search with a newer_than window; pass `query` to narrow further.',
+      parameters: Z.object({
+        hours: Z.number().default(24).describe('Look-back window in hours (1-720)'),
+        query: Z.string().optional().describe('Extra Gmail query terms'),
+        account: Z.string().optional().describe('Mailbox email (omit for primary)'),
+        maxResults: Z.number().default(10).describe('Max messages to return (1-50)'),
+      }),
+      execute: async (args: { hours: number; query?: string; account?: string; maxResults: number }) => {
+        const acct = pickAccount(ctx, args.account);
+        const hours = Math.min(Math.max(Math.round(args.hours || 24), 1), 720);
+        const window = hours < 24 ? `newer_than:${hours}h` : `newer_than:${Math.ceil(hours / 24)}d`;
+        const query = [window, args.query?.trim()].filter(Boolean).join(' ');
+        const max = Math.min(Math.max(args.maxResults, 1), 50);
+        try {
+          const result = await gogJson<{ messages?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>>(
+            ['gmail', 'messages', 'search', query, '--max', String(max)],
+            acct,
+          );
+          const messages = Array.isArray(result) ? result : (result.messages ?? []);
+          return { account: acct.email, query, hours, count: messages.length, messages };
+        } catch (err) {
+          return { error: (err as Error).message, account: acct.email, query };
+        }
+      },
+    }),
+
     gmail_get: tool({
       description:
         'Fetch the full body of a Gmail message by id (e.g. ids returned by gmail_search). ' +

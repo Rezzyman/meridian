@@ -26,6 +26,8 @@ import { createMemoryProvider } from '../memory/index.js';
 import { ProviderRouter } from '../providers/router.js';
 import { streamText } from 'ai';
 import { colors } from '../utils/truecolor.js';
+import { checkProviderPosture } from '../providers/preflight.js';
+import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 
 interface CheckRow {
   name: string;
@@ -50,7 +52,7 @@ function printRow(r: CheckRow): void {
   console.log(`${tag} ${r.name}${detail}`);
 }
 
-export async function runDoctor(): Promise<number> {
+export async function runDoctor(opts: { providerVerbose?: boolean } = {}): Promise<number> {
   console.log(colors.cyan('Meridian doctor'));
   console.log(colors.muted('Checking foundation...'));
   const rows: CheckRow[] = [];
@@ -146,6 +148,32 @@ export async function runDoctor(): Promise<number> {
     return 1;
   }
   rows.push(row('Active agent', 'ok', activeSlug));
+  // Timezone (defect b): every scheduler runs in one zone; UTC only by choice.
+  if (timezoneConfigured(config.agent.timezone, process.env.TZ)) {
+    rows.push(row('Timezone', 'ok', resolveTimezone(config.agent.timezone, process.env.TZ)));
+  } else {
+    rows.push(
+      row(
+        'Timezone',
+        'warn',
+        'none configured; schedulers run in UTC. Set agent.timezone in config.yaml',
+      ),
+    );
+  }
+  // Provider posture (defect h): a routexor primary aimed at a native endpoint
+  // cannot answer a single turn, and the old gateway could not say why.
+  {
+    const posture = checkProviderPosture(config.models.primary, readEnvFile(home.envPath));
+    rows.push(
+      posture.ok
+        ? row(
+            'Provider posture',
+            'ok',
+            `${posture.primary} via ${posture.baseUrlHost ?? posture.provider}`,
+          )
+        : row('Provider posture', 'fail', posture.reason ?? 'invalid'),
+    );
+  }
   // Read the agent's own .env so the probe honors a per-agent
   // MERIDIAN_CORTEX_URL override (production agents typically point at
   // their dedicated CORTEX on a non-default port like 3101).
@@ -341,6 +369,9 @@ export async function runDoctor(): Promise<number> {
       );
     } else {
       let replied = false;
+      // Defect (c): a provider that rejects a parameter or a base URL used to
+      // vanish into "did not respond". Keep the sanitized reason per ref.
+      const providerErrors: string[] = [];
       for (const provider of chain) {
         try {
           const stream = streamText({
@@ -357,9 +388,15 @@ export async function runDoctor(): Promise<number> {
             rows.push(row('LLM chain dry-run', 'ok', `${provider.ref} responded`));
             break;
           }
-        } catch {
-          /* try next */
+        } catch (err) {
+          const raw = err instanceof Error ? err.message : String(err);
+          providerErrors.push(
+            `${provider.ref}: ${raw.replace(/\s+/g, ' ').slice(0, opts.providerVerbose ? 600 : 160)}`,
+          );
         }
+      }
+      if (providerErrors.length > 0 && (opts.providerVerbose || !replied)) {
+        rows.push(row('Provider errors', replied ? 'warn' : 'fail', providerErrors.join(' | ')));
       }
       // If none answered, the severity depends on whether the operator actually
       // configured a model. A present cloud key that fails is a real failure. But

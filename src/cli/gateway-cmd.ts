@@ -22,6 +22,8 @@ import { DreamWeaver } from '../dream/weaver.js';
 import { buildToolSurface } from '../agent/tool-surface.js';
 import { createLogger } from '../logger/pino.js';
 import { installCrashHandlers } from '../gateway/crash-safety.js';
+import { checkProviderPosture } from '../providers/preflight.js';
+import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
 import { SlackChannel } from '../channels/slack.js';
@@ -46,7 +48,7 @@ import { SessionStore } from '../session/store.js';
 import { ProactiveSentinel } from '../proactive/sentinel.js';
 import { AutomationManager } from '../automations/manager.js';
 import { armHeartbeat, createHeartbeatAssessor } from '../heartbeat/scheduler.js';
-import { watchInbox } from '../ingest/file-ingest.js';
+import { ingestFile, watchInbox } from '../ingest/file-ingest.js';
 import { analyzeImage } from '../vision/analyze.js';
 import { mkdirSync } from 'node:fs';
 import type { ChannelKind } from '../agent/operator.js';
@@ -79,6 +81,27 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   const env = loadAgentEnv(home);
   const logger = createLogger({ home });
   installCrashHandlers(logger, process, { agentId: slug });
+
+  // One clock for every scheduler. config.agent.timezone wins over the
+  // process TZ; when neither is set every scheduler runs in UTC and doctor
+  // warns (defect (b): the old default was a silent America/Chicago).
+  if (!process.env.TZ && config.agent.timezone) process.env.TZ = config.agent.timezone;
+  const tz = resolveTimezone(config.agent.timezone, process.env.TZ);
+  if (!timezoneConfigured(config.agent.timezone, process.env.TZ)) {
+    logger.warn({
+      msg: 'no timezone configured; schedulers run in UTC',
+      hint: 'set agent.timezone in config.yaml',
+    });
+  }
+
+  // Provider posture preflight (defect (h)): refuse to boot into a config
+  // that cannot produce a single model turn.
+  const posture = checkProviderPosture(config.models.primary, env);
+  if (!posture.ok) {
+    logger.fatal({ msg: 'provider posture invalid; refusing to start', ...posture });
+    console.error(colors.err(`provider misconfiguration: ${posture.reason}`));
+    if (process.env.MERIDIAN_ALLOW_PROVIDER_MISMATCH !== '1') process.exit(2);
+  }
 
   const cortex = bindCortex(env.CORTEX_AGENT_ID, env.MERIDIAN_CORTEX_URL);
   const router = new ProviderRouter(env);
@@ -337,6 +360,16 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       mediaDir: join(home.layer('MEMORY'), 'media'),
       maxMediaBytes: config.vision.maxBytes,
       vision: visionAnalyze ? { analyze: visionAnalyze } : undefined,
+      ingest: {
+        ingest: async (path: string) => {
+          const r = await ingestFile(memorySelection.provider, path, {
+            logger,
+            vision: { enabled: config.vision.enabled, analyze: visionAnalyze },
+            pdf: { maxPages: config.pdf.maxPages, maxBytesMb: config.pdf.maxBytesMb },
+          });
+          return { chunks: r.chunks, type: r.type, warnings: r.warnings };
+        },
+      },
     });
     await telegram.start(undefined, {
       onInbound: async (m) => turn('telegram', m.from, m.text),
@@ -600,7 +633,37 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   });
   const autoDefs = automations.start();
   if (autoDefs.length > 0) {
-    console.log(colors.ok(`automations armed: ${autoDefs.length} job(s)`));
+    const st = automations.status();
+    const nextFire =
+      st
+        .map((a) => a.nextFireAt)
+        .filter(Boolean)
+        .sort()[0] ?? 'n/a';
+    logger.info({
+      msg: 'automations armed',
+      count: autoDefs.length,
+      names: st.map((a) => a.name),
+      next: nextFire,
+      timezone: tz,
+    });
+    console.log(
+      colors.ok(`automations armed: ${autoDefs.length} job(s), next ${nextFire}, tz ${tz}`),
+    );
+    // Silence detector (defect (a)): a parked proactive layer must be visible
+    // within a day. Log-only here; the ops sink is wired in the observability pass.
+    const silenceHours = Number(process.env.MERIDIAN_SILENCE_ALERT_HOURS ?? 26);
+    const silenceTimer = setInterval(() => {
+      for (const quiet of automations.silentAutomations(silenceHours * 3600_000)) {
+        logger.warn({
+          msg: 'automation silent',
+          name: quiet.name,
+          silentForMs: quiet.silentForMs,
+          lastDeliveredAt: quiet.lastDeliveredAt,
+          nextFireAt: quiet.nextFireAt,
+        });
+      }
+    }, 60 * 60_000);
+    silenceTimer.unref();
     for (const d of autoDefs) {
       console.log(colors.muted(`  • ${d.name}  ${d.schedule}`));
     }
@@ -783,6 +846,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     sms,
     sentinel,
     automations,
+    provider: posture,
     waitlist,
     web,
     ingest,

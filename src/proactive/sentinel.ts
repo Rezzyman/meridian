@@ -12,6 +12,7 @@
  */
 
 import { schedule as cronSchedule, type ScheduledTask } from 'node-cron';
+import { resolveTimezone } from '../config/timezone.js';
 import { streamText } from 'ai';
 import type { Logger } from 'pino';
 import type { MemoryProvider } from '../memory/provider.js';
@@ -60,7 +61,7 @@ export class ProactiveSentinel {
             this.opts.logger.error({ msg: 'morning brief failed', err }),
           );
         },
-        { timezone: process.env.TZ ?? 'America/Chicago' },
+        { timezone: resolveTimezone(process.env.TZ) },
       );
       this.opts.logger.info({
         msg: 'morning brief scheduled',
@@ -75,7 +76,7 @@ export class ProactiveSentinel {
             this.opts.logger.error({ msg: 'hourly nudge failed', err }),
           );
         },
-        { timezone: process.env.TZ ?? 'America/Chicago' },
+        { timezone: resolveTimezone(process.env.TZ) },
       );
       this.opts.logger.info({
         msg: 'hourly nudge scheduled',
