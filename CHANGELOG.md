@@ -4,6 +4,11 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Production cutover tooling (2026-09-22)
+
+- **`scripts/ops/arlo-cutover.sh`** snapshots both configs, dry-runs the rollback, stops the incumbent unit fully, starts the Meridian unit, polls the port bind, checks `/health` and one authenticated turn, verifies the voice webhook and Loop sidecar were untouched, and rolls back on any failure. **`arlo-rollback.sh`** restores the retained incumbent unit in under 20 seconds. **`arlo-soak-check.sh`** reads `/health` and the journal and exits non-zero on a hard failure so a timer or loop can trigger the rollback.
+- **`docs/production-deployment.md`** is the deployment shape with secrets removed: layout, unit, ship, shadow, cutover, rollback, and the rules that do not bend.
+
 ### Harness parity bench v1 (2026-09-22)
 
 - **`benchmarks/harness-parity-v1/`** measures Meridian against the incumbent runtime on the same agent home and memory clone, through the same OpenAI-compatible completions route: 30 functional prompts with deterministic checks, 20 seeded-memory recalls, 100 reliability turns (p50, p95, error rate), and a blind pairwise human-feel judge. `scripts/harness-parity.mts` writes `results-<date>.json` and exits non-zero unless Meridian meets or beats the incumbent on every axis (p95 within 20 percent, human feel at least 60 percent preferred). Unmeasurable cells are recorded as `unmeasured`.
