@@ -36,7 +36,10 @@ function relay(opts: { failSend?: boolean; attachmentBytes?: Buffer } = {}) {
       ok,
       status: ok ? 200 : 500,
       json: async () => ({ status: 200 }),
-      arrayBuffer: async () => (opts.attachmentBytes ?? Buffer.from('')).buffer.slice(0),
+      arrayBuffer: async () => {
+        const b = opts.attachmentBytes ?? Buffer.from('');
+        return new Uint8Array(b).buffer as ArrayBuffer;
+      },
       text: async () => '',
     };
   };
@@ -211,10 +214,8 @@ describe('imessage inbound', () => {
     const r = relay();
     const { ch } = channel(r);
     await ch.send({ channel: 'imessage', to: '+13033329227', text: 'Morning brief: two things.' });
-    assert.equal(
-      (r.calls.at(-1)?.body as { chatGuid: string }).chatGuid,
-      'iMessage;-;+13033329227',
-    );
+    const lastText = r.calls.filter((c) => c.url.includes('/message/text')).at(-1);
+    assert.equal((lastText?.body as { chatGuid: string }).chatGuid, 'iMessage;-;+13033329227');
     assert.equal(await ch.react('iMessage;-;+13033329227', 'msg-1', 'love'), true);
     assert.equal((r.calls.at(-1)?.body as { reaction: string }).reaction, 'love');
   });
