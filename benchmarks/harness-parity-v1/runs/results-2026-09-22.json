@@ -19,30 +19,14 @@
       "total": 30,
       "passed": 22,
       "failures": {
-        "f06": [
-          "missing /friday/"
-        ],
-        "f10": [
-          "over 900 chars"
-        ],
-        "f11": [
-          "over 500 chars"
-        ],
-        "f13": [
-          "over 400 chars"
-        ],
-        "f17": [
-          "over 900 chars"
-        ],
-        "f21": [
-          "over 900 chars"
-        ],
-        "f22": [
-          "narration prefix"
-        ],
-        "f29": [
-          "over 1400 chars"
-        ]
+        "f06": ["missing /friday/"],
+        "f10": ["over 900 chars"],
+        "f11": ["over 500 chars"],
+        "f13": ["over 400 chars"],
+        "f17": ["over 900 chars"],
+        "f21": ["over 900 chars"],
+        "f22": ["narration prefix"],
+        "f29": ["over 1400 chars"]
       }
     },
     "memory": {
@@ -73,53 +57,20 @@
       "total": 30,
       "passed": 16,
       "failures": {
-        "f04": [
-          "missing /4:?4|4:?5|late|over|miss/"
-        ],
-        "f05": [
-          "missing /thursday/"
-        ],
-        "f06": [
-          "missing /friday/"
-        ],
-        "f10": [
-          "markdown wall",
-          "over 900 chars"
-        ],
-        "f11": [
-          "over 500 chars"
-        ],
-        "f13": [
-          "over 400 chars"
-        ],
-        "f17": [
-          "over 900 chars"
-        ],
-        "f19": [
-          "assistant-speak",
-          "markdown wall",
-          "over 300 chars"
-        ],
-        "f20": [
-          "over 300 chars"
-        ],
-        "f21": [
-          "markdown wall",
-          "over 900 chars"
-        ],
-        "f23": [
-          "HTTP 500"
-        ],
-        "f24": [
-          "over 300 chars"
-        ],
-        "f29": [
-          "markdown wall",
-          "over 1400 chars"
-        ],
-        "f30": [
-          "over 1200 chars"
-        ]
+        "f04": ["missing /4:?4|4:?5|late|over|miss/"],
+        "f05": ["missing /thursday/"],
+        "f06": ["missing /friday/"],
+        "f10": ["markdown wall", "over 900 chars"],
+        "f11": ["over 500 chars"],
+        "f13": ["over 400 chars"],
+        "f17": ["over 900 chars"],
+        "f19": ["assistant-speak", "markdown wall", "over 300 chars"],
+        "f20": ["over 300 chars"],
+        "f21": ["markdown wall", "over 900 chars"],
+        "f23": ["HTTP 500"],
+        "f24": ["over 300 chars"],
+        "f29": ["markdown wall", "over 1400 chars"],
+        "f30": ["over 1200 chars"]
       }
     },
     "memory": {
@@ -139,10 +90,7 @@
   "humanFeelTies": 7,
   "verdict": {
     "ok": false,
-    "reasons": [
-      "memory hit 80% < 100%",
-      "human-feel preference 34.5% < 60%"
-    ]
+    "reasons": ["memory hit 80% < 100%", "human-feel preference 34.5% < 60%"]
   },
   "replies": {
     "a": {
