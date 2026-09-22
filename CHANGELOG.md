@@ -4,6 +4,10 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Harness parity bench v1 (2026-09-22)
+
+- **`benchmarks/harness-parity-v1/`** measures Meridian against the incumbent runtime on the same agent home and memory clone, through the same OpenAI-compatible completions route: 30 functional prompts with deterministic checks, 20 seeded-memory recalls, 100 reliability turns (p50, p95, error rate), and a blind pairwise human-feel judge. `scripts/harness-parity.mts` writes `results-<date>.json` and exits non-zero unless Meridian meets or beats the incumbent on every axis (p95 within 20 percent, human feel at least 60 percent preferred). Unmeasurable cells are recorded as `unmeasured`.
+
 ### IRL ears and mouth: Loop, wearables, voice (2026-09-22)
 
 - **OpenAI-compatible `POST /v1/chat/completions`** on the gateway (bearer token, non-streaming). The Loop sidecar reaches its harness over exactly this route, so switching Loop to Meridian is `LOOP_UPSTREAM_URL` plus `MERIDIAN_COMPLETIONS_ISOLATION=loop` on a dedicated gateway; the parity bench drives both harnesses through the same shape. `x-meridian-isolation: loop` (or the env) makes the turn tool-free and memory-write-free and folds system messages into a per-turn policy.

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "m01",
+    "seed": "Remember this: the code word for the garage is falcon-seven.",
+    "ask": "What's the code word for the garage?",
+    "expect": "falcon.?seven"
+  },
+  {
+    "id": "m02",
+    "seed": "Note that Eric's favorite lunch spot is Tamayo on Larimer.",
+    "ask": "Where does Eric like to get lunch?",
+    "expect": "tamayo"
+  },
+  {
+    "id": "m03",
+    "seed": "For the record, the Pineda invoice number is PN-4471.",
+    "ask": "What's the Pineda invoice number?",
+    "expect": "PN-?4471"
+  },
+  {
+    "id": "m04",
+    "seed": "Remember that Ricki's flight lands at 6:40pm on the 14th.",
+    "ask": "When does Ricki's flight land?",
+    "expect": "6:?40"
+  },
+  {
+    "id": "m05",
+    "seed": "Please keep in mind: the BRG estimate uses 22 squares of shingle.",
+    "ask": "How many squares of shingle is the BRG estimate?",
+    "expect": "\\b22\\b"
+  },
+  {
+    "id": "m06",
+    "seed": "Note: the gutter guard supplier is called Northline Metals.",
+    "ask": "Who is the gutter guard supplier?",
+    "expect": "northline"
+  },
+  {
+    "id": "m07",
+    "seed": "Remember the WiFi at the shop is named shopnet-5g.",
+    "ask": "What's the shop WiFi network called?",
+    "expect": "shopnet"
+  },
+  {
+    "id": "m08",
+    "seed": "The kids' dentist appointment is October 3rd at 9am, remember that.",
+    "ask": "When is the kids' dentist appointment?",
+    "expect": "october 3|oct(ober)? 3|3rd"
+  },
+  {
+    "id": "m09",
+    "seed": "Keep this: Jeff's partner on the leads deal is named Marcus Bell.",
+    "ask": "Who is Jeff's partner on the leads deal?",
+    "expect": "marcus"
+  },
+  {
+    "id": "m10",
+    "seed": "Remember that the demo login for Melk uses the email demo@melkpos.com.",
+    "ask": "What email is the Melk demo login?",
+    "expect": "demo@melkpos"
+  },
+  {
+    "id": "m11",
+    "seed": "Note that the storage unit number is B-218.",
+    "ask": "What's the storage unit number?",
+    "expect": "B-?218"
+  },
+  {
+    "id": "m12",
+    "seed": "Remember: the Sparq press peg is the CSW conference.",
+    "ask": "What's the press peg for Sparq?",
+    "expect": "csw"
+  },
+  {
+    "id": "m13",
+    "seed": "For later: the truck's oil change is due at 84,000 miles.",
+    "ask": "When is the truck's oil change due?",
+    "expect": "84,?000"
+  },
+  {
+    "id": "m14",
+    "seed": "Keep in mind Luca's Telegram handle is @luca_ops.",
+    "ask": "What's Luca's Telegram handle?",
+    "expect": "luca_ops"
+  },
+  {
+    "id": "m15",
+    "seed": "Remember the Precision Homes contact is Nora and she prefers email.",
+    "ask": "How does Nora at Precision Homes prefer to be contacted?",
+    "expect": "email"
+  },
+  {
+    "id": "m16",
+    "seed": "Note: the Hostinger snapshot cadence we agreed on is weekly, Sundays.",
+    "ask": "How often do we snapshot Hostinger?",
+    "expect": "weekly|sunday"
+  },
+  {
+    "id": "m17",
+    "seed": "Remember that the Gutter Gurus site should never show public pricing.",
+    "ask": "Should the Gutter Gurus site show pricing?",
+    "expect": "no|never|should not|shouldn't"
+  },
+  {
+    "id": "m18",
+    "seed": "For the record, RevLine's booking form backend is still open work.",
+    "ask": "What's still open on RevLine?",
+    "expect": "form|backend|booking"
+  },
+  {
+    "id": "m19",
+    "seed": "Remember: Hank is 6 and Rey is 4.",
+    "ask": "How old are Hank and Rey?",
+    "expect": "6.*4|six.*four"
+  },
+  {
+    "id": "m20",
+    "seed": "Keep this: the parity bench marker word is quartzite.",
+    "ask": "What's the parity bench marker word?",
+    "expect": "quartzite"
+  }
+]
