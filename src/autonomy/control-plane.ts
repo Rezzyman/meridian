@@ -44,6 +44,8 @@ interface JobState {
   lastNotification?: { digest: string; at: string };
   consecutiveFailures: number;
   runs: AutonomyRun[];
+  /** Trust graduation (WS3): set once the automation earned direct mode. */
+  graduatedAt?: string;
 }
 
 interface ControlPlaneState {
@@ -136,6 +138,33 @@ export class AutonomyControlPlane {
       if (next) current.nextScheduledAt = next.toISOString();
       else delete current.nextScheduledAt;
     });
+  }
+
+  /** Runs that went past the approval gate and finished, newest first, until
+   *  the first one that did not. This is the "consecutive approved runs"
+   *  counter behind trust graduation. */
+  consecutiveApprovedRuns(job: string): number {
+    const runs = [...(this.snapshot().jobs[job]?.runs ?? [])].reverse();
+    let n = 0;
+    for (const run of runs) {
+      if (run.outcome === 'running') continue;
+      if (run.outcome === 'success' || run.outcome === 'skipped' || run.outcome === 'degraded')
+        n += 1;
+      else break;
+    }
+    return n;
+  }
+
+  setGraduated(job: string, at: Date | null): void {
+    this.mutate((state) => {
+      const current = this.job(state, job);
+      if (at) current.graduatedAt = at.toISOString();
+      else delete current.graduatedAt;
+    });
+  }
+
+  graduatedAt(job: string): string | null {
+    return this.snapshot().jobs[job]?.graduatedAt ?? null;
   }
 
   getNextScheduledAt(job: string): Date | null {

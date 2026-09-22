@@ -278,6 +278,9 @@ export function watchInbox(
   opts: {
     logger?: Logger;
     debounceMs?: number;
+    /** Periodic sweep for files whose fs event was missed (macOS FSEvents and
+     *  network mounts drop create events under load). Default 30s. */
+    rescanMs?: number;
     vision?: IngestOptions['vision'];
     pdf?: IngestOptions['pdf'];
   } = {},
@@ -285,15 +288,18 @@ export function watchInbox(
   if (!existsSync(dir)) return () => {};
   const debounce = opts.debounceMs ?? 1500;
   const pending = new Map<string, NodeJS.Timeout>();
+  const inFlight = new Set<string>();
   const enqueue = (filename: string): void => {
     if (filename.endsWith('.processed') || filename.endsWith('.failed') || filename.startsWith('.'))
       return;
+    if (inFlight.has(filename)) return;
     const existing = pending.get(filename);
     if (existing) clearTimeout(existing);
     const t = setTimeout(async () => {
       pending.delete(filename);
       const path = resolve(dir, filename);
       if (!existsSync(path)) return;
+      inFlight.add(filename);
       try {
         const result = await ingestFile(cortex, path, {
           logger: opts.logger,
@@ -327,6 +333,8 @@ export function watchInbox(
         renameSync(path, `${path}.processed`);
       } catch (err) {
         opts.logger?.warn({ msg: 'inbox ingest failed', err, path });
+      } finally {
+        inFlight.delete(filename);
       }
     }, debounce);
     pending.set(filename, t);
@@ -336,8 +344,22 @@ export function watchInbox(
   });
   // Startup scan: documents parked while no gateway was running (downtime
   // drops, pre-boot copies) emit no fs event — sweep them into the same queue.
-  for (const existing of readdirSync(dir)) enqueue(existing);
+  const sweep = (): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const existing of entries) enqueue(existing);
+  };
+  sweep();
+  // A missed fs event must never strand a document (that is the "lost
+  // document" class this watcher exists to prevent), so sweep periodically.
+  const rescan = setInterval(sweep, opts.rescanMs ?? 30_000);
+  rescan.unref();
   return () => {
+    clearInterval(rescan);
     watcher.close();
     for (const t of pending.values()) clearTimeout(t);
   };

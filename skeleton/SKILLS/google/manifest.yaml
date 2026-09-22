@@ -20,6 +20,8 @@ tools:
     description: List recent Gmail messages from the last N hours (alias kept for v0.1 automations)
   - name: gmail_get
     description: Fetch full body of a Gmail message
+  - name: gmail_read
+    description: Alias of gmail_get kept for v0.1 automations
   - name: gmail_draft
     description: Create a Gmail draft (never sends)
   - name: gcal_today

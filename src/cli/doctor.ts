@@ -507,6 +507,34 @@ export async function runDoctor(opts: { providerVerbose?: boolean } = {}): Promi
     );
   } catch (err) {
     rows.push(row('Automations parse', 'fail', String((err as Error).message)));
+  } // WS3: policy summary so a job that will never deliver is visible before it
+  // spends a week being silent.
+  try {
+    const { loadAutomationDefs } = await import('../automations/manager.js');
+    const defs = loadAutomationDefs(home);
+    const quiet = defs.filter(
+      (d) => d.autonomyMode !== 'live' || d.mode !== 'direct' || d.pushTo === 'none',
+    );
+    const gated = defs.filter((d) => d.requiresApproval);
+    if (defs.length > 0) {
+      const detail = defs
+        .map(
+          (d) =>
+            `${d.name}: ${d.autonomyMode}/${d.mode}/${d.requiresApproval ? 'approval' : 'direct'}${d.trustGraduationAfter ? ` graduates@${d.trustGraduationAfter}` : ''}`,
+        )
+        .join('; ');
+      rows.push(
+        row(
+          'Automations policy',
+          quiet.length === defs.length ? 'warn' : 'ok',
+          quiet.length === defs.length
+            ? `none of ${defs.length} will deliver (shadow, draft, or pushTo none): ${detail}`
+            : `${defs.length - quiet.length} deliver, ${gated.length} approval-gated. ${detail}`,
+        ),
+      );
+    }
+  } catch {
+    /* parse row above already reported */
   }
 
   rows.forEach(printRow);

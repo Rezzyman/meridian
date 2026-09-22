@@ -4,6 +4,16 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Safety config that was parsed and ignored now works (2026-09-22)
+
+- **Slash commands on chat channels.** `/approve`, `/reject`, `/approvals`, `/drafts`, `/automations`, and `/help` are honored from the resolved operator over Telegram, the CLI, and the token-authed gateway. Before this, `/approve` existed only in the local REPL, so an automation that asked for approval over Telegram could never receive it.
+- **Approval-gated runs tell the operator.** An `awaiting_approval` run pushes one notice with the exact command (rate limited to one per six hours per job) instead of sitting silently in the ledger.
+- **Draft mode is real.** A `mode: draft` run writes `OUTBOX/<automation>/<id>.md`, previews to the operator, and delivers only on `/approve draft:<id>`; `/reject draft:<id>` marks the file rejected and keeps it.
+- **Trust graduation.** `trustGraduation: N` (or `{ after: N }`) flips an approval-gated automation to direct mode after N consecutive approved runs. The flip is durable in the autonomy control plane, recorded as a signed `automation.graduate` receipt, announced once, and revoked by setting the value to 0.
+- **Doctor** prints an automations policy row and warns when none of the armed jobs can deliver.
+- **google skill** also aliases `gmail_read` to `gmail_get` (Arlo's open-loops automation calls it).
+- **Inbox watcher rescans** every 30 seconds (configurable) with an in-flight guard, so a missed filesystem event can no longer strand a document. This was the one flaky test.
+
 ### Eight July production defects, reproduce-first (2026-09-22)
 
 - **(a) Silent agents.** `AutomationManager.status()` exposes schedule, timezone, next fire, last run, last delivery on `/health.automations`; boot logs the armed count and next fire; an hourly silence detector warns when a delivering automation has been quiet longer than `MERIDIAN_SILENCE_ALERT_HOURS` (default 26).
