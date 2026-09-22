@@ -130,3 +130,35 @@ describe('OpenAI-compatible /v1/chat/completions (WS5d)', () => {
     assert.equal(opts.isolation.disableTools, true);
   });
 });
+
+describe('stateless completions (WS5d)', () => {
+  it('uses a fresh conversation seeded with prior messages, never the shared session', async () => {
+    const seen: Array<{ input: string; history: Array<{ role: string; content: string }> }> = [];
+    const { conversation, calls } = stub();
+    const base = await boot(conversation, {
+      completions: async (
+        input: string,
+        history: Array<{ role: 'user' | 'assistant'; content: string }>,
+      ) => {
+        seen.push({ input, history });
+        return { id: 'c1', content: `fresh: ${input}` };
+      },
+    });
+    const res = await post(base, {
+      messages: [
+        { role: 'system', content: 'policy' },
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'ok' },
+        { role: 'user', content: 'second' },
+      ],
+    });
+    const body = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+    assert.equal(body.choices[0]?.message.content, 'fresh: second');
+    assert.equal(calls.length, 0, 'shared session untouched');
+    assert.equal(seen[0]?.input, 'second');
+    assert.deepEqual(seen[0]?.history, [
+      { role: 'user', content: 'first' },
+      { role: 'assistant', content: 'ok' },
+    ]);
+  });
+});

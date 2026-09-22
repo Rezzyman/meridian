@@ -31,13 +31,20 @@ interface Target {
   name: string;
   url: string;
   token: string;
+  /** Model id the target's completions route expects (OpenClaw insists on `openclaw`). */
+  model: string;
 }
 function parseTarget(spec: string | undefined, label: string): Target {
   if (!spec) throw new Error(`--${label} name=url,token is required`);
   const [name, rest] = spec.split('=', 2);
-  const [url, token] = (rest ?? '').split(',', 2);
-  if (!name || !url || !token) throw new Error(`--${label} must be name=url,token`);
-  return { name, url: url.replace(/\/$/, ''), token };
+  const [url, token, model] = (rest ?? '').split(',', 3);
+  if (!name || !url || !token) throw new Error(`--${label} must be name=url,token[,model]`);
+  return {
+    name,
+    url: url.replace(/\/$/, ''),
+    token,
+    model: model ?? (/openclaw/i.test(name) ? 'openclaw' : 'meridian'),
+  };
 }
 
 const A = parseTarget(opt('a'), 'a');
@@ -65,7 +72,7 @@ async function ask(
     const res = await fetch(`${t.url}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${t.token}` },
-      body: JSON.stringify({ model: 'bench', messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: t.model, messages: [{ role: 'user', content: prompt }] }),
       signal: AbortSignal.timeout(120_000),
     });
     const ms = Date.now() - started;

@@ -59,6 +59,14 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Stateless completion (WS5d): a fresh conversation per request seeded
+   *  with the caller's prior messages, exactly like the OpenAI contract.
+   *  Absent = falls back to the shared conversation facade. */
+  completions?: (
+    input: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    sendOpts?: Parameters<Conversation['send']>[1],
+  ) => Promise<{ id: string; content: string }>;
   /** Force every /v1/chat/completions turn into Loop isolation (no tools, no
    *  memory writes). Set on a gateway that serves only the Loop sidecar. */
   completionsIsolation?: 'loop';
@@ -454,7 +462,17 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       : systemPolicy
         ? { systemPolicy }
         : undefined;
-    const turn = await opts.conversation.send(input, isolation ? { isolation } : undefined);
+    const history = messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({ role: m.role as 'user' | 'assistant', content: textOf(m.content) }))
+      .filter((m) => m.content.trim().length > 0);
+    // Drop the final user message from history: it is the input.
+    const lastIdx = history.map((m) => m.role).lastIndexOf('user');
+    if (lastIdx >= 0) history.splice(lastIdx, 1);
+    const sendOpts = isolation ? { isolation } : undefined;
+    const turn = opts.completions
+      ? await opts.completions(input, history, sendOpts)
+      : await opts.conversation.send(input, sendOpts);
     return {
       id: `chatcmpl-${turn.id}`,
       object: 'chat.completion',
