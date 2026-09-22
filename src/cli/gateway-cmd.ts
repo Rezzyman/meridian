@@ -319,7 +319,14 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     operatorLabel: string;
     trusted: boolean;
   } {
-    const op = resolveOperator(config, channel, from);
+    // A token-authenticated gateway request IS the operator: the bearer is the
+    // credential. Without a token the gateway is open and stays untrusted.
+    // (Before this, /chat resolved as unknown:gateway:http, governance denied
+    // Arlo's own tools, and the model narrated the denials to the operator.)
+    const op =
+      channel === 'gateway' && env.MERIDIAN_GATEWAY_TOKEN && config.operator
+        ? { id: config.operator.id, source: 'config' as const, channel, from }
+        : resolveOperator(config, channel, from);
     const sessionId = op.source === 'config' ? operatorSessionId(op.id) : `op:${op.id}`;
     const opLabel = op.source === 'config' ? op.id : `unknown(${channel}:${from || 'anon'})`;
     const now = Date.now();
@@ -870,6 +877,49 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   // The HTTP /chat path now also flows through the operator-keyed session
   // cache so an authenticated /chat call from the operator joins the same
   // conversation as their voice + Telegram threads.
+  // Stateless OpenAI-compatible completions: one fresh conversation per
+  // request, trusted when the gateway is token-protected, history from the
+  // caller's messages. Nothing persists between calls, which is the contract
+  // the Loop sidecar and the parity bench rely on.
+  const completions = async (
+    input: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    sendOpts?: Parameters<Conversation['send']>[1],
+  ) => {
+    const now = Date.now();
+    const convo = new Conversation({
+      config,
+      cortex: memorySelection.provider,
+      router,
+      logger,
+      systemBase,
+      channel: 'gateway',
+      tools,
+      skillToolNames,
+      mcpGate: surface.mcpGate,
+      verificationChecks,
+      provenanceSigner,
+      senderTrusted: !!env.MERIDIAN_GATEWAY_TOKEN,
+      spend,
+      resume: {
+        id: `cmpl-${randomUUID()}`,
+        agentSlug: home.agentSlug,
+        createdAt: new Date(now).toISOString(),
+        turns: history.map((m, i) => ({
+          id: `h_${i}`,
+          sessionId: 'cmpl',
+          role: m.role,
+          content: m.content,
+          channel: 'gateway' as const,
+          ts: new Date(now - (history.length - i) * 1000).toISOString(),
+        })),
+      },
+    });
+    const t = await convo.send(input, sendOpts);
+    health.recordTurn(true);
+    return { id: t.id, content: t.content };
+  };
+
   const httpConvoFacade = {
     sessionId: 'gateway-http',
     agentSlug: home.agentSlug,
@@ -992,6 +1042,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     loop,
     logger,
     conversation: httpConvoFacade,
+    completions,
     vapi,
     slack,
     discord,

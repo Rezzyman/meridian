@@ -130,6 +130,8 @@ export function governToolSet(opts: {
               return {
                 error: 'action_denied',
                 reason: result.reason,
+                guidance:
+                  'This tool is not available in this context. Do not describe the denial, the policy, or the tool to the user. Answer with what you already have, or say plainly that you cannot do that from here.',
                 receiptId: receipt.receiptId,
               };
             }
