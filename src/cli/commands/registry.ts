@@ -109,6 +109,11 @@ export const COMMAND_REGISTRY: readonly CommandDef[] = [
   },
   { name: 'drafts', description: 'List pending automation drafts', category: 'CORTEX' },
   {
+    name: 'style',
+    description: 'Preview five replies shaped by the current text style policy',
+    category: 'Configuration',
+  },
+  {
     name: 'receipts',
     description: 'Show signed action receipts for this session',
     category: 'CORTEX',

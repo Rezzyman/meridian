@@ -21,6 +21,12 @@ import { Bot } from 'grammy';
 import type { ChannelAdapter, ChannelStartOptions } from './types.js';
 import type { Logger } from 'pino';
 import { sanitizeOutbound } from '../safety/error-firewall.js';
+import {
+  DEFAULT_TEXT_STYLE,
+  humanDelayMs,
+  shapeForText,
+  type TextStylePolicy,
+} from '../agent/text-style.js';
 
 /** Vision hook wired by the gateway; absent = vision disabled. */
 export interface TelegramVisionDeps {
@@ -98,6 +104,10 @@ export class TelegramChannel implements ChannelAdapter {
       ingest?: TelegramIngestDeps;
       /** Injectable downloader (tests). Defaults to fetch(). */
       fetchFile?: (url: string) => Promise<Buffer>;
+      /** Human texting shape (WS5b). Defaults to the framework policy. */
+      textStyle?: TextStylePolicy;
+      /** Injectable sleeper (tests). */
+      sleep?: (ms: number) => Promise<void>;
     },
   ) {
     this.trustedChatIds = new Set(
@@ -146,9 +156,7 @@ export class TelegramChannel implements ChannelAdapter {
         stopTyping();
         // Last-mile RULE ZERO net (defense-in-depth; turn.ts already sanitizes,
         // but a non-turn onInbound or future caller is covered here too).
-        for (const chunk of splitForTelegram(sanitizeOutbound(reply, { trusted: true }))) {
-          await ctx.reply(chunk);
-        }
+        await this.replyBubbles(ctx, sanitizeOutbound(reply, { trusted: true }));
       } catch (err) {
         stopTyping();
         this.opts.logger.error({ msg: 'telegram inbound error', err });
@@ -251,9 +259,7 @@ export class TelegramChannel implements ChannelAdapter {
         },
       });
       stopTyping();
-      for (const chunk of splitForTelegram(sanitizeOutbound(reply, { trusted: true }))) {
-        await ctx.reply(chunk);
-      }
+      await this.replyBubbles(ctx, sanitizeOutbound(reply, { trusted: true }));
     } catch (err) {
       stopTyping();
       this.opts.logger.error({ msg: 'telegram document inbound error', err });
@@ -368,9 +374,7 @@ export class TelegramChannel implements ChannelAdapter {
       });
       stopTyping();
       // Same last-mile RULE ZERO net as the text path.
-      for (const chunk of splitForTelegram(sanitizeOutbound(reply, { trusted: true }))) {
-        await ctx.reply(chunk);
-      }
+      await this.replyBubbles(ctx, sanitizeOutbound(reply, { trusted: true }));
     } catch (err) {
       stopTyping();
       this.opts.logger.error({ msg: 'telegram media inbound error', err });
@@ -385,8 +389,48 @@ export class TelegramChannel implements ChannelAdapter {
 
   async send(msg: { to: string; text: string }): Promise<void> {
     if (!this.bot) throw new Error('telegram bot not started');
-    for (const chunk of splitForTelegram(msg.text)) {
-      await this.bot.api.sendMessage(msg.to, chunk);
+    const bubbles = this.bubbles(msg.text);
+    for (let i = 0; i < bubbles.length; i += 1) {
+      const b = bubbles[i]!;
+      if (i > 0) {
+        void this.bot.api.sendChatAction(msg.to, 'typing').catch(() => {});
+        await this.sleep(humanDelayMs(b, this.style));
+      }
+      await this.bot.api.sendMessage(msg.to, b);
+    }
+  }
+
+  private get style(): TextStylePolicy {
+    return this.opts.textStyle ?? DEFAULT_TEXT_STYLE;
+  }
+
+  private get sleep(): (ms: number) => Promise<void> {
+    return this.opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  /** Shape a reply into human-sized bubbles that also respect Telegram's limit. */
+  private bubbles(text: string): string[] {
+    const shaped = shapeForText(text, this.style);
+    if (shaped.length === 0) return splitForTelegram(text);
+    return shaped.flatMap((b) => splitForTelegram(b));
+  }
+
+  /** Reply in bubbles with a typing indicator and a human pause between them. */
+  private async replyBubbles(
+    ctx: {
+      reply(text: string): Promise<unknown>;
+      replyWithChatAction(action: 'typing'): Promise<unknown>;
+    },
+    text: string,
+  ): Promise<void> {
+    const bubbles = this.bubbles(text);
+    for (let i = 0; i < bubbles.length; i += 1) {
+      const b = bubbles[i]!;
+      if (i > 0) {
+        void ctx.replyWithChatAction('typing').catch(() => {});
+        await this.sleep(humanDelayMs(b, this.style));
+      }
+      await ctx.reply(b);
     }
   }
 

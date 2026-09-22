@@ -438,6 +438,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       envPath: home.envPath,
       logger,
       mediaDir: join(home.layer('MEMORY'), 'media'),
+      textStyle: config.textStyle,
       maxMediaBytes: config.vision.maxBytes,
       vision: visionAnalyze ? { analyze: visionAnalyze } : undefined,
       ingest: {
@@ -623,6 +624,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     env.WHATSAPP_VERIFY_TOKEN
   ) {
     whatsapp = new WhatsappChannel({
+      textStyle: config.textStyle,
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
       accessToken: env.WHATSAPP_ACCESS_TOKEN,
       appSecret: env.WHATSAPP_APP_SECRET,
@@ -664,6 +666,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     env.TWILIO_WEBHOOK_URL
   ) {
     sms = new SmsChannel({
+      textStyle: config.textStyle,
       accountSid: env.TWILIO_ACCOUNT_SID,
       authToken: env.TWILIO_AUTH_TOKEN,
       fromNumber: env.TWILIO_PHONE_NUMBER,

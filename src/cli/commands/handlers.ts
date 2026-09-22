@@ -4,6 +4,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
+import { STYLE_SAMPLES, shapeForText } from '../../agent/text-style.js';
 import { join } from 'node:path';
 import { colors } from '../../utils/truecolor.js';
 import type { Conversation } from '../../agent/conversation.js';
@@ -78,6 +79,8 @@ export async function dispatch(line: string, ctx: HandlerCtx): Promise<string | 
       return await handleApprove(ctx, arg);
     case 'reject':
       return handleReject(ctx, arg);
+    case 'style':
+      return renderStyle(ctx);
     case 'drafts':
       return renderDrafts(ctx);
     case 'approvals':
@@ -359,6 +362,24 @@ async function handleApprove(ctx: HandlerCtx, arg: string): Promise<string> {
   const sessionId = automationScope ? `op:${ctx.config.operator!.id}` : ctx.conversation.sessionId;
   const grant = ctx.store.grantApproval(sessionId, toolName, minutes);
   return colors.ok(`approved one use of ${toolName} for ${minutes} minute(s) · ${grant.grantId}`);
+}
+
+function renderStyle(ctx: HandlerCtx): string {
+  const policy = ctx.config.textStyle;
+  const lines = [
+    colors.cyan(
+      `Text style · ${policy.enabled ? 'on' : 'off'} · bubbles ≤${policy.maxBubbleChars} chars, ≤${policy.maxBubbles} per reply`,
+    ),
+    '',
+  ];
+  for (const sample of STYLE_SAMPLES) {
+    lines.push(colors.steel(`> ${sample.prompt}`));
+    const bubbles = shapeForText(sample.raw, policy);
+    for (const b of bubbles) lines.push(`  ${b.replace(/\n/g, '\n  ')}`);
+    lines.push('');
+  }
+  lines.push(colors.muted('tune under textStyle in config.yaml; no deploy needed for the preview'));
+  return lines.join('\n');
 }
 
 function handleReject(ctx: HandlerCtx, arg: string): string {

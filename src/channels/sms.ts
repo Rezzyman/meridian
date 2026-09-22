@@ -15,6 +15,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { DEFAULT_TEXT_STYLE, shapeForText, type TextStylePolicy } from '../agent/text-style.js';
 import type { Logger } from 'pino';
 import type { ChannelAdapter, InboundMessage, OutboundMessage } from './types.js';
 
@@ -59,6 +60,8 @@ export interface SmsChannelOptions {
   /** Optional sender allowlist (E.164); empty = anyone. */
   allowedNumbers?: string[];
   logger: Logger;
+  /** Human texting shape (WS5b). */
+  textStyle?: TextStylePolicy;
   /** Injectable for tests; defaults to global fetch. */
   fetchImpl?: FetchLike;
 }
@@ -147,7 +150,9 @@ export class SmsChannel implements ChannelAdapter {
   private async sendSms(to: string, text: string): Promise<void> {
     // Paginate instead of truncating — a long answer used to lose everything
     // past 1500 chars silently. Each segment is a separate Twilio message.
-    for (const segment of splitForSms(text)) {
+    const shaped = shapeForText(text, this.opts.textStyle ?? DEFAULT_TEXT_STYLE);
+    const pieces = (shaped.length ? shaped : [text]).flatMap((b) => splitForSms(b));
+    for (const segment of pieces) {
       await this.postSegment(to, segment);
     }
   }
