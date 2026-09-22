@@ -4,6 +4,13 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Observability a canary can be judged on (2026-09-22)
+
+- **`GET /health` now carries** version, uptime, provider posture, CORTEX reachability (probed every minute), breaker state per model ref, last-hour inference (turns and errors), every automation's next fire and last delivery, the most recent proactive delivery, and spend today and this month.
+- **`meridian status`** renders that document for a human; `--json` prints it raw.
+- **One structured log line per turn** (`turn complete`) with agentId, channel, turnId, sessionId, model, tokens, USD, duration, tool calls, recall and quarantine counts.
+- **Ops alert sink.** `MERIDIAN_OPS_CHAT_ID` routes infra and health notices (silent automations first) to a dedicated Telegram chat through the same bot, rate limited per condition; unset means log-only. The operator's own agent thread is never used for infra.
+
 ### Spend accounting and caps inside the harness (2026-09-22)
 
 - **Every model call is on the ledger.** `LEDGER/spend-YYYY-MM-DD.jsonl` per agent home records model, tokens, and USD (null when unpriced, never guessed) for turns and automation runs. Totals survive restarts; `/health.spend`, `/trace`, and `meridian doctor` show them.

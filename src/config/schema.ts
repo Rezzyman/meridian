@@ -34,6 +34,9 @@ export const AgentEnvSchema = z
     // Telegram
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_DEFAULT_CHAT_ID: z.string().optional(),
+    /** Ops alert chat (WS5): infra and health notices go here, never to the
+     *  operator's own agent thread. */
+    MERIDIAN_OPS_CHAT_ID: z.string().optional(),
 
     // Slack (Events API): bot token (xoxb-…) + the app signing secret.
     SLACK_BOT_TOKEN: z.string().optional(),

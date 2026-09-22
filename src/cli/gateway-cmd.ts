@@ -25,6 +25,8 @@ import { installCrashHandlers } from '../gateway/crash-safety.js';
 import { checkProviderPosture } from '../providers/preflight.js';
 import { dispatchChannelCommand, isChannelCommand } from '../gateway/slash.js';
 import { SpendLedger } from '../spend/ledger.js';
+import { HealthState } from '../gateway/health.js';
+import { createOpsAlerter } from '../ops/alerts.js';
 import { PricingCatalog } from '../providers/pricing.js';
 import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 import { TelegramChannel } from '../channels/telegram.js';
@@ -80,6 +82,16 @@ function readSystemBase(home: ReturnType<typeof ensureAgentHome>, agentName: str
 export async function runGateway(opts: { port?: number; web?: boolean }): Promise<void> {
   const slug = activeAgentSlug();
   const home = ensureAgentHome(slug);
+  const gatewayVersion = (): string => {
+    try {
+      const pkg = JSON.parse(
+        readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+      ) as { version?: string };
+      return pkg.version ?? '0.0.0';
+    } catch {
+      return '0.0.0';
+    }
+  };
   const config = loadAgentConfig(home);
   const env = loadAgentEnv(home);
   const logger = createLogger({ home });
@@ -125,6 +137,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     logger.warn({ msg: 'pricing catalog unavailable; recording tokens without USD', err });
   }
   const spend = { ledger: spendLedger, pricing };
+  const health = new HealthState(gatewayVersion());
   {
     const t = spendLedger.today();
     logger.info({
@@ -148,6 +161,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
         setTimeout(() => reject(new Error('cortex health probe timed out (3s)')), 3000),
       ),
     ]);
+    health.setCortex(bootHealth.status === 'ok' ? 'ok' : 'degraded', cortex.baseUrl);
     if (bootHealth.status === 'ok') {
       logger.info({
         event: 'cortex.health',
@@ -349,7 +363,14 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
       if (out !== undefined) return out;
     }
     const startedTurns = convo.historyCount; // approximate index
-    const t = await convo.send(text, sendOpts);
+    let t: Awaited<ReturnType<Conversation['send']>>;
+    try {
+      t = await convo.send(text, sendOpts);
+      health.recordTurn(true);
+    } catch (err) {
+      health.recordTurn(false);
+      throw err;
+    }
     // Append BOTH user + assistant turns to the store with monotonic idx
     // so loadSession returns them in send order.
     const userTurnId = `t_${Date.now().toString(36)}_${randomUUID().slice(0, 4)}u`;
@@ -382,6 +403,16 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
 
   // Channel registry — ProactiveSentinel uses this to push briefs.
   const channelMap = new Map<string, ChannelAdapter>();
+  // Ops alert sink (WS5): a dedicated chat, never the operator's own thread.
+  const ops = createOpsAlerter({
+    logger,
+    chatId: env.MERIDIAN_OPS_CHAT_ID,
+    send: async (chatId, text) => {
+      const tg = channelMap.get('telegram');
+      if (!tg?.send) throw new Error('telegram channel not started');
+      await tg.send({ channel: 'telegram', to: chatId, text });
+    },
+  });
 
   // ── Vision hook — one closure shared by Telegram media + the inbox ingest ──
   // Carries the operator's custom analysis prompt (config.vision.prompt) and
@@ -682,6 +713,21 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     store,
   });
   late.automations = automations;
+  // Periodic CORTEX probe for /health (WS5): cheap, bounded, never fatal.
+  const cortexProbe = setInterval(async () => {
+    try {
+      const h = await Promise.race([
+        cortex.health(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('probe timeout')), 3000),
+        ),
+      ]);
+      health.setCortex(h.status === 'ok' ? 'ok' : 'degraded', cortex.baseUrl);
+    } catch {
+      health.setCortex('down', cortex.baseUrl);
+    }
+  }, 60_000);
+  cortexProbe.unref();
   const autoDefs = automations.start();
   if (autoDefs.length > 0) {
     const st = automations.status();
@@ -705,6 +751,10 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     const silenceHours = Number(process.env.MERIDIAN_SILENCE_ALERT_HOURS ?? 26);
     const silenceTimer = setInterval(() => {
       for (const quiet of automations.silentAutomations(silenceHours * 3600_000)) {
+        void ops.alert(
+          `silent:${quiet.name}`,
+          `${slug}: automation ${quiet.name} has delivered nothing for ${Math.round((quiet.silentForMs ?? 0) / 3600_000)}h (next fire ${quiet.nextFireAt ?? 'n/a'}).`,
+        );
         logger.warn({
           msg: 'automation silent',
           name: quiet.name,
@@ -899,6 +949,8 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     sentinel,
     automations,
     provider: posture,
+    health,
+    breaker: () => router.breakerSnapshot(),
     spend: spendLedger,
     waitlist,
     web,

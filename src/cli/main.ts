@@ -38,6 +38,7 @@ import { runRepl } from './repl.js';
 import { runAudit, writeReport, renderReport } from '../audit/retrospective.js';
 import { colors } from '../utils/truecolor.js';
 import { runDoctor } from './doctor.js';
+import { runStatus } from './status-cmd.js';
 import { runDeploy } from '../deploy/pipeline.js';
 import { runGateway } from './gateway-cmd.js';
 import { initAgent } from './init-cmd.js';
@@ -236,6 +237,15 @@ mcp
   .option('--allow-encode', 'also expose memory_encode (write access)')
   .action(async (opts: { allowEncode?: boolean }) => {
     await runMcpServe(opts);
+  });
+
+program
+  .command('status')
+  .description("Show the running gateway's health: provider, memory, spend, automations")
+  .option('--json', 'print the raw /health document')
+  .option('--port <port>', 'gateway port (default from .env or 18889)')
+  .action(async (o: { json?: boolean; port?: string }) => {
+    process.exit(await runStatus({ json: !!o.json, port: o.port ? Number(o.port) : undefined }));
   });
 
 program
