@@ -74,6 +74,7 @@ export function stripAssistantSpeak(text: string): string {
   let out = text;
   for (const re of ASSISTANT_SPEAK_CLAUSES) out = out.replace(re, '');
   for (const re of SIGN_OFFS) out = out.replace(re, '');
+  if (out === text) return text; // nothing removed: never touch a human's lowercase
   // Capitalize a sentence that lost its opening clause.
   out = out.replace(
     /(^|[.!?]\s+)([a-z])/g,
