@@ -28,6 +28,7 @@ import type { AutomationManager } from '../automations/manager.js';
 import { readWaitlist, recordWaitlist } from '../hosted/waitlist.js';
 import { sanitizeUserFacingError } from '../safety/error-firewall.js';
 import { settle } from './crash-safety.js';
+import type { ImessageChannel } from '../channels/imessage.js';
 import type { WeatherProvider } from './weather.js';
 import { parseDeviceLookMultipart } from './device-media.js';
 import type { AudioTranscriber, ImageDescriber } from './device-media.js';
@@ -58,6 +59,8 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** iMessage over BlueBubbles (WS5c). Route exists only when configured. */
+  imessage?: ImessageChannel;
   /** Runtime health state (WS5): cortex probe, last-hour inference, uptime. */
   health?: import('./health.js').HealthState;
   /** Provider breaker snapshot (WS5). */
@@ -162,6 +165,9 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       cortex,
       breaker: opts.breaker ? opts.breaker() : [],
       lastHourInference: opts.health?.lastHourInference() ?? null,
+      channels: {
+        imessage: opts.imessage ? opts.imessage.relayHealth() : null,
+      },
       automations,
       lastProactiveDelivery,
       spend: opts.spend ? { today: opts.spend.today(), month: opts.spend.month() } : null,
@@ -670,6 +676,30 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     reply.code(result.status).header('content-type', result.contentType);
     return result.body;
   });
+
+  // iMessage via BlueBubbles (WS5c). The relay cannot sign, so a shared secret
+  // (query `secret` or header `x-meridian-secret`) gates the route and it
+  // fails closed. Acks now, runs the turn async.
+  app.post<{ Headers: { 'x-meridian-secret'?: string }; Querystring: { secret?: string } }>(
+    '/imessage/webhook',
+    async (req, reply) => {
+      if (!opts.imessage) {
+        reply.code(404);
+        return { error: 'imessage channel not configured' };
+      }
+      const presented = req.headers['x-meridian-secret'] ?? req.query?.secret;
+      if (!opts.imessage.verifySecret(presented)) {
+        reply.code(401);
+        return { error: 'invalid webhook secret' };
+      }
+      const result = opts.imessage.handleRequest(
+        (req.body ?? {}) as Parameters<ImessageChannel['handleRequest']>[0],
+      );
+      settle(result.done, opts.logger, { route: req.url, channel: 'imessage' });
+      reply.code(result.status);
+      return result.body;
+    },
+  );
 
   // Place an outbound voice call via VAPI. Token-gated. Used by the
   // signup wizard's "agent calls you to introduce itself" moment, by

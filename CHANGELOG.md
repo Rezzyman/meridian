@@ -4,6 +4,12 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### iMessage through a BlueBubbles relay (2026-09-22)
+
+- **New channel: iMessage.** `src/channels/imessage.ts` speaks to a BlueBubbles relay: inbound text and attachments over `POST /imessage/webhook` (shared secret required, fails closed), replies as blue bubbles with a typing indicator and a human pause between them, tapback reactions, and SMS fallback for phone handles when the relay cannot deliver. The operator is matched by handle (phone normalized, email case-folded); slash commands work from the operator's handle.
+- **Config:** `BLUEBUBBLES_URL`, `BLUEBUBBLES_PASSWORD`, `BLUEBUBBLES_WEBHOOK_SECRET` in `.env`; `operator.channels.imessage` and `channels.imessage.allowedHandles` in `config.yaml`.
+- **Doctor** probes the relay; `/health.channels.imessage` reports it. `docs/imessage-setup.md` walks the setup and names the one decision it forces: a Mac that stays on, signed into a dedicated Apple ID for the agent.
+
 ### Feels like a person over text (2026-09-22)
 
 - **Text channels get a texting voice.** On Telegram, iMessage, SMS, and WhatsApp the system prompt carries a short text-style rule (short, plain, first person, no headers or bullet walls, no assistant-speak, no sign-offs, ask one question when something is missing).

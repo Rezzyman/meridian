@@ -66,6 +66,11 @@ export const AgentEnvSchema = z
     TWILIO_AUTH_TOKEN: z.string().optional(),
     TWILIO_PHONE_NUMBER: z.string().optional(),
     TWILIO_WEBHOOK_URL: z.string().url().optional(),
+    /** iMessage via a BlueBubbles relay (WS5c). */
+    BLUEBUBBLES_URL: z.string().url().optional(),
+    BLUEBUBBLES_PASSWORD: z.string().optional(),
+    BLUEBUBBLES_WEBHOOK_SECRET: z.string().min(16).optional(),
+    BLUEBUBBLES_SEND_METHOD: z.enum(['private-api', 'apple-script']).optional(),
 
     // Gateway
     MERIDIAN_GATEWAY_TOKEN: z.string().optional(),
@@ -228,6 +233,13 @@ export const ChannelConfigSchema = z.object({
       allowedNumbers: z.array(z.string()).default([]),
     })
     .default({ enabled: false, allowedNumbers: [] }),
+  imessage: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Optional sender allowlist (iMessage handles: phone or email); empty = anyone. */
+      allowedHandles: z.array(z.string()).default([]),
+    })
+    .default({ enabled: false, allowedHandles: [] }),
   vapi: z
     .object({
       enabled: z.boolean().default(false),
@@ -429,6 +441,8 @@ export const OperatorConfigSchema = z.object({
       voice: z.array(z.string()).default([]),
       whatsapp: z.array(z.string()).default([]),
       sms: z.array(z.string()).default([]),
+      // Handle-matched (phone or email): phones normalized, emails case-folded.
+      imessage: z.array(z.string()).default([]),
       // OS-username-matched.
       cli: z.array(z.string()).default([]),
     })
@@ -752,6 +766,7 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     whatsapp: { enabled: false, allowedNumbers: [] },
     matrix: { enabled: false, allowedRooms: [] },
     sms: { enabled: false, allowedNumbers: [] },
+    imessage: { enabled: false, allowedHandles: [] },
     vapi: { enabled: false, voicePersona: 'warm_professional' },
     gateway: { enabled: false, port: 18889 },
   },
