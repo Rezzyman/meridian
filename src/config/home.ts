@@ -122,8 +122,11 @@ export function setActiveAgent(slug: string): void {
 export function listAgents(): string[] {
   const root = meridianRoot();
   if (!existsSync(root)) return [];
+  // A directory is an agent home only if it carries config.yaml. Shared dirs
+  // such as `bin` used to be reported as agents by doctor (defect (f)).
   return readdirSync(root, { withFileTypes: true })
     .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .filter((d) => existsSync(join(root, d.name, 'config.yaml')))
     .map((d) => d.name);
 }
 

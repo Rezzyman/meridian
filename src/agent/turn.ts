@@ -24,6 +24,7 @@ import type { Logger } from 'pino';
 import type { MeridianTurn } from './types.js';
 import { sanitizeOutbound, ProviderChainError } from '../safety/error-firewall.js';
 import { governToolSet, type ActionReceiptInput } from '../governance/action-policy.js';
+import { diagnoseToolSet, type ToolCallDiagnostic } from './tool-diagnostics.js';
 
 /**
  * Framework-enforced behavioral rules prepended to every system prompt.
@@ -271,6 +272,8 @@ export interface TurnResult {
     recallArtifactIds: number[];
     recallTokenCount: number;
     toolCalls: Array<{ name: string; stepType: string; ts: string }>;
+    /** Per-call wall time, outcome, error class, args digest (never args). */
+    toolDiagnostics: ToolCallDiagnostic[];
     model?: string;
     modelTraceIds: string[];
     /** Memories pulled from the model's view by the integrity screen. */
@@ -457,18 +460,26 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
           record: ctx.actionGovernance.record,
         })
       : allowedTools;
-  const turnTools = governedTools
-    ? withEmptyResultBreaker(governedTools, {
-        threshold: 2,
-        onTrip: (name) => {
-          emptyByTool[name] = (emptyByTool[name] ?? 0) + 1;
-        },
-      })
-    : undefined;
-
   // Trace accumulator — every tool call this turn lands here. Persisted by
   // the gateway/REPL after the turn completes for /why + /trace queries.
   const toolCallTrace: Array<{ name: string; stepType: string; ts: string }> = [];
+  const toolDiagnostics: ToolCallDiagnostic[] = [];
+  const turnTools = governedTools
+    ? withEmptyResultBreaker(
+        diagnoseToolSet(governedTools, {
+          logger: ctx.logger,
+          onCall: (d) => {
+            toolDiagnostics.push(d);
+          },
+        }),
+        {
+          threshold: 2,
+          onTrip: (name) => {
+            emptyByTool[name] = (emptyByTool[name] ?? 0) + 1;
+          },
+        },
+      )
+    : undefined;
   let providerUsed: string | undefined;
   let modelTraceIds: string[] = [];
 
@@ -741,6 +752,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
       recallArtifactIds,
       recallTokenCount,
       toolCalls: toolCallTrace,
+      toolDiagnostics,
       model: providerUsed,
       modelTraceIds,
       quarantinedMemories,

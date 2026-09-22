@@ -58,6 +58,14 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Boot-time provider posture (defect (h)); surfaced verbatim on /health. */
+  provider?: {
+    ok: boolean;
+    primary: string;
+    provider: string;
+    baseUrlHost?: string;
+    reason?: string;
+  };
   /** Opt-in `POST /waitlist` capture (a landing page's signup target). The
    *  route exists ONLY when this is provided — a gateway must never grow an
    *  anonymous write endpoint silently. */
@@ -119,10 +127,12 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
   );
 
   app.get('/health', async () => ({
-    ok: true,
+    ok: opts.provider ? opts.provider.ok : true,
     agent: opts.conversation.agentSlug,
     sessionId: opts.conversation.sessionId,
     ts: new Date().toISOString(),
+    provider: opts.provider ?? null,
+    automations: opts.automations ? opts.automations.status() : [],
   }));
 
   // First-party Aterna AI Loop channel. The route imposes a stricter contract

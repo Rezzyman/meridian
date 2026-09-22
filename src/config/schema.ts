@@ -472,6 +472,9 @@ export const AgentConfigSchema = z.object({
     maxTurns: z.number().int().default(60),
     gatewayTimeoutSec: z.number().int().default(1800),
     reasoningEffort: z.enum(['off', 'low', 'medium', 'high']).default('medium'),
+    /** IANA zone every scheduler (automations, heartbeat, sentinel, dream)
+     *  runs in. Falls back to process TZ, then UTC. */
+    timezone: z.string().optional(),
   }),
   operator: OperatorConfigSchema.optional(),
   models: ModelChainSchema,

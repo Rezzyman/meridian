@@ -26,6 +26,8 @@ import { createMemoryProvider } from '../memory/index.js';
 import { ProviderRouter } from '../providers/router.js';
 import { streamText } from 'ai';
 import { colors } from '../utils/truecolor.js';
+import { checkProviderPosture } from '../providers/preflight.js';
+import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 
 interface CheckRow {
   name: string;
@@ -146,6 +148,32 @@ export async function runDoctor(): Promise<number> {
     return 1;
   }
   rows.push(row('Active agent', 'ok', activeSlug));
+  // Timezone (defect b): every scheduler runs in one zone; UTC only by choice.
+  if (timezoneConfigured(config.agent.timezone, process.env.TZ)) {
+    rows.push(row('Timezone', 'ok', resolveTimezone(config.agent.timezone, process.env.TZ)));
+  } else {
+    rows.push(
+      row(
+        'Timezone',
+        'warn',
+        'none configured; schedulers run in UTC. Set agent.timezone in config.yaml',
+      ),
+    );
+  }
+  // Provider posture (defect h): a routexor primary aimed at a native endpoint
+  // cannot answer a single turn, and the old gateway could not say why.
+  {
+    const posture = checkProviderPosture(config.models.primary, readEnvFile(home.envPath));
+    rows.push(
+      posture.ok
+        ? row(
+            'Provider posture',
+            'ok',
+            `${posture.primary} via ${posture.baseUrlHost ?? posture.provider}`,
+          )
+        : row('Provider posture', 'fail', posture.reason ?? 'invalid'),
+    );
+  }
   // Read the agent's own .env so the probe honors a per-agent
   // MERIDIAN_CORTEX_URL override (production agents typically point at
   // their dedicated CORTEX on a non-default port like 3101).
