@@ -14,7 +14,7 @@
  * partner ritual; automations are operator-defined cognitive habits.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolveTimezone } from '../config/timezone.js';
 import { NARRATION_RULE, stripNarration } from './narration.js';
 import { join } from 'node:path';
@@ -41,6 +41,9 @@ export interface AutomationDef {
   timezone?: string;
   mode: 'direct' | 'draft'; // direct = push immediately; draft = save + tag for approval
   requiresApproval: boolean;
+  /** After this many consecutive approved runs the automation graduates to
+   *  running without a per-run approval grant (WS3). 0 = never. */
+  trustGraduationAfter: number;
   /** observe = read-only tools; draft = read-only tools + no delivery;
    * execute = consequential tools, always gated by an owner grant. */
   actionTier: 'observe' | 'draft' | 'execute';
@@ -88,6 +91,40 @@ export interface AutomationStatus {
   armedAt: string | null;
   /** ms since the later of armedAt / lastDeliveredAt; null when never armed. */
   silentForMs: number | null;
+  mode: 'direct' | 'draft';
+  requiresApproval: boolean;
+  graduatedAt: string | null;
+  trustGraduationAfter: number;
+  pendingDrafts: number;
+}
+
+function readDraft(
+  path: string,
+): { id: string; createdAt: string; status: string; body: string } | null {
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+  const m = /^---\n([\s\S]*?)\n---\n?/.exec(text);
+  if (!m) return null;
+  const meta: Record<string, string> = {};
+  for (const line of m[1]!.split('\n')) {
+    const i = line.indexOf(':');
+    if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  return {
+    id: path.split('/').pop()!.replace(/\.md$/, ''),
+    createdAt: meta.createdAt ?? '',
+    status: meta.status ?? 'pending',
+    body: text.slice(m[0].length).replace(/\s+$/, ''),
+  };
+}
+
+function markDraft(path: string, status: 'delivered' | 'rejected'): void {
+  const text = readFileSync(path, 'utf8');
+  writeFileSync(path, text.replace(/^status: .*$/m, `status: ${status}`), { mode: 0o600 });
 }
 
 function silentFor(now: Date, armedAt?: Date, lastDeliveredAt?: string): number | null {
@@ -123,6 +160,17 @@ const RESERVED_NAMES = new Set([
   'dream-cycle',
 ]);
 
+/** `trustGraduation: 5`, `{ after: 5 }`, or the config-schema shape `{ minRuns: 5 }`. */
+export function parseGraduation(raw: unknown): number {
+  if (typeof raw === 'number') return raw > 0 ? Math.floor(raw) : 0;
+  if (raw && typeof raw === 'object') {
+    const o = raw as { after?: unknown; minRuns?: unknown };
+    const n = typeof o.after === 'number' ? o.after : typeof o.minRuns === 'number' ? o.minRuns : 0;
+    return n > 0 ? Math.floor(n) : 0;
+  }
+  return 0;
+}
+
 export function loadAutomationDefs(home: MeridianHome): AutomationDef[] {
   const dir = home.layer('AUTOMATIONS');
   if (!existsSync(dir)) return [];
@@ -153,6 +201,7 @@ export function loadAutomationDefs(home: MeridianHome): AutomationDef[] {
       ...(typeof meta.timezone === 'string' ? { timezone: meta.timezone } : {}),
       mode: meta.mode === 'direct' ? 'direct' : 'draft',
       requiresApproval: meta.requiresApproval !== false,
+      trustGraduationAfter: parseGraduation(meta.trustGraduation),
       actionTier:
         meta.actionTier === 'execute'
           ? 'execute'
@@ -282,6 +331,11 @@ export class AutomationManager {
         lastDeliveredAt: job?.lastNotification?.at ?? null,
         armedAt: this.armedAt ? this.armedAt.toISOString() : null,
         silentForMs: silentFor(now, this.armedAt, job?.lastNotification?.at),
+        mode: def.mode,
+        requiresApproval: def.requiresApproval,
+        graduatedAt: job?.graduatedAt ?? null,
+        trustGraduationAfter: def.trustGraduationAfter,
+        pendingDrafts: this.listDrafts().filter((d) => d.name === def.name).length,
       };
     });
   }
@@ -345,7 +399,8 @@ export class AutomationManager {
         'execute-tier automations with consequential tools must declare requiresApproval: true',
       );
     }
-    if (def.requiresApproval) {
+    const graduated = def.trustGraduationAfter > 0 && !!this.controlPlane.graduatedAt(def.name);
+    if (def.requiresApproval && !graduated) {
       if (!this.opts.config.operator?.id) {
         return this.terminal(
           def,
@@ -367,6 +422,13 @@ export class AutomationManager {
         approvalDigest,
       );
       if (!approved) {
+        // WS3: the operator must LEARN that approval is needed. Before this,
+        // an awaiting_approval run was a ledger entry nobody saw.
+        await this.notifyOperator(
+          def,
+          `needs your approval to run. Reply /approve automation:${def.name} within 5 minutes of the next fire, or set requiresApproval: false in its frontmatter.`,
+          `awaiting-approval:${def.name}`,
+        );
         return this.terminal(
           def,
           runId,
@@ -473,10 +535,26 @@ export class AutomationManager {
       this.opts.logger.info({ msg: 'automation ran silent — push suppressed', name });
     }
 
-    // Shadow and draft runs are observable in the durable ledger but never
-    // notify or perform an outward delivery.
+    // Shadow runs are observable in the durable ledger but never notify.
+    // Draft runs (WS3) land in OUTBOX and the operator gets a preview with the
+    // approve/reject commands; nothing is delivered until /approve draft:<id>.
     const pushed: string[] = [];
     const deliveryAllowed = def.autonomyMode === 'live' && def.mode === 'direct';
+    if (
+      !silent &&
+      def.autonomyMode === 'live' &&
+      def.mode === 'draft' &&
+      def.pushTo === 'telegram'
+    ) {
+      const draft = this.saveDraft(def, runId, reply);
+      const preview = reply.length > 400 ? `${reply.slice(0, 400)}…` : reply;
+      await this.notifyOperator(
+        def,
+        `drafted a message and is waiting for you.\n\n${preview}\n\nReply /approve draft:${draft.id} to deliver it, or /reject draft:${draft.id} to discard.`,
+        `draft:${draft.id}`,
+      );
+      pushed.push('outbox');
+    }
     if (
       !silent &&
       deliveryAllowed &&
@@ -519,7 +597,172 @@ export class AutomationManager {
         : def.autonomyMode === 'shadow'
           ? 'shadow'
           : 'success';
-    return this.terminal(def, runId, started, outcome, reply, pushed);
+    const result = this.terminal(def, runId, started, outcome, reply, pushed);
+    await this.maybeGraduate(def, runId);
+    return result;
+  }
+
+  /** Push a short operator-facing notice with a cooldown keyed on `key`. */
+  private async notifyOperator(def: AutomationDef, text: string, key: string): Promise<boolean> {
+    const op = this.opts.config.operator;
+    const tg = this.opts.channels.get('telegram');
+    if (!tg?.send || !op?.channels.telegram[0]) return false;
+    if (!this.controlPlane.notificationAllowed(`${def.name}#notice`, key, 6 * 3600_000))
+      return false;
+    try {
+      await tg.send({
+        channel: 'telegram',
+        to: op.channels.telegram[0],
+        text: `🔔 ${def.name} ${text}`,
+      });
+      this.controlPlane.recordNotification(`${def.name}#notice`, key);
+      return true;
+    } catch (err) {
+      this.opts.logger.warn({ msg: 'operator notice failed', name: def.name, err });
+      return false;
+    }
+  }
+
+  private draftsDir(def?: AutomationDef): string {
+    const base = join(this.opts.home.agentRoot, 'OUTBOX');
+    return def ? join(base, def.name) : base;
+  }
+
+  private saveDraft(def: AutomationDef, runId: string, body: string): { id: string; path: string } {
+    const dir = this.draftsDir(def);
+    mkdirSync(dir, { recursive: true });
+    const id = runId.replace(/[^\w-]+/g, '').slice(0, 24) || Date.now().toString(36);
+    const path = join(dir, `${id}.md`);
+    const front = [
+      '---',
+      `name: ${def.name}`,
+      `runId: ${runId}`,
+      `createdAt: ${new Date().toISOString()}`,
+      'status: pending',
+      '---',
+      '',
+    ].join('\n');
+    writeFileSync(path, `${front}${body}\n`, { mode: 0o600 });
+    return { id, path };
+  }
+
+  /** Pending drafts across every automation, newest first. */
+  listDrafts(): Array<{
+    id: string;
+    name: string;
+    createdAt: string;
+    path: string;
+    preview: string;
+  }> {
+    const base = this.draftsDir();
+    if (!existsSync(base)) return [];
+    const out: Array<{
+      id: string;
+      name: string;
+      createdAt: string;
+      path: string;
+      preview: string;
+    }> = [];
+    for (const name of readdirSync(base)) {
+      const dir = join(base, name);
+      let entries: string[];
+      try {
+        entries = readdirSync(dir);
+      } catch {
+        continue;
+      }
+      for (const f of entries) {
+        if (!f.endsWith('.md')) continue;
+        const parsed = readDraft(join(dir, f));
+        if (parsed && parsed.status === 'pending')
+          out.push({
+            id: parsed.id,
+            name,
+            createdAt: parsed.createdAt,
+            path: join(dir, f),
+            preview: parsed.body.slice(0, 120),
+          });
+      }
+    }
+    return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  private findDraft(id: string) {
+    return this.listDrafts().find((d) => d.id === id);
+  }
+
+  /** /approve draft:<id>: deliver the saved text to the operator's Telegram. */
+  async deliverDraft(id: string): Promise<{ ok: boolean; reason: string }> {
+    const draft = this.findDraft(id);
+    if (!draft) return { ok: false, reason: `no pending draft ${id}` };
+    const def = this.defs.find((d) => d.name === draft.name);
+    const op = this.opts.config.operator;
+    const tg = this.opts.channels.get('telegram');
+    if (!tg?.send || !op?.channels.telegram[0])
+      return { ok: false, reason: 'no telegram delivery path' };
+    const body = readDraft(draft.path)?.body ?? '';
+    try {
+      await tg.send({
+        channel: 'telegram',
+        to: op.channels.telegram[0],
+        text: `🔔 ${draft.name}\n\n${body}`,
+      });
+    } catch (err) {
+      return { ok: false, reason: `delivery failed: ${(err as Error).message}` };
+    }
+    markDraft(draft.path, 'delivered');
+    if (def) this.controlPlane.recordNotification(def.name, body);
+    this.opts.store.audit('draft_delivered', { id, name: draft.name });
+    return { ok: true, reason: 'delivered' };
+  }
+
+  /** /reject draft:<id>: keep the file, mark it rejected, deliver nothing. */
+  rejectDraft(id: string): { ok: boolean; reason: string } {
+    const draft = this.findDraft(id);
+    if (!draft) return { ok: false, reason: `no pending draft ${id}` };
+    markDraft(draft.path, 'rejected');
+    this.opts.store.audit('draft_rejected', { id, name: draft.name });
+    return { ok: true, reason: 'rejected' };
+  }
+
+  /**
+   * Trust graduation (WS3): once an approval-gated automation has completed
+   * `trustGraduationAfter` consecutive approved runs, it earns direct mode.
+   * The flip is durable (control plane) and signed (action receipt) so /why
+   * and /receipts can show when and why an automation stopped asking.
+   */
+  private async maybeGraduate(def: AutomationDef, runId: string): Promise<void> {
+    if (!def.requiresApproval || def.trustGraduationAfter <= 0) return;
+    if (this.controlPlane.graduatedAt(def.name)) return;
+    const approved = this.controlPlane.consecutiveApprovedRuns(def.name);
+    if (approved < def.trustGraduationAfter) return;
+    const now = new Date();
+    this.controlPlane.setGraduated(def.name, now);
+    const receipt = this.opts.store.recordActionReceipt({
+      receiptId: `rcpt_grad_${runId}`,
+      ts: now.toISOString(),
+      agentId: this.opts.config.agent.slug,
+      sessionId: `automation:${def.name}`,
+      channel: 'system',
+      senderTrusted: true,
+      toolName: 'automation.graduate',
+      callIndex: 0,
+      decision: 'allow',
+      rule: 'trustGraduation',
+      reason: `${approved} consecutive approved runs (threshold ${def.trustGraduationAfter})`,
+      argsDigest: this.opts.store.digestActionArgs({ job: def.name, approved }),
+      outcome: 'succeeded',
+    });
+    this.opts.logger.info({
+      msg: 'automation graduated to direct mode',
+      name: def.name,
+      receipt: receipt.receiptId,
+    });
+    await this.notifyOperator(
+      def,
+      `has earned direct mode after ${approved} approved runs and will no longer ask before running. Receipt ${receipt.receiptId}. Set trustGraduation: 0 to revoke.`,
+      `graduated:${def.name}`,
+    );
   }
 
   private selectTools(def: AutomationDef): ToolSet {

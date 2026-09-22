@@ -297,6 +297,24 @@ export function createTools(ctx: SkillToolContext): Record<string, unknown> {
       },
     }),
 
+    // Compatibility alias (defect (e)): v0.1 called this gmail_read.
+    gmail_read: tool({
+      description: 'Alias of gmail_get: fetch the full body of a Gmail message by id.',
+      parameters: Z.object({
+        messageId: Z.string().describe('Gmail message id'),
+        account: Z.string().optional().describe('Mailbox the message lives in'),
+      }),
+      execute: async (args: { messageId: string; account?: string }) => {
+        const acct = pickAccount(ctx, args.account);
+        try {
+          const result = await gogJson(['gmail', 'get', args.messageId, '--format', 'full'], acct);
+          return { account: acct.email, message: result };
+        } catch (err) {
+          return { error: (err as Error).message, account: acct.email, messageId: args.messageId };
+        }
+      },
+    }),
+
     gmail_draft: tool({
       description:
         "Create a Gmail DRAFT (not send). The draft sits in the operator's Drafts folder " +

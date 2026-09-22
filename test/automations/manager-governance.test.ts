@@ -137,7 +137,9 @@ describe('automation runtime enforcement', () => {
     m.stop();
     assert.equal(result?.outcome, 'awaiting_approval');
     assert.match(result?.reason ?? '', /\/approve automation:test/);
-    assert.deepEqual(f.sent, []);
+    // WS3: the operator is told once, with the exact command; nothing else is delivered.
+    assert.equal(f.sent.length, 1);
+    assert.match(f.sent[0] ?? '', /\/approve automation:test/);
   });
 
   it('consumes an owner-scoped automation grant exactly once', async () => {

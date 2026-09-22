@@ -26,6 +26,7 @@ export interface HandlerCtx {
   skills: SkillRegistry;
   store?: SessionStore;
   passphraseGuard?: PassphraseGuard;
+  automations?: import('../../automations/manager.js').AutomationManager;
 }
 
 export async function dispatch(line: string, ctx: HandlerCtx): Promise<string | undefined> {
@@ -74,7 +75,11 @@ export async function dispatch(line: string, ctx: HandlerCtx): Promise<string | 
     case 'receipts':
       return renderReceipts(ctx, arg);
     case 'approve':
-      return handleApprove(ctx, arg);
+      return await handleApprove(ctx, arg);
+    case 'reject':
+      return handleReject(ctx, arg);
+    case 'drafts':
+      return renderDrafts(ctx);
     case 'approvals':
       return renderApprovals(ctx);
     case 'auth':
@@ -334,10 +339,17 @@ function handleAuth(ctx: HandlerCtx, arg: string): string {
   }
 }
 
-function handleApprove(ctx: HandlerCtx, arg: string): string {
+async function handleApprove(ctx: HandlerCtx, arg: string): Promise<string> {
   if (!ctx.store) return colors.warn('approval store not wired into this REPL');
   const [toolName, minutesRaw] = arg.split(/\s+/);
-  if (!toolName) return 'usage: /approve <tool> [minutes]';
+  if (!toolName) return 'usage: /approve <tool> [minutes]  or  /approve draft:<id>';
+  if (toolName.startsWith('draft:')) {
+    if (!ctx.automations) return colors.warn('automations not wired into this REPL');
+    const r = await ctx.automations.deliverDraft(toolName.slice(6));
+    return r.ok
+      ? colors.ok(`delivered draft ${toolName.slice(6)}`)
+      : colors.warn(`could not deliver: ${r.reason}`);
+  }
   const minutes = minutesRaw ? Number(minutesRaw) : 5;
   if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 60)
     return colors.warn('minutes must be between 1 and 60');
@@ -347,6 +359,26 @@ function handleApprove(ctx: HandlerCtx, arg: string): string {
   const sessionId = automationScope ? `op:${ctx.config.operator!.id}` : ctx.conversation.sessionId;
   const grant = ctx.store.grantApproval(sessionId, toolName, minutes);
   return colors.ok(`approved one use of ${toolName} for ${minutes} minute(s) · ${grant.grantId}`);
+}
+
+function handleReject(ctx: HandlerCtx, arg: string): string {
+  const target = arg.split(/\s+/)[0] ?? '';
+  if (!target.startsWith('draft:')) return 'usage: /reject draft:<id>';
+  if (!ctx.automations) return colors.warn('automations not wired into this REPL');
+  const r = ctx.automations.rejectDraft(target.slice(6));
+  return r.ok
+    ? colors.ok(`discarded draft ${target.slice(6)}`)
+    : colors.warn(`could not reject: ${r.reason}`);
+}
+
+function renderDrafts(ctx: HandlerCtx): string {
+  if (!ctx.automations) return colors.warn('automations not wired into this REPL');
+  const list = ctx.automations.listDrafts();
+  if (!list.length) return colors.muted('no pending drafts');
+  return [
+    colors.cyan('Pending drafts'),
+    ...list.slice(0, 10).map((d) => `  draft:${d.id}  ${d.name}  ${d.createdAt}\n    ${d.preview}`),
+  ].join('\n');
 }
 
 function renderApprovals(ctx: HandlerCtx): string {

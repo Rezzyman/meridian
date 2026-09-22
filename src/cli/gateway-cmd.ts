@@ -23,6 +23,7 @@ import { buildToolSurface } from '../agent/tool-surface.js';
 import { createLogger } from '../logger/pino.js';
 import { installCrashHandlers } from '../gateway/crash-safety.js';
 import { checkProviderPosture } from '../providers/preflight.js';
+import { dispatchChannelCommand, isChannelCommand } from '../gateway/slash.js';
 import { resolveTimezone, timezoneConfigured } from '../config/timezone.js';
 import { TelegramChannel } from '../channels/telegram.js';
 import { VapiChannel } from '../channels/vapi.js';
@@ -292,6 +293,9 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
   }
 
   // Persist each turn so cross-channel resume works after restart.
+  // Set once the automation manager exists (declared later in this boot).
+  const late: { automations?: AutomationManager } = {};
+
   async function turn(
     channel: ChannelKind,
     from: string,
@@ -299,6 +303,21 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     sendOpts?: Parameters<Conversation['send']>[1],
   ): Promise<string> {
     const { convo, sessionId } = getSession(channel, from);
+    // WS3: slash commands from the resolved operator on a trusted channel are
+    // commands, not prose. Telegram only reaches here for trusted chats; the
+    // CLI and token-authed gateway are operator surfaces by construction.
+    if (
+      (channel === 'telegram' || channel === 'cli' || channel === 'gateway') &&
+      isChannelCommand(text)
+    ) {
+      const out = await dispatchChannelCommand(text, {
+        config,
+        store,
+        automations: late.automations,
+        sessionId,
+      });
+      if (out !== undefined) return out;
+    }
     const startedTurns = convo.historyCount; // approximate index
     const t = await convo.send(text, sendOpts);
     // Append BOTH user + assistant turns to the store with monotonic idx
@@ -631,6 +650,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     tools,
     store,
   });
+  late.automations = automations;
   const autoDefs = automations.start();
   if (autoDefs.length > 0) {
     const st = automations.status();

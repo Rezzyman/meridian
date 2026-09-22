@@ -102,6 +102,13 @@ export const COMMAND_REGISTRY: readonly CommandDef[] = [
     argsHint: '<turn-id|last>',
   },
   {
+    name: 'reject',
+    description: 'Discard a drafted automation message',
+    category: 'CORTEX',
+    argsHint: 'draft:<id>',
+  },
+  { name: 'drafts', description: 'List pending automation drafts', category: 'CORTEX' },
+  {
     name: 'receipts',
     description: 'Show signed action receipts for this session',
     category: 'CORTEX',

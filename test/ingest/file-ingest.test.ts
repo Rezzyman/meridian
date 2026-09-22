@@ -169,7 +169,7 @@ describe('inbox watcher failure semantics', () => {
     dead.encode = async () => {
       throw new Error('no backend');
     };
-    const stop = watchInbox(dead, dir, { logger: silentLogger, debounceMs: 50 });
+    const stop = watchInbox(dead, dir, { logger: silentLogger, debounceMs: 50, rescanMs: 200 });
     writeFileSync(join(dir, 'doc.md'), '# survey\n\nreal content that must not vanish');
     // Watcher debounce (50ms) + async ingest; poll for the rename.
     for (let i = 0; i < 300; i += 1) {
@@ -185,7 +185,7 @@ describe('inbox watcher failure semantics', () => {
   it('marks a document .processed when chunks store, and records the count', async () => {
     const dir = tmpDir();
     const cortex = mockCortex();
-    const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50 });
+    const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50, rescanMs: 200 });
     writeFileSync(join(dir, 'ok.md'), '# note\n\ncontent that stores fine');
     for (let i = 0; i < 300; i += 1) {
       await new Promise((r) => setTimeout(r, 50));
@@ -202,7 +202,7 @@ describe('inbox startup scan', () => {
     const dir = tmpDir();
     writeFileSync(join(dir, 'parked.md'), '# parked\n\nplaced during downtime');
     const cortex = mockCortex();
-    const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50 });
+    const stop = watchInbox(cortex, dir, { logger: silentLogger, debounceMs: 50, rescanMs: 200 });
     for (let i = 0; i < 300; i += 1) {
       await new Promise((r) => setTimeout(r, 50));
       if (readdirSync(dir).includes('parked.md.processed')) break;
