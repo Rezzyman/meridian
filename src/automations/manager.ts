@@ -265,6 +265,10 @@ export class AutomationManager {
     // specific automation. We inject relevant CORTEX recall on the prompt
     // body so the automation has context, not raw recency.
     let recallContext = '';
+    // Tri-state recall: present, empty, or failed. The model must never read
+    // a failed recall as "nothing happened" (recovered from the 2026-08-18
+    // Arlo production build; the source of that fix was lost).
+    let recallAvailable = true;
     try {
       const r = await this.opts.cortex.recall(def.prompt, {
         tokenBudget: 2000,
@@ -274,6 +278,7 @@ export class AutomationManager {
       });
       recallContext = r.context;
     } catch (err) {
+      recallAvailable = false;
       this.opts.logger.warn({ msg: 'automation recall failed', name, err });
     }
 
@@ -289,10 +294,14 @@ export class AutomationManager {
       op?.name ? `Operator: ${op.name}` : '',
       '',
       'Compose the output of this automation. Direct, no preamble. If recall did',
-      'not pull anything actionable, say so cleanly — do not invent. Cite memory',
-      'ids in (#nnnn) for any specific claim.',
+      "not pull anything actionable, follow the automation's no-update instruction.",
+      'Do not invent and do not expose internal memory or message ids.',
       '',
-      recallContext ? `<cortex_recall>\n${recallContext}\n</cortex_recall>` : '',
+      recallAvailable
+        ? recallContext
+          ? `<cortex_recall>\n${recallContext}\n</cortex_recall>`
+          : '<cortex_recall>No relevant memories returned.</cortex_recall>'
+        : '<cortex_recall status="unavailable">Recall failed this run. Do not describe it as empty.</cortex_recall>',
     ]
       .filter(Boolean)
       .join('\n');

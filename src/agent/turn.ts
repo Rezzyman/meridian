@@ -489,10 +489,12 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
         tools: turnTools,
         maxTokens: ctx.limits?.maxOutputTokens,
         maxRetries: 1,
-        // Multi-step: model can call a tool then continue writing. Capped
-        // at 3 — enough for legitimate fetch+summarize, not enough for
-        // an investigation-spree.
-        maxSteps: 3,
+        // Multi-step: model can call a tool then continue writing. 24 matches
+        // the proven npm 1.4.0 engine; 3 starved real fetch+summarize turns
+        // into the "no final summary" fallback (9 Arlo incidents 2026-08-01 to
+        // 08-07). Governance maxToolCallsPerTurn (default 8) and the
+        // empty-result breaker remain the per-agent cost brakes.
+        maxSteps: 24,
         abortSignal: AbortSignal.timeout(ctx.config.agent.gatewayTimeoutSec * 1000),
         experimental_continueSteps: true,
         onStepFinish: ({ stepType, toolCalls, toolResults }) => {
