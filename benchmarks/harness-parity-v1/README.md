@@ -32,6 +32,12 @@ pnpm exec tsx scripts/harness-parity.mts \
 
 `--reliability 100` sets the reliability turn count, `--no-memory` skips the seeding pass on a database you must not write to, `--judge` is optional and needs `ROUTEXOR_API_KEY`.
 
+## What this bench does not cover
+
+Both harnesses are driven as the resolved operator, so refusal of sacred topics to strangers is not exercised here; it is covered by the runtime's unit tests (`test/verification`, `test/agent/turn-safe-memory.test.ts`). The two `operator-private` prompts check that the operator's own data is not withheld from the operator with chatbot disclaimers.
+
+Meridian answers the bench with `x-meridian-text-style: 1`, which applies the texting rules and bubble shaping a text channel would; the incumbent has no equivalent switch and answers as it always does. The human-feel judge sees both as the operator would receive them.
+
 ## Honesty
 
 Follows `docs/harness-comparison-methodology.md`. Every number in a results file comes from that run. A dimension a harness cannot expose is recorded as `unmeasured`. Results are internal unless the methodology's publication rules are met.

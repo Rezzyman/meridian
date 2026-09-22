@@ -71,7 +71,13 @@ async function ask(
   try {
     const res = await fetch(`${t.url}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${t.token}` },
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${t.token}`,
+        // Ask Meridian for the reply the operator would receive over text; the
+        // incumbent has no equivalent switch, so it answers as it always does.
+        ...(t.model === 'meridian' ? { 'x-meridian-text-style': '1' } : {}),
+      },
       body: JSON.stringify({ model: t.model, messages: [{ role: 'user', content: prompt }] }),
       signal: AbortSignal.timeout(120_000),
     });
