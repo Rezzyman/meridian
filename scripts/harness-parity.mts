@@ -55,6 +55,8 @@ const out =
 const reliabilityTurns = Number(opt('reliability') ?? 100);
 const judgeModel = opt('judge');
 const skipMemory = flag('no-memory');
+/** Re-run only the judge over a saved results file (replies are persisted before judging). */
+const judgeOnly = opt('judge-only');
 
 const prompts = JSON.parse(
   readFileSync(join(root, 'benchmarks/harness-parity-v1/prompts.json'), 'utf8'),
@@ -172,11 +174,19 @@ async function judge(
     const b = bReplies[c.id] ?? '';
     if (!a || !b) continue;
     const swap = Math.random() < 0.5;
-    const { text } = await generateText({
-      model: rx(modelId),
-      prompt: judgePrompt(c.prompt, swap ? b : a, swap ? a : b),
-      maxTokens: 120,
-    });
+    let text = '';
+    try {
+      ({ text } = await generateText({
+        model: rx(modelId),
+        prompt: judgePrompt(c.prompt, swap ? b : a, swap ? a : b),
+        maxTokens: 300,
+        maxRetries: 2,
+      }));
+    } catch (err) {
+      // One bad provider reply must not sink the axis; skip the comparison.
+      console.log(`  judge skipped ${c.id}: ${(err as Error).message.slice(0, 80)}`);
+      continue;
+    }
     const v = parseJudge(text);
     if (!v) continue;
     comparisons += 1;
@@ -186,23 +196,54 @@ async function judge(
   return { comparisons, preferred, ties };
 }
 
-const a = await runHarness(A);
-const b = await runHarness(B);
-const hf = await judge(a.replies, b.replies);
-if (hf.comparisons > 0) a.run.humanFeel = { comparisons: hf.comparisons, preferred: hf.preferred };
-const verdict = judgeParity(a.run, b.run);
-const results = {
-  schema: 'meridian.harness-parity.v1',
-  ranAt: new Date().toISOString(),
-  targets: { a: { name: A.name, url: A.url }, b: { name: B.name, url: B.url } },
-  judgeModel: judgeModel ?? null,
-  a: a.run,
-  b: b.run,
-  humanFeelTies: hf.ties,
-  verdict,
-  replies: { a: a.replies, b: b.replies },
+let a: { run: HarnessRun; replies: Record<string, string> };
+let b: { run: HarnessRun; replies: Record<string, string> };
+if (judgeOnly) {
+  const saved = JSON.parse(readFileSync(judgeOnly, 'utf8')) as {
+    a: HarnessRun;
+    b: HarnessRun;
+    replies: { a: Record<string, string>; b: Record<string, string> };
+  };
+  a = { run: saved.a, replies: saved.replies.a };
+  b = { run: saved.b, replies: saved.replies.b };
+} else {
+  a = await runHarness(A);
+  b = await runHarness(B);
+}
+// Persist BEFORE judging: a judge failure must never lose an hour of runs.
+const write = (
+  hf: { comparisons: number; preferred: number; ties: number } | null,
+  judgeError?: string,
+) => {
+  if (hf && hf.comparisons > 0)
+    a.run.humanFeel = { comparisons: hf.comparisons, preferred: hf.preferred };
+  const verdict = judgeParity(a.run, b.run);
+  const results = {
+    schema: 'meridian.harness-parity.v1',
+    ranAt: new Date().toISOString(),
+    targets: { a: { name: A.name, url: A.url }, b: { name: B.name, url: B.url } },
+    judgeModel: judgeModel ?? null,
+    judgeError: judgeError ?? null,
+    a: a.run,
+    b: b.run,
+    humanFeelTies: hf?.ties ?? null,
+    verdict,
+    replies: { a: a.replies, b: b.replies },
+  };
+  writeFileSync(out, `${JSON.stringify(results, null, 2)}\n`);
+  return verdict;
 };
-writeFileSync(out, `${JSON.stringify(results, null, 2)}\n`);
+write(null);
+console.log(`results (pre-judge): ${out}`);
+let hf: { comparisons: number; preferred: number; ties: number } | null = null;
+let judgeError: string | undefined;
+try {
+  hf = await judge(a.replies, b.replies);
+} catch (err) {
+  judgeError = (err as Error).message;
+  console.log(`judge failed: ${judgeError}`);
+}
+const verdict = write(hf, judgeError);
 console.log(`\n${verdict.ok ? 'PARITY PASS' : 'PARITY FAIL'} ${verdict.reasons.join('; ')}`);
 console.log(`results: ${out}`);
 process.exit(verdict.ok ? 0 : 1);

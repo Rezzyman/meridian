@@ -19,11 +19,20 @@ Code (all merged to `origin/main`, CI green on Node 20, 22, 24; 856 tests, up fr
 | #39 | OpenAI-compatible `POST /v1/chat/completions` (the Loop sidecar's wire), `MERIDIAN_COMPLETIONS_ISOLATION=loop`, wearables per-encode timeout, `scripts/ops/loop-canary.mjs`, `scripts/ops/continuity-check.mjs` |
 | #40 | Harness parity bench v1 (`benchmarks/harness-parity-v1/`, `scripts/harness-parity.mts`) |
 | #41 | `scripts/ops/arlo-cutover.sh`, `arlo-rollback.sh`, `arlo-soak-check.sh`, `docs/production-deployment.md` |
+| #42 | Token-authenticated gateway requests resolve as the operator (found on the bench: `/chat` was a stranger, governance denied Arlo's own tools, the model narrated the denials); stateless `/v1/chat/completions`; denial guidance for the model |
+| #43 | `x-meridian-text-style: 1` on completions; two bench prompts reclassified as operator-private |
+| #44 | Prompt budget: `/health.promptBudget` and boot log; `spend.maxPromptTokensPerTurn` (150k) cuts a runaway tool loop and answers with what it has |
+
+## The two findings that matter most
+
+1. **Cost per turn.** On Arlo's real home the first bench pass averaged 57k prompt tokens per call (33.7k minimum, 241k on a tool loop), $4.41 for 37 calls on Sonnet 5. Measured breakdown after the fix: about 20k static tokens per step, half identity plus context (Arlo's `IDENTITY/AGENT.md` alone is 21 KB), half 87 tool schemas, most of them MCP servers (cortex, meetjoin, voice, wearables) that ride on every turn. Multi-step turns resend all of it each step. This is almost certainly the mechanism behind the unattributed $556 on `ARLO_MERIDIAN-2.0` in late August. The ceiling is now in place; the config-side cuts (gate the cortex MCP server to CLI only, trim the identity file, prefer Haiku primary with Sonnet fallback) are Rez's calls and are listed under blockers.
+2. **Trust on the HTTP path.** Every authenticated gateway request was a stranger to governance. Fixed in #42; the bench would have failed the functional axis without it.
 
 VPS #2 (177.7.40.108), nothing production touched:
 
 - Release staged: `/opt/meridian/releases/1.5.0-rc.1` = main `aa062d5`, deps installed with the box's pnpm 9.15.9, built with the aterna node 26.8.1. Version string still prints 1.4.0 (no package bump in this prompt).
 - Bench Postgres: Docker `meridian-bench-pg` (pgvector pg17) on 127.0.0.1:5499, db `cortex_bench`, restoring `/root/cortex-backups/arlo/cortex-arlo-20260921-040137.sql.gz` in the background; log `/root/meridian-bench/restore.log` (ends with `EXIT:<code>` when done).
+- Bench stack running (transient units, all bench-only): `meridian-bench-cortex` on 3199 against the clone (157,320 nodes, 1.5M synapses restored from the 09-22 dump), `meridian-bench-gateway` on 28889 from the staged release with the bench home `/root/.meridian-bench/arlo` (Telegram off, `dailyUsd` 15 for today only, `recallTokenBudget` 900, primary `claude-haiku-4.5`), `meridian-bench-openclaw` on 28890 from the production vendor build with a bench instance dir pointed at 3199 and pinned to the same model. `/root/meridian-bench/stop-all.sh` stops them. Parity run 2 log: `/root/meridian-bench/parity.log`; results `/root/meridian-bench/results-2026-09-22.json` when it finishes. Run 1 was stopped at the cap (partial log kept).
 - Arlo still runs on `aterna-openclaw-arlo-canary.service` (port 18889). The retained `meridian-gateway-arlo.service` unit still points at the old shared install and must be rewritten from `skeleton/systemd/meridian-gateway@.service` with `<release>=/opt/meridian/releases/1.5.0-rc.1` before cutover.
 - Peer session: the Arlo voice session (`rezcorp-85`) confirmed it owns only `/root/arlo-voice-webhook`, its unit, the three VAPI assistants, and `/root/vapi-hero-webhook`. It was told the cutover will be announced first. It also measured CORTEX recall at about 1 second at or below 900 tokens and 10 to 16 seconds at 2000; Arlo's config must set `cortex.recallTokenBudget: 900`.
 
@@ -44,6 +53,7 @@ VPS #2 (177.7.40.108), nothing production touched:
 - Bench spend: the bench runs on Arlo's ROUTEXOR key under a five dollar daily cap in the bench config unless a dedicated `ARLO_BENCH` key is provided. Say so if that is not acceptable.
 - A Hostinger snapshot of VPS #2 before the cutover (panel click).
 - Two prospect names for the client-build lever; that lever has not started.
+- Cost decisions before cutover: (a) gate the cortex MCP server (and meetjoin, voice, wearables) to the channels that need them in `CONNECTIONS/mcp.json`; (b) shrink `IDENTITY/AGENT.md` from 21 KB; (c) primary model for Arlo on Meridian (Haiku with Sonnet fallback is the cost-sane default; the current config is Sonnet primary).
 
 ## Landmines carried forward
 
