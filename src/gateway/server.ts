@@ -10,6 +10,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { shapeForText } from '../agent/text-style.js';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { basename, join } from 'node:path';
@@ -59,6 +60,8 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Text-style policy for shaped completions (`x-meridian-text-style`). */
+  textStylePolicy?: import('../agent/text-style.js').TextStylePolicy;
   /** Stateless completion (WS5d): a fresh conversation per request seeded
    *  with the caller's prior messages, exactly like the OpenAI contract.
    *  Absent = falls back to the shared conversation facade. */
@@ -414,7 +417,11 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       messages?: Array<{ role: string; content: string | Array<{ type: string; text?: string }> }>;
       stream?: boolean;
     };
-    Headers: { authorization?: string; 'x-meridian-isolation'?: string };
+    Headers: {
+      authorization?: string;
+      'x-meridian-isolation'?: string;
+      'x-meridian-text-style'?: string;
+    };
   }>('/v1/chat/completions', async (req, reply) => {
     if (opts.token) {
       const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -469,18 +476,26 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
     // Drop the final user message from history: it is the input.
     const lastIdx = history.map((m) => m.role).lastIndexOf('user');
     if (lastIdx >= 0) history.splice(lastIdx, 1);
-    const sendOpts = isolation ? { isolation } : undefined;
+    // `x-meridian-text-style: 1` asks for the reply the operator would get over
+    // a text channel: the texting rules in the prompt and bubble shaping on the
+    // way out (bubbles joined by a blank line).
+    const textStyle = ['1', 'true', 'yes'].includes(
+      (req.headers['x-meridian-text-style'] ?? '').toLowerCase(),
+    );
+    const sendOpts = isolation || textStyle ? { isolation, textStyle } : undefined;
     const turn = opts.completions
       ? await opts.completions(input, history, sendOpts)
       : await opts.conversation.send(input, sendOpts);
+    const content =
+      textStyle && opts.textStylePolicy
+        ? shapeForText(turn.content, opts.textStylePolicy).join('\n\n') || turn.content
+        : turn.content;
     return {
       id: `chatcmpl-${turn.id}`,
       object: 'chat.completion',
       created: Math.floor(started / 1000),
       model: body.model ?? 'meridian',
-      choices: [
-        { index: 0, message: { role: 'assistant', content: turn.content }, finish_reason: 'stop' },
-      ],
+      choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
       usage: { prompt_tokens: null, completion_tokens: null, total_tokens: null },
       meridian: { turnId: turn.id, isolated, durationMs: Date.now() - started },
     };

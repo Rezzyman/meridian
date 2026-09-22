@@ -162,3 +162,39 @@ describe('stateless completions (WS5d)', () => {
     ]);
   });
 });
+
+describe('text-style completions (bench and text delivery)', () => {
+  it('the header applies the texting rules and shapes the reply into bubbles', async () => {
+    const seen: unknown[] = [];
+    const { conversation } = stub();
+    const base = await boot(conversation, {
+      textStylePolicy: {
+        enabled: true,
+        maxBubbleChars: 500,
+        maxBubbles: 4,
+        stripMarkdown: true,
+        noAssistantSpeak: true,
+        delayMsPerChar: 0,
+        maxDelayMs: 0,
+      },
+      completions: async (_input: string, _h: unknown, sendOpts: unknown) => {
+        seen.push(sendOpts);
+        return {
+          id: 'c',
+          content:
+            '## Summary\n\nAs an AI, I found this:\n\n- Eric said Friday.\n- He wants an estimate.',
+        };
+      },
+    });
+    const res = await post(
+      base,
+      { messages: [{ role: 'user', content: 'q' }] },
+      { 'x-meridian-text-style': '1' },
+    );
+    const body = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+    assert.deepEqual(seen[0], { isolation: undefined, textStyle: true });
+    assert.ok(!body.choices[0]!.message.content.includes('##'));
+    assert.ok(!/as an ai/i.test(body.choices[0]!.message.content));
+    assert.ok(body.choices[0]!.message.content.includes('Eric said Friday'));
+  });
+});

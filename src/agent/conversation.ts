@@ -90,6 +90,8 @@ export class Conversation {
         disableMemoryWrite?: boolean;
         systemPolicy?: string;
       };
+      /** Apply the texting rules to this turn regardless of channel. */
+      textStyle?: boolean;
     },
   ): Promise<MeridianTurn> {
     const userTurn: MeridianTurn = {
@@ -127,6 +129,7 @@ export class Conversation {
             }
           : undefined,
         isolation: sendOpts?.isolation,
+        textStyle: sendOpts?.textStyle,
         spend: this.opts.spend,
         onStreamEvent: sendOpts?.onStreamEvent,
         history: [...this.history],

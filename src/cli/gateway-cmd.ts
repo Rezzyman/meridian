@@ -1043,6 +1043,7 @@ export async function runGateway(opts: { port?: number; web?: boolean }): Promis
     logger,
     conversation: httpConvoFacade,
     completions,
+    textStylePolicy: config.textStyle,
     vapi,
     slack,
     discord,

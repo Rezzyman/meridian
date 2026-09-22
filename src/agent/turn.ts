@@ -162,6 +162,9 @@ export interface TurnContext {
     /** Framework-authored policy appended to the system prompt for this turn. */
     systemPolicy?: string;
   };
+  /** Apply the texting rules even off a text channel (a completion that will
+   *  be delivered over text, or the parity bench). */
+  textStyle?: boolean;
   /** Spend accounting (WS4): ledger + pricing. Absent = usage is still on the
    *  trace but nothing is recorded or capped. */
   spend?: { ledger: SpendLedger; pricing?: PricingCatalog };
@@ -401,7 +404,9 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // turn — no per-home edit required.
   const system = [
     RUNTIME_RULES,
-    ctx.config.textStyle.enabled && isTextChannel(ctx.channel) ? TEXT_STYLE_RULES : '',
+    ctx.config.textStyle.enabled && (ctx.textStyle || isTextChannel(ctx.channel))
+      ? TEXT_STYLE_RULES
+      : '',
     ctx.systemBase,
     ctx.isolation?.systemPolicy ?? '',
     recallSummary ? `<cortex_recall>\n${recallSummary}\n</cortex_recall>` : '',
