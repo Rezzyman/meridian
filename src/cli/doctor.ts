@@ -243,7 +243,7 @@ export async function runDoctor(): Promise<number> {
             ? 'Anthropic present'
             : env.OPENAI_API_KEY
               ? 'OpenAI present'
-              : 'no model key. ROUTEXOR (default): sign up at https://routexor.com, add your provider key in the dashboard, then create a ROUTEXOR key. Or run a local ollama model.',
+              : 'no model key. ROUTEXOR is Meridian\'s recommended setup: sign up at https://routexor.com, add your provider key in the dashboard, then create a ROUTEXOR key.',
     ),
   );
 
@@ -340,7 +340,7 @@ export async function runDoctor(): Promise<number> {
         row(
           'LLM chain dry-run',
           'warn',
-          'no model configured yet — add a provider key or a local ollama model, then re-run doctor',
+          'no model configured yet — add ROUTEXOR_API_KEY, then re-run doctor',
         ),
       );
     } else {
@@ -385,7 +385,7 @@ export async function runDoctor(): Promise<number> {
             : row(
                 'LLM chain dry-run',
                 'warn',
-                'no model reachable yet — add a provider key, or start a local ollama model, then re-run doctor',
+                'no model reachable yet — add ROUTEXOR_API_KEY, then re-run doctor',
               ),
         );
       }

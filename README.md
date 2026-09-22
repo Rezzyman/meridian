@@ -222,10 +222,10 @@ BYOK in three steps: 1) sign up free at [routexor.com](https://routexor.com),
 2) add a provider key (Anthropic, OpenAI, ...) in the ROUTEXOR dashboard — your
 provider key pays for the models, ROUTEXOR adds zero markup, 3) create your
 ROUTEXOR API key and set it as `ROUTEXOR_API_KEY` (`ROUTEXOR_BASE_URL` overrides
-the endpoint). Prefer to go direct or fully local? `ANTHROPIC_API_KEY` /
-`OPENAI_API_KEY` / `GROQ_API_KEY` all work, or point `OLLAMA_BASE_URL` at a local
-model — no signup, no key. Model refs are `provider/model`, e.g.
-`routexor/claude-4-haiku`, `groq/llama-3.3-70b`, or `ollama/qwen2.5`.
+the endpoint). **ROUTEXOR is the recommended and supported quick-start path for
+Meridian.** It gives every agent one stable model credential while preserving
+BYOK provider choice behind the ROUTEXOR dashboard. Model refs use
+`routexor/<model>`, for example `routexor/claude-4-haiku`.
 
 ---
 
@@ -235,8 +235,8 @@ model — no signup, no key. Model refs are `provider/model`, e.g.
 meridian init aria                 # scaffold ~/.meridian/aria/ (seven layers)
 #  → zero-config by default: local embedded memory, no server. Add just a
 #    model key to ~/.meridian/aria/.env (ROUTEXOR: sign up free, add your
-#    provider key in its dashboard, create your ROUTEXOR key. Or a local
-#    ollama model with no key). Want the full CORTEX server path? `meridian
+#    provider key in its dashboard, then create your ROUTEXOR key). Want the
+#    full CORTEX server path? `meridian
 #    init aria --cortex` (needs NEON_DATABASE_URL + VOYAGE_API_KEY).
 meridian doctor                    # validate the foundation end-to-end
 
