@@ -377,3 +377,40 @@ describe('telegram documents (defect d: documents were refused)', () => {
     assert.match(replies[0] ?? '', /PDFs, and text files/);
   });
 });
+
+describe('telegram human bubbles (WS5b)', () => {
+  it('a markdown wall arrives as a few plain bubbles with a typing pause between them', async () => {
+    const replies: string[] = [];
+    const actions: string[] = [];
+    const sleeps: number[] = [];
+    const channel = new TelegramChannel({
+      token: 'tg-test-token',
+      defaultChatId: '42',
+      logger: silent,
+      mediaDir: mkdtempSync(join(tmpdir(), 'meridian-tg-')),
+      fetchFile: async () => PNG_BYTES,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    const { ctx } = photoCtx({ caption: 'what did eric say', replies });
+    ctx.replyWithChatAction = async (a: 'typing') => {
+      actions.push(a);
+    };
+    await channel.handleMediaMessage(
+      ctx,
+      async () =>
+        '## Summary\n\nAs an AI, I can share this:\n\n- Eric said the south slope has hail bruising.\n- He wants an estimate by Friday.\n\nI hope this helps! Let me know if you need anything else.',
+    );
+    assert.ok(replies.length >= 2, `expected several bubbles, got ${replies.length}`);
+    for (const r of replies) {
+      assert.ok(!r.includes('##'));
+      assert.ok(!r.includes('- '));
+      assert.ok(!/as an ai/i.test(r));
+      assert.ok(!/hope this helps/i.test(r));
+    }
+    assert.ok(replies.join(' ').includes('hail bruising'));
+    assert.ok(sleeps.length >= 1, 'a human pause before the second bubble');
+    assert.ok(actions.filter((a) => a === 'typing').length >= 1);
+  });
+});

@@ -480,6 +480,28 @@ export const SpendConfigSchema = z
   .default({ onExceed: 'block' });
 export type SpendConfig = z.infer<typeof SpendConfigSchema>;
 
+/** Human texting shape (WS5b): how replies are shaped on text channels. */
+export const TextStyleConfigSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    maxBubbleChars: z.number().int().min(80).max(4000).default(500),
+    maxBubbles: z.number().int().min(1).max(10).default(4),
+    stripMarkdown: z.boolean().default(true),
+    noAssistantSpeak: z.boolean().default(true),
+    delayMsPerChar: z.number().min(0).max(50).default(8),
+    maxDelayMs: z.number().int().min(0).max(10000).default(2000),
+  })
+  .default({
+    enabled: true,
+    maxBubbleChars: 500,
+    maxBubbles: 4,
+    stripMarkdown: true,
+    noAssistantSpeak: true,
+    delayMsPerChar: 8,
+    maxDelayMs: 2000,
+  });
+export type TextStyleConfig = z.infer<typeof TextStyleConfigSchema>;
+
 export const AgentConfigSchema = z.object({
   agent: z.object({
     slug: z.string().min(1),
@@ -506,6 +528,7 @@ export const AgentConfigSchema = z.object({
   governance: GovernanceConfigSchema,
   delegation: DelegationConfigSchema.optional(),
   spend: SpendConfigSchema,
+  textStyle: TextStyleConfigSchema,
   cortex: z.object({
     agentId: z.string(),
     recallTopK: z.number().int().default(8),
@@ -759,6 +782,15 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     maxToolCallsPerTurn: 8,
   },
   spend: { onExceed: 'block' },
+  textStyle: {
+    enabled: true,
+    maxBubbleChars: 500,
+    maxBubbles: 4,
+    stripMarkdown: true,
+    noAssistantSpeak: true,
+    delayMsPerChar: 8,
+    maxDelayMs: 2000,
+  },
   cortex: {
     agentId: slug,
     recallTopK: 8,

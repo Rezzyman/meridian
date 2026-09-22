@@ -12,6 +12,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { DEFAULT_TEXT_STYLE, shapeForText, type TextStylePolicy } from '../agent/text-style.js';
 import type { ChannelAdapter, InboundMessage, OutboundMessage } from './types.js';
 import type { Logger } from 'pino';
 import type { FetchLike } from './slack.js';
@@ -55,6 +56,8 @@ export interface WhatsappChannelOptions {
   /** Optional sender allowlist (wa_id / phone). Empty = anyone who messages. */
   allowedNumbers?: string[];
   logger: Logger;
+  /** Human texting shape (WS5b). */
+  textStyle?: TextStylePolicy;
   fetchImpl?: FetchLike;
 }
 
@@ -167,7 +170,9 @@ export class WhatsappChannel implements ChannelAdapter {
 
   private async sendMessage(to: string, text: string): Promise<void> {
     const url = `https://graph.facebook.com/${GRAPH_VERSION}/${this.opts.phoneNumberId}/messages`;
-    for (const chunk of splitForWhatsapp(text)) {
+    const shaped = shapeForText(text, this.opts.textStyle ?? DEFAULT_TEXT_STYLE);
+    const pieces = (shaped.length ? shaped : [text]).flatMap((b) => splitForWhatsapp(b));
+    for (const chunk of pieces) {
       const res = await this.fetchImpl(url, {
         method: 'POST',
         headers: {

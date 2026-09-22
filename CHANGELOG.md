@@ -4,6 +4,12 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Feels like a person over text (2026-09-22)
+
+- **Text channels get a texting voice.** On Telegram, iMessage, SMS, and WhatsApp the system prompt carries a short text-style rule (short, plain, first person, no headers or bullet walls, no assistant-speak, no sign-offs, ask one question when something is missing).
+- **Replies are shaped into bubbles.** Markdown is flattened, assistant-speak and sign-offs are stripped, long answers split on sentence breaks into a few bubbles (default at most four of 500 characters), and a typing indicator plus a short human pause precede each bubble after the first. Configure under `textStyle` in `config.yaml`.
+- **`/style`** previews five sample replies under the current policy so the operator can tune without a deploy.
+
 ### Observability a canary can be judged on (2026-09-22)
 
 - **`GET /health` now carries** version, uptime, provider posture, CORTEX reachability (probed every minute), breaker state per model ref, last-hour inference (turns and errors), every automation's next fire and last delivery, the most recent proactive delivery, and spend today and this month.

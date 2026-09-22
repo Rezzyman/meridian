@@ -26,6 +26,7 @@ import { sanitizeOutbound, ProviderChainError } from '../safety/error-firewall.j
 import { governToolSet, type ActionReceiptInput } from '../governance/action-policy.js';
 import { diagnoseToolSet, type ToolCallDiagnostic } from './tool-diagnostics.js';
 import { checkSpend, spendRefusal } from '../spend/guard.js';
+import { TEXT_STYLE_RULES, isTextChannel } from './text-style.js';
 import type { SpendLedger } from '../spend/ledger.js';
 import type { PricingCatalog } from '../providers/pricing.js';
 
@@ -400,6 +401,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
   // turn — no per-home edit required.
   const system = [
     RUNTIME_RULES,
+    ctx.config.textStyle.enabled && isTextChannel(ctx.channel) ? TEXT_STYLE_RULES : '',
     ctx.systemBase,
     ctx.isolation?.systemPolicy ?? '',
     recallSummary ? `<cortex_recall>\n${recallSummary}\n</cortex_recall>` : '',
