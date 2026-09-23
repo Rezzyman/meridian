@@ -289,3 +289,46 @@ describe('at least one channel must be green', () => {
     assert.equal(reachable.certified, true);
   });
 });
+
+describe('golden set inside certify (step 2)', () => {
+  it('runs the job prompts through text-styled completions and scores the pass rate', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'meridian-golden-'));
+    writeFileSync(
+      join(dir, 'golden.json'),
+      JSON.stringify([
+        { id: 'g1', category: 'x', prompt: 'hey', mustNotMatch: ['as an ai'] },
+        { id: 'g2', category: 'x', prompt: 'breakfast 2021?', mustMatch: ["don't"] },
+        { id: 'g3', category: 'x', prompt: 'say banana', mustMatch: ['banana'] },
+      ]),
+    );
+    const base = await boot();
+    const manifest = CapabilityManifestSchema.parse({
+      schema: 'meridian.capabilities.v1',
+      agent: 'arlo',
+      audience: 'internal',
+      golden: { file: 'golden.json', minPassRate: 0.6 },
+      capabilities: [
+        {
+          id: 'gateway.health',
+          claim: 'ok',
+          channel: true,
+          probe: { kind: 'health', field: 'ok', equals: true },
+        },
+      ],
+    });
+    const report = await certify(manifest, {
+      gateway: base,
+      token: 'tok',
+      manifestDir: dir,
+      sleep: async () => {},
+    });
+    const g = report.results.find((r) => r.id === 'golden');
+    assert.ok(g);
+    assert.equal(g.status, 'green', g.evidence);
+    assert.match(g.evidence, /^2\/3 passed/);
+    assert.match(g.evidence, /g3: missing/);
+  });
+});

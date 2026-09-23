@@ -4,6 +4,9 @@
 schema: meridian.capabilities.v1
 agent: arlo
 audience: internal
+golden:
+  file: golden.json        # Arlo's job as prompts (step 3 refines this draft)
+  minPassRate: 0.8
 
 capabilities:
   # ── Foundation (required for every agent) ──

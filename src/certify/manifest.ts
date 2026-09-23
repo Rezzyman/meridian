@@ -74,9 +74,20 @@ export const CapabilitySchema = z.object({
 });
 export type Capability = z.infer<typeof CapabilitySchema>;
 
+/** Golden set (certification step 2): the agent's own job, as prompts with
+ *  deterministic checks, run on every certification. The file uses the parity
+ *  bench prompt shape. */
+export const GoldenSetSchema = z.object({
+  file: z.string().min(1),
+  /** Fraction of golden prompts that must pass. */
+  minPassRate: z.number().min(0).max(1).default(0.8),
+  severity: z.enum(['blocking', 'advisory']).default('blocking'),
+});
+
 export const CapabilityManifestSchema = z.object({
   schema: z.literal('meridian.capabilities.v1'),
   agent: z.string().min(1),
+  golden: GoldenSetSchema.optional(),
   /** Who this agent serves; decides which probes are mandatory (see required()). */
   audience: z.enum(['internal', 'client-facing']),
   capabilities: z.array(CapabilitySchema).min(1),
