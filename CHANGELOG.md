@@ -10,6 +10,7 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 - **`meridian certify`** runs the manifest against a live gateway and prints a card with evidence per claim; exit 0 only when every blocking claim is green. Manual claims go green only with `--confirm <id>` from the operator. Reports land in `CAPABILITIES/certifications/`.
 - **Memory probe protocol** fixes what the parity bench got wrong: seed on a fresh session, then poll fresh sessions until the fact is recalled or the deadline passes.
 - **Gateway:** `/health` gains `timezone` and `spendCaps`; token-gated `GET /tools` lists the tool surface by name.
+- **Channel rule (Rez, 2026-09-23):** claims can be marked `channel: true`; certification requires at least one operator channel green, whatever each channel's own severity, so an agent nobody can reach is never certified. Arlo's manifest keeps Telegram (advisory, not the primary), adds SMS, and names iMessage and the Loop app as the intended primaries (advisory until the relay and a paired device token exist).
 - **`examples/arlo/CAPABILITIES/manifest.yaml`** is Arlo's draft: 22 claims across foundation, conversation, channels, tools, and the three automations.
 
 ### Prompt budget: measure the static prompt, cap tokens per turn (2026-09-22)

@@ -33,3 +33,33 @@ describe('capability manifest (certification step 1)', () => {
     assert.ok(!requiredCapabilityIds('internal').includes('brand.no-internal-names'));
   });
 });
+
+describe('channel rule (Rez, 2026-09-23: never certify an agent nobody can reach)', () => {
+  it('a manifest with no channel claims is missing channel.any', () => {
+    const m = CapabilityManifestSchema.parse({
+      schema: 'meridian.capabilities.v1',
+      agent: 'x',
+      audience: 'internal',
+      capabilities: requiredCapabilityIds('internal').map((id) => ({
+        id,
+        claim: id,
+        probe: { kind: 'health', field: 'ok', equals: true },
+      })),
+    });
+    assert.ok(missingRequired(m).some((x) => x.startsWith('channel.any')));
+  });
+  it("Arlo's manifest marks telegram, imessage, sms, and loop as channels", () => {
+    const m = loadManifest(join(process.cwd(), 'examples/arlo/CAPABILITIES/manifest.yaml'));
+    const channels = m.capabilities
+      .filter((c) => c.channel)
+      .map((c) => c.id)
+      .sort();
+    assert.deepEqual(channels, [
+      'imessage.operator',
+      'loop.canary',
+      'sms.operator',
+      'telegram.operator',
+    ]);
+    assert.deepEqual(missingRequired(m), []);
+  });
+});
