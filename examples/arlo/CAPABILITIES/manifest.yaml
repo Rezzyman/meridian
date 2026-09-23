@@ -24,8 +24,8 @@ capabilities:
     probe:
       kind: memory
       # Unique nouns per run so an older, similar fact cannot outrank the new one.
-      seed: "Please keep this: the vault code for locker {{marker}} is zebra-{{marker}}."
-      ask: "What is the vault code for locker {{marker}}?"
+      seed: "Small thing to remember: the mascot of the {{marker}} project is a zebra named zebra-{{marker}}."
+      ask: "What is the name of the {{marker}} project's mascot?"
       expect: "zebra-{{marker}}"
       withinMs: 120000
   - id: spend.caps

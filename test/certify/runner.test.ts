@@ -52,7 +52,7 @@ async function boot(): Promise<string> {
     },
     completions: async (input: string) => {
       // Seed shapes used by the tests: "marker is cert-x." and "locker cert-x is zebra-cert-x."
-      const m = /(?:marker is|is )(zebra-cert-[a-z0-9]+|cert-[a-z0-9]+)\.?/i.exec(input);
+      const m = /(?:marker is|is |named )(zebra-cert-[a-z0-9]+|cert-[a-z0-9]+)\.?/i.exec(input);
       if (m) {
         seeded = m[1]!;
         asks = 0;
@@ -243,8 +243,8 @@ describe('at least one channel must be green', () => {
               claim: 'r',
               probe: {
                 kind: 'memory',
-                seed: 'the vault code for locker {{marker}} is zebra-{{marker}}',
-                ask: 'vault code for locker {{marker}}?',
+                seed: 'the mascot of the {{marker}} project is a zebra named zebra-{{marker}}.',
+                ask: 'name of the {{marker}} mascot?',
                 expect: 'zebra-{{marker}}',
                 withinMs: 60_000,
               },

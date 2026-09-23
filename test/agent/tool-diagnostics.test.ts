@@ -36,7 +36,7 @@ describe('tool diagnostics (defect g: tool failures had no structured record)', 
     assert.equal(seen[0]?.argsDigest.length, 12);
   });
 
-  it('classifies and rethrows failures unchanged', async () => {
+  it('classifies failures and returns them to the model as an error result, never a dead turn', async () => {
     const seen: ToolCallDiagnostic[] = [];
     const tools = diagnoseToolSet(
       {
@@ -53,7 +53,14 @@ describe('tool diagnostics (defect g: tool failures had no structured record)', 
     const exec = (
       tools.flaky as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }
     ).execute;
-    await assert.rejects(() => exec({}, {}), /timed out/);
+    const result = (await exec({}, {})) as {
+      error?: string;
+      errorClass?: string;
+      guidance?: string;
+    };
+    assert.match(result.error ?? '', /timed out/);
+    assert.equal(result.errorClass, 'timeout');
+    assert.match(result.guidance ?? '', /Tell the user plainly/);
     assert.equal(seen[0]?.ok, false);
     assert.equal(seen[0]?.errorClass, 'timeout');
   });
