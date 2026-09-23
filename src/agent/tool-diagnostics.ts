@@ -8,8 +8,13 @@ import type { ToolSet } from 'ai';
  * Tool failures used to surface as a generic hiccup with nothing in the log
  * an operator could act on. Every call now records tool name, wall time, an
  * error class, and a short digest of the arguments (never the arguments
- * themselves) to the log and to the turn trace. Errors are rethrown unchanged
- * so existing tool-error semantics stay exactly as they were.
+ * themselves) to the log and to the turn trace.
+ *
+ * A thrown tool error is returned to the model as `{ error, guidance }`
+ * instead of propagating. Found on the bench: `gcal_today` threw "google
+ * skill not configured" and the whole turn died as an HTTP 500 after burning
+ * every fallback provider on the same error. A human assistant whose calendar
+ * app is down says so; it does not hang up.
  */
 export interface ToolCallDiagnostic {
   name: string;
@@ -114,7 +119,13 @@ export function diagnoseToolSet(
             ...d,
             err: err instanceof Error ? err : new Error(String(err)),
           });
-          throw err;
+          const message = err instanceof Error ? err.message : String(err);
+          return {
+            error: message.slice(0, 300),
+            errorClass: d.errorClass,
+            guidance:
+              'This tool failed. Tell the user plainly what you could not do and why in one sentence, then answer with what you already have. Do not retry the same call with the same arguments.',
+          };
         }
       },
     } as ToolSet[string];
