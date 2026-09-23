@@ -298,6 +298,15 @@ export async function certify(
   const missing = missingRequired(manifest);
   const reasons: string[] = [];
   for (const id of missing) reasons.push(`required capability not promised: ${id}`);
+  // At least one operator channel must be green, whatever each channel's own
+  // severity: an agent nobody can reach is not certified.
+  const channelIds = manifest.capabilities.filter((c) => c.channel).map((c) => c.id);
+  if (
+    channelIds.length > 0 &&
+    !results.some((r) => channelIds.includes(r.id) && r.status === 'green')
+  ) {
+    reasons.push(`no operator channel is green (${channelIds.join(', ')}); at least one must be`);
+  }
   for (const r of results) {
     if (r.severity !== 'blocking') continue;
     if (r.status === 'red') reasons.push(`${r.id}: ${r.evidence}`);

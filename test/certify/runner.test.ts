@@ -51,9 +51,11 @@ async function boot(): Promise<string> {
       baseUrlHost: 'api.routexor.com',
     },
     completions: async (input: string) => {
-      const m = /marker is (cert-[a-z0-9]+)/i.exec(input);
+      // Seed shapes used by the tests: "marker is cert-x." and "locker cert-x is zebra-cert-x."
+      const m = /(?:marker is|is )(zebra-cert-[a-z0-9]+|cert-[a-z0-9]+)\.?/i.exec(input);
       if (m) {
         seeded = m[1]!;
+        asks = 0;
         return { id: 's', content: 'Got it.' };
       }
       asks += 1;
@@ -140,6 +142,7 @@ describe('meridian certify (certification step 1)', () => {
         {
           id: 'telegram.operator',
           claim: 'telegram',
+          channel: true,
           probe: { kind: 'manual', instruction: 'send ping' },
         },
       ],
@@ -175,7 +178,7 @@ describe('meridian certify (certification step 1)', () => {
       sleep: async () => {},
       confirmed: new Set(['telegram.operator']),
     });
-    assert.equal(attested.certified, true);
+    assert.equal(attested.certified, true, JSON.stringify(attested.reasons));
     assert.match(renderCard(attested), /CERTIFIED: every blocking claim is green/);
   });
 
@@ -200,11 +203,89 @@ describe('meridian certify (certification step 1)', () => {
         id: 'x',
         claim: 'x',
         severity: 'blocking',
+        channel: false,
         probe: { kind: 'http', url: 'http://127.0.0.1:1/nothing', withinMs: 500 },
       },
       { gateway: 'http://127.0.0.1:1', sleep: async () => {} },
     );
     assert.equal(r.status, 'red');
     assert.ok(r.evidence.length > 0);
+  });
+});
+
+describe('at least one channel must be green', () => {
+  it('all-advisory channels that are all red still block certification; one green channel clears it', async () => {
+    const base = await boot();
+    const mk = (telegramConfirmed: boolean) =>
+      certify(
+        CapabilityManifestSchema.parse({
+          schema: 'meridian.capabilities.v1',
+          agent: 'arlo',
+          audience: 'internal',
+          capabilities: [
+            {
+              id: 'gateway.health',
+              claim: 'ok',
+              probe: { kind: 'health', field: 'ok', equals: true },
+            },
+            {
+              id: 'provider.posture',
+              claim: 'p',
+              probe: { kind: 'health', field: 'provider.ok', equals: true },
+            },
+            {
+              id: 'memory.reachable',
+              claim: 'm',
+              probe: { kind: 'health', field: 'cortex.status', equals: 'ok' },
+            },
+            {
+              id: 'memory.roundtrip',
+              claim: 'r',
+              probe: {
+                kind: 'memory',
+                seed: 'the vault code for locker {{marker}} is zebra-{{marker}}',
+                ask: 'vault code for locker {{marker}}?',
+                expect: 'zebra-{{marker}}',
+                withinMs: 60_000,
+              },
+            },
+            {
+              id: 'spend.caps',
+              claim: 's',
+              probe: { kind: 'health', field: 'spendCaps.dailyUsd', truthy: true },
+            },
+            {
+              id: 'timezone',
+              claim: 't',
+              probe: { kind: 'health', field: 'timezone', equals: 'America/Denver' },
+            },
+            {
+              id: 'telegram.operator',
+              claim: 'tg',
+              channel: true,
+              severity: 'advisory',
+              probe: { kind: 'manual', instruction: 'ping' },
+            },
+            {
+              id: 'imessage.operator',
+              claim: 'im',
+              channel: true,
+              severity: 'advisory',
+              probe: { kind: 'health', field: 'channels.imessage.ok', equals: true },
+            },
+          ],
+        }),
+        {
+          gateway: base,
+          token: 'tok',
+          sleep: async () => {},
+          confirmed: telegramConfirmed ? new Set(['telegram.operator']) : new Set(),
+        },
+      );
+    const unreachable = await mk(false);
+    assert.equal(unreachable.certified, false);
+    assert.ok(unreachable.reasons.some((r) => r.startsWith('no operator channel is green')));
+    const reachable = await mk(true);
+    assert.equal(reachable.certified, true);
   });
 });

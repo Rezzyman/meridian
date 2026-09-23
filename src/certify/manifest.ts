@@ -63,6 +63,11 @@ export type Probe = z.infer<typeof ProbeSchema>;
 export const CapabilitySchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9.-]*$/),
   claim: z.string().min(1),
+  /** Marks a claim as an operator channel. Certification requires at least
+   *  one channel claim green: an agent must be reachable the way its person
+   *  already communicates (phone number over iMessage/SMS, the Loop app,
+   *  Telegram, Slack...), and never certified with no working channel. */
+  channel: z.boolean().default(false),
   /** blocking: red fails certification. advisory: red is reported, not fatal. */
   severity: z.enum(['blocking', 'advisory']).default('blocking'),
   probe: ProbeSchema,
@@ -110,5 +115,8 @@ export function requiredCapabilityIds(audience: CapabilityManifest['audience']):
 
 export function missingRequired(manifest: CapabilityManifest): string[] {
   const have = new Set(manifest.capabilities.map((c) => c.id));
-  return requiredCapabilityIds(manifest.audience).filter((id) => !have.has(id));
+  const missing = requiredCapabilityIds(manifest.audience).filter((id) => !have.has(id));
+  if (!manifest.capabilities.some((c) => c.channel))
+    missing.push('channel.any (no claim is marked channel: true)');
+  return missing;
 }

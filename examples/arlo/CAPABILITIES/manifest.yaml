@@ -43,21 +43,32 @@ capabilities:
     claim: An ambiguous ask gets one clarifying question, not a guess
     probe: { kind: turn, input: "book it", mustMatch: ["\\?"] }
 
-  # ── Channels ──
+  # ── Channels (Rez, 2026-09-23: reach the agent the way you reach a person:
+  #    a phone number over iMessage/SMS, and the Loop app as the main channel.
+  #    Telegram stays available but is never the sole channel. Certification
+  #    requires at least one channel below to be green.) ──
   - id: telegram.operator
-    claim: Rez's Telegram chat is the trusted operator channel and gets replies
-    severity: blocking
+    claim: Rez's Telegram chat reaches Arlo and gets replies (kept, not the primary)
+    channel: true
+    severity: advisory
     probe: { kind: manual, instruction: "Send 'ping' from Rez's Telegram; expect a reply within 20 seconds as plain bubbles." }
   - id: imessage.operator
-    claim: Rez can text Arlo on iMessage and get blue bubbles back
-    severity: advisory   # blocking once the BlueBubbles relay decision is made
+    claim: Rez can text Arlo's number on iMessage and get blue bubbles back (the intended primary)
+    channel: true
+    severity: advisory   # blocking the day the BlueBubbles relay is live
     probe: { kind: health, field: channels.imessage.ok, equals: true }
+  - id: sms.operator
+    claim: Rez can text Arlo's number over SMS when iMessage is unavailable
+    channel: true
+    severity: advisory   # blocking with the Twilio number
+    probe: { kind: manual, instruction: "Text 'ping' to Arlo's number from a non-iMessage phone; expect a reply." }
   - id: voice.line
     claim: The voice line answers (separate arlo-voice-webhook service)
     probe: { kind: http, url: "http://127.0.0.1:18893/health" }
   - id: loop.canary
-    claim: The Loop app gets cited, tool-free, memory-write-free answers
-    severity: advisory   # blocking when Loop's upstream moves to Meridian
+    claim: The Loop app (the main channel for ATERNA agents) gets cited, tool-free, memory-write-free answers
+    channel: true
+    severity: advisory   # blocking when Loop's upstream moves to Meridian and a device token is paired
     # Needs a scoped DEVICE bearer (minted by pairing), not the gateway loop token; skipped when unset.
     probe: { kind: loop-canary, url: "https://webhook.aterna.ai/v1/loop/turns", tokenEnv: LOOP_DEVICE_TOKEN }
 
