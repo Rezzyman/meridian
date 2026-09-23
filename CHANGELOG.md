@@ -4,6 +4,10 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Certification step 2: the golden set runs inside certify (2026-09-23)
+
+- A manifest may name a `golden` file (the agent's own job as prompts with deterministic checks, the parity bench prompt shape) and a minimum pass rate; `meridian certify` runs it through stateless, text-styled completions and reports one `golden` row with the failures named. Arlo's draft golden set has 12 prompts (brief, inbox, calendar, drafting, two memory recalls, honesty, clarify, safety, tone, commitments, brevity).
+
 ### Certification step 1: capability manifests and `meridian certify` (2026-09-23)
 
 - **`CAPABILITIES/manifest.yaml`** per agent: every claim carries a probe (`health`, `turn`, `memory`, `tools`, `automation`, `http`, `loop-canary`, `manual`). Required probes by audience: every agent must promise gateway health, provider posture, memory reachable, memory round trip, spend caps, and timezone; client-facing agents must also promise brand hygiene and stranger refusal.

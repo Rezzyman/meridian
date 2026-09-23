@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { activeAgentSlug, ensureAgentHome } from '../config/home.js';
 import { loadManifest } from '../certify/manifest.js';
 import { certify, renderCard } from '../certify/runner.js';
@@ -50,6 +50,7 @@ export async function runCertify(opts: {
   const report = await certify(manifest, {
     gateway,
     token,
+    manifestDir: dirname(manifestPath),
     confirmed: new Set(opts.confirm ?? []),
     env: process.env,
   });

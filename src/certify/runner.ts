@@ -1,4 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
+import { checkReply, type PromptCase } from '../bench/parity.js';
 import type { Capability, CapabilityManifest, Probe } from './manifest.js';
 import { missingRequired } from './manifest.js';
 
@@ -34,6 +37,8 @@ export interface CertifyReport {
 
 export interface CertifyTarget {
   gateway: string;
+  /** Directory the manifest was loaded from; golden `file` resolves against it. */
+  manifestDir?: string;
   token?: string;
   /** Values for {{marker}} style placeholders; a fresh marker per run by default. */
   vars?: Record<string, string>;
@@ -287,6 +292,69 @@ export async function loopCanary(
       };
 }
 
+/** Run the golden set (the agent's own job as prompts) through stateless,
+ *  text-styled completions and score the pass rate. */
+export async function runGolden(
+  manifest: CapabilityManifest,
+  t: CertifyTarget,
+): Promise<ProbeResult | null> {
+  const g = manifest.golden;
+  if (!g) return null;
+  const f = t.fetchImpl ?? fetch;
+  const now = t.now ?? Date.now;
+  const started = now();
+  const path = isAbsolute(g.file) ? g.file : resolve(t.manifestDir ?? process.cwd(), g.file);
+  let cases: PromptCase[];
+  try {
+    cases = JSON.parse(readFileSync(path, 'utf8')) as PromptCase[];
+  } catch (err) {
+    return {
+      id: 'golden',
+      claim: `Golden set ${g.file}`,
+      severity: g.severity,
+      status: 'red',
+      evidence: `cannot read golden set: ${(err as Error).message}`,
+      durationMs: now() - started,
+    };
+  }
+  const auth: Record<string, string> = t.token ? { authorization: `Bearer ${t.token}` } : {};
+  const failures: string[] = [];
+  let passed = 0;
+  for (const c of cases) {
+    try {
+      const res = await f(`${t.gateway.replace(/\/$/, '')}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-meridian-text-style': '1', ...auth },
+        body: JSON.stringify({
+          model: 'meridian',
+          messages: [{ role: 'user', content: c.prompt }],
+        }),
+        signal: AbortSignal.timeout(90_000),
+      });
+      if (!res.ok) {
+        failures.push(`${c.id}: HTTP ${res.status}`);
+        continue;
+      }
+      const b = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const check = checkReply(c, b.choices?.[0]?.message?.content ?? '');
+      if (check.ok) passed += 1;
+      else failures.push(`${c.id}: ${check.failures.join(', ')}`);
+    } catch (err) {
+      failures.push(`${c.id}: ${(err as Error).message.slice(0, 80)}`);
+    }
+  }
+  const rate = cases.length ? passed / cases.length : 0;
+  const more = failures.length > 6 ? ` | +${failures.length - 6} more` : '';
+  return {
+    id: 'golden',
+    claim: `Golden set: at least ${Math.round(g.minPassRate * 100)}% of ${cases.length} job prompts pass`,
+    severity: g.severity,
+    status: rate >= g.minPassRate ? 'green' : 'red',
+    evidence: `${passed}/${cases.length} passed${failures.length ? `; ${failures.slice(0, 6).join(' | ')}${more}` : ''}`,
+    durationMs: now() - started,
+  };
+}
+
 export async function certify(
   manifest: CapabilityManifest,
   target: CertifyTarget,
@@ -295,6 +363,8 @@ export async function certify(
   const t = { ...target, vars };
   const results: ProbeResult[] = [];
   for (const cap of manifest.capabilities) results.push(await runProbe(cap, t));
+  const golden = await runGolden(manifest, t);
+  if (golden) results.push(golden);
   const missing = missingRequired(manifest);
   const reasons: string[] = [];
   for (const id of missing) reasons.push(`required capability not promised: ${id}`);
