@@ -4,6 +4,14 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Certification step 1: capability manifests and `meridian certify` (2026-09-23)
+
+- **`CAPABILITIES/manifest.yaml`** per agent: every claim carries a probe (`health`, `turn`, `memory`, `tools`, `automation`, `http`, `loop-canary`, `manual`). Required probes by audience: every agent must promise gateway health, provider posture, memory reachable, memory round trip, spend caps, and timezone; client-facing agents must also promise brand hygiene and stranger refusal.
+- **`meridian certify`** runs the manifest against a live gateway and prints a card with evidence per claim; exit 0 only when every blocking claim is green. Manual claims go green only with `--confirm <id>` from the operator. Reports land in `CAPABILITIES/certifications/`.
+- **Memory probe protocol** fixes what the parity bench got wrong: seed on a fresh session, then poll fresh sessions until the fact is recalled or the deadline passes.
+- **Gateway:** `/health` gains `timezone` and `spendCaps`; token-gated `GET /tools` lists the tool surface by name.
+- **`examples/arlo/CAPABILITIES/manifest.yaml`** is Arlo's draft: 22 claims across foundation, conversation, channels, tools, and the three automations.
+
 ### Prompt budget: measure the static prompt, cap tokens per turn (2026-09-22)
 
 - **Found on the bench:** on Arlo's real home a turn averaged 57k prompt tokens (33.7k minimum, 241k maximum) because identity, context, and every tool schema ride along on every step and a tool loop resends them each step. The runtime could not say where the tokens went.

@@ -39,6 +39,7 @@ import { runAudit, writeReport, renderReport } from '../audit/retrospective.js';
 import { colors } from '../utils/truecolor.js';
 import { runDoctor } from './doctor.js';
 import { runStatus } from './status-cmd.js';
+import { runCertify } from './certify-cmd.js';
 import { runDeploy } from '../deploy/pipeline.js';
 import { runGateway } from './gateway-cmd.js';
 import { initAgent } from './init-cmd.js';
@@ -247,6 +248,30 @@ program
   .action(async (o: { json?: boolean; port?: string }) => {
     process.exit(await runStatus({ json: !!o.json, port: o.port ? Number(o.port) : undefined }));
   });
+
+program
+  .command('certify')
+  .description(
+    "Run the agent's capability manifest against a live gateway; exit 0 only when certified",
+  )
+  .option('--gateway <url>', 'gateway base URL (default from .env port)')
+  .option('--token <token>', 'gateway bearer (default from .env)')
+  .option('--manifest <path>', 'manifest path (default CAPABILITIES/manifest.yaml)')
+  .option('--confirm <id...>', 'attest a manual claim for this run')
+  .option('--out <path>', 'write the JSON report here')
+  .option('--json', 'print the raw report')
+  .action(
+    async (o: {
+      gateway?: string;
+      token?: string;
+      manifest?: string;
+      confirm?: string[];
+      out?: string;
+      json?: boolean;
+    }) => {
+      process.exit(await runCertify(o));
+    },
+  );
 
 program
   .command('doctor')
