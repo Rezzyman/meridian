@@ -15,7 +15,11 @@ import {
   type AgentConfig,
   type VerificationCheck,
 } from '../config/schema.js';
-import { screenRecall, type QuarantinedMemory } from '../verification/memory-integrity.js';
+import {
+  prefixProvenanceResolver,
+  screenRecall,
+  type QuarantinedMemory,
+} from '../verification/memory-integrity.js';
 import { makeModelJudge, screenRecallDeep } from '../verification/memory-judge.js';
 import { type ProvenanceSigner, signedProvenanceResolver } from '../verification/provenance.js';
 import { buildSacredGuard, sacredViolation } from '../verification/sacred.js';
@@ -371,7 +375,7 @@ export async function runTurn(ctx: TurnContext, userInput: string): Promise<Turn
     const provenance =
       ctx.config.cortex.provenanceTrust === 'signed' && ctx.provenanceSigner
         ? signedProvenanceResolver(ctx.provenanceSigner)
-        : undefined;
+        : prefixProvenanceResolver(ctx.config.cortex.trustedSources ?? []);
     const screen = ctx.config.cortex.memoryLlmJudge
       ? await screenRecallDeep(r.memories, r.context, {
           provenance,

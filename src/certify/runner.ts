@@ -14,6 +14,15 @@ import { missingRequired } from './manifest.js';
  */
 export type ProbeStatus = 'green' | 'red' | 'manual' | 'skipped';
 
+export interface GoldenCaseResult {
+  id: string;
+  ok: boolean;
+  failures: string[];
+  chars: number;
+  /** First 240 characters of the reply, so a red golden row can be read without rerunning. */
+  excerpt: string;
+}
+
 export interface ProbeResult {
   id: string;
   claim: string;
@@ -21,6 +30,8 @@ export interface ProbeResult {
   status: ProbeStatus;
   evidence: string;
   durationMs: number;
+  /** Golden rows only: one entry per prompt. */
+  cases?: GoldenCaseResult[];
 }
 
 export interface CertifyReport {
@@ -319,6 +330,7 @@ export async function runGolden(
   }
   const auth: Record<string, string> = t.token ? { authorization: `Bearer ${t.token}` } : {};
   const failures: string[] = [];
+  const caseResults: GoldenCaseResult[] = [];
   let passed = 0;
   for (const c of cases) {
     try {
@@ -333,14 +345,31 @@ export async function runGolden(
       });
       if (!res.ok) {
         failures.push(`${c.id}: HTTP ${res.status}`);
+        caseResults.push({
+          id: c.id,
+          ok: false,
+          failures: [`HTTP ${res.status}`],
+          chars: 0,
+          excerpt: '',
+        });
         continue;
       }
       const b = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-      const check = checkReply(c, b.choices?.[0]?.message?.content ?? '');
+      const text = b.choices?.[0]?.message?.content ?? '';
+      const check = checkReply(c, text);
       if (check.ok) passed += 1;
       else failures.push(`${c.id}: ${check.failures.join(', ')}`);
+      caseResults.push({
+        id: c.id,
+        ok: check.ok,
+        failures: check.failures,
+        chars: text.length,
+        excerpt: text.slice(0, 240),
+      });
     } catch (err) {
-      failures.push(`${c.id}: ${(err as Error).message.slice(0, 80)}`);
+      const message = (err as Error).message.slice(0, 80);
+      failures.push(`${c.id}: ${message}`);
+      caseResults.push({ id: c.id, ok: false, failures: [message], chars: 0, excerpt: '' });
     }
   }
   const rate = cases.length ? passed / cases.length : 0;
@@ -352,6 +381,7 @@ export async function runGolden(
     status: rate >= g.minPassRate ? 'green' : 'red',
     evidence: `${passed}/${cases.length} passed${failures.length ? `; ${failures.slice(0, 6).join(' | ')}${more}` : ''}`,
     durationMs: now() - started,
+    cases: caseResults,
   };
 }
 
