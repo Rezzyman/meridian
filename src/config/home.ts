@@ -14,6 +14,7 @@ import { AgentConfigSchema, defaultAgentConfig } from './schema.js';
 const SEVEN_LAYERS = [
   'IDENTITY',
   'CONTEXT',
+  'CAPABILITIES',
   'SKILLS',
   'MEMORY',
   'CONNECTIONS',

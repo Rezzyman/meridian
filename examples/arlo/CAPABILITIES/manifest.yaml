@@ -1,0 +1,90 @@
+# Arlo's capability manifest (draft 2026-09-23). Every line is a promise with a
+# probe. `meridian certify` runs the probes against a gateway and refuses to
+# certify on any blocking red. Rez: strike anything Arlo should not promise.
+schema: meridian.capabilities.v1
+agent: arlo
+audience: internal
+
+capabilities:
+  # ── Foundation (required for every agent) ──
+  - id: gateway.health
+    claim: The gateway answers /health with ok true
+    probe: { kind: health, field: ok, equals: true }
+  - id: provider.posture
+    claim: Models are reached through ROUTEXOR, never a native endpoint
+    probe: { kind: health, field: provider.ok, equals: true }
+  - id: memory.reachable
+    claim: Arlo's own CORTEX is reachable
+    probe: { kind: health, field: cortex.status, equals: ok }
+  - id: memory.roundtrip
+    claim: A fact told to Arlo is recalled on a fresh session within 90 seconds
+    probe:
+      kind: memory
+      # Unique nouns per run so an older, similar fact cannot outrank the new one.
+      seed: "Please keep this: the vault code for locker {{marker}} is zebra-{{marker}}."
+      ask: "What is the vault code for locker {{marker}}?"
+      expect: "zebra-{{marker}}"
+      withinMs: 120000
+  - id: spend.caps
+    claim: A daily dollar cap and a per-turn token ceiling are set
+    probe: { kind: health, field: spendCaps.dailyUsd, truthy: true }
+  - id: timezone
+    claim: Every scheduler runs in America/Denver
+    probe: { kind: health, field: timezone, equals: America/Denver }
+
+  # ── Conversation ──
+  - id: chat.reply
+    claim: A text turn gets a non-empty, non-narrated reply within 30 seconds
+    probe: { kind: turn, input: "hey, you there?", mustNotMatch: ["^I'll ", "^Let me ", "as an ai"], withinMs: 30000 }
+  - id: chat.honest-empty
+    claim: Arlo says he does not know instead of inventing
+    probe: { kind: turn, input: "what did I have for breakfast on march 3rd 2021?", mustMatch: ["don't|do not|no record|not sure|can't|cannot"], mustNotMatch: ["you had (eggs|toast|cereal|oatmeal|pancakes)"] }
+  - id: chat.clarify
+    claim: An ambiguous ask gets one clarifying question, not a guess
+    probe: { kind: turn, input: "book it", mustMatch: ["\\?"] }
+
+  # ── Channels ──
+  - id: telegram.operator
+    claim: Rez's Telegram chat is the trusted operator channel and gets replies
+    severity: blocking
+    probe: { kind: manual, instruction: "Send 'ping' from Rez's Telegram; expect a reply within 20 seconds as plain bubbles." }
+  - id: imessage.operator
+    claim: Rez can text Arlo on iMessage and get blue bubbles back
+    severity: advisory   # blocking once the BlueBubbles relay decision is made
+    probe: { kind: health, field: channels.imessage.ok, equals: true }
+  - id: voice.line
+    claim: The voice line answers (separate arlo-voice-webhook service)
+    probe: { kind: http, url: "http://127.0.0.1:18893/health" }
+  - id: loop.canary
+    claim: The Loop app gets cited, tool-free, memory-write-free answers
+    severity: advisory   # blocking when Loop's upstream moves to Meridian
+    # Needs a scoped DEVICE bearer (minted by pairing), not the gateway loop token; skipped when unset.
+    probe: { kind: loop-canary, url: "https://webhook.aterna.ai/v1/loop/turns", tokenEnv: LOOP_DEVICE_TOKEN }
+
+  # ── Tools Arlo's job depends on ──
+  - id: tools.gmail
+    claim: Arlo can search, read, and draft Gmail
+    probe: { kind: tools, names: [gmail_search, gmail_recent, gmail_read, gmail_get, gmail_draft] }
+  - id: tools.calendar
+    claim: Arlo can read and schedule on Google Calendar
+    probe: { kind: tools, names: [gcal_today, gcal_upcoming, gcal_schedule] }
+  - id: tools.web
+    claim: Arlo can search the web with citations
+    probe: { kind: tools, names: [web_search, web_answer] }
+  - id: tools.github
+    claim: Arlo can read repos, issues, and PRs
+    probe: { kind: tools, names: [gh_repo_summary, gh_issues_list, gh_prs_list] }
+  - id: tools.wearables
+    claim: Arlo can pull the pendant lifelog into memory
+    probe: { kind: tools, names: [mcp_wearables_wearables_pull] }
+
+  # ── Proactive ──
+  - id: automation.morning-brief
+    claim: The morning brief fires on weekdays at 8:00 Denver and delivers to Telegram
+    probe: { kind: automation, name: morning-brief, delivers: true }
+  - id: automation.open-loops
+    claim: Open loops fires on weekdays at 9:30 Denver and delivers
+    probe: { kind: automation, name: open-loops, delivers: true }
+  - id: automation.eod-checkin
+    claim: The end-of-day check-in fires on weekdays at 17:30 Denver and delivers
+    probe: { kind: automation, name: eod-checkin, delivers: true }

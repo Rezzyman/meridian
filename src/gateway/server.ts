@@ -60,6 +60,16 @@ export interface GatewayOptions {
   sms?: SmsChannel;
   sentinel?: ProactiveSentinel;
   automations?: AutomationManager;
+  /** Certification facts (step 1): resolved timezone, spend caps, tool names. */
+  timezone?: string;
+  spendCaps?: {
+    dailyUsd?: number;
+    monthlyUsd?: number;
+    perTurnUsd?: number;
+    perRunUsd?: number;
+    maxPromptTokensPerTurn?: number;
+  };
+  toolNames?: string[];
   /** Static prompt measurement from boot (identity+context, tool schemas). */
   promptBudget?: import('../agent/prompt-budget.js').PromptBudgetReport;
   /** Text-style policy for shaped completions (`x-meridian-text-style`). */
@@ -182,6 +192,8 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       breaker: opts.breaker ? opts.breaker() : [],
       lastHourInference: opts.health?.lastHourInference() ?? null,
       promptBudget: opts.promptBudget ?? null,
+      timezone: opts.timezone ?? null,
+      spendCaps: opts.spendCaps ?? null,
       channels: {
         imessage: opts.imessage ? opts.imessage.relayHealth() : null,
       },
@@ -407,6 +419,19 @@ export async function startGateway(opts: GatewayOptions): Promise<FastifyInstanc
       return { reply: turn.content, turnId: turn.id, memoryId: turn.memoryId };
     },
   );
+
+  // Certification: the tool surface by name, token-gated (names only, never
+  // schemas or secrets). `meridian certify` checks promised tools against it.
+  app.get<{ Headers: { authorization?: string } }>('/tools', async (req, reply) => {
+    if (opts.token) {
+      const got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (got !== opts.token) {
+        reply.code(401);
+        return { error: 'unauthorized' };
+      }
+    }
+    return { tools: opts.toolNames ?? [] };
+  });
 
   // OpenAI-compatible chat completions (WS5d). The Loop sidecar and any
   // OpenAI-shaped client (including the parity bench) reach Meridian exactly
