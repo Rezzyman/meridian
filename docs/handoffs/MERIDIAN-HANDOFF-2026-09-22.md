@@ -36,6 +36,13 @@ VPS #2 (177.7.40.108), nothing production touched:
 - Arlo still runs on `aterna-openclaw-arlo-canary.service` (port 18889). The retained `meridian-gateway-arlo.service` unit still points at the old shared install and must be rewritten from `skeleton/systemd/meridian-gateway@.service` with `<release>=/opt/meridian/releases/1.5.0-rc.1` before cutover.
 - Peer session: the Arlo voice session (`rezcorp-85`) confirmed it owns only `/root/arlo-voice-webhook`, its unit, the three VAPI assistants, and `/root/vapi-hero-webhook`. It was told the cutover will be announced first. It also measured CORTEX recall at about 1 second at or below 900 tokens and 10 to 16 seconds at 2000; Arlo's config must set `cortex.recallTokenBudget: 900`.
 
+## Update 2026-09-23: parity loop 2 and certification step 1
+
+- Parity rerun (`benchmarks/harness-parity-v1/runs/results-2026-09-22-run2.json`): Meridian functional 22/30 vs 15/30, reliability 0 errors vs 3, p50 3.4s vs 3.7s, p95 within 20 percent, human feel 62 percent preferred (after PR #46 fixed pre-tool text being glued to the answer). Memory 17/20 vs 20/20, but that axis was unfair as run: Meridian writes memory in the background and the bench asked 8 seconds after seeding, and the clone was shared across runs so the second harness read the first one's seeds. Not a cutover blocker by itself; certify's memory probe now polls until recalled.
+- Certification step 1 merged (PR #47): `CAPABILITIES/manifest.yaml` per agent, `meridian certify`, `/health.timezone`, `/health.spendCaps`, `GET /tools`. Arlo's draft manifest at `examples/arlo/CAPABILITIES/manifest.yaml` (22 claims) awaits Rez's strike-through.
+- First certify card on the bench found: Arlo's installed google skill is v0.1 (no gmail_get/gmail_draft/gcal_*), upgrade at cutover; recall ranks older look-alike facts above a newer one (CORTEX recency weighting item); Loop probe needs a paired device token.
+- Next: step 2 (golden set inside certify, real automation and channel probes on the actual Arlo home in shadow), step 3 (Arlo's golden set), step 4 (release train with certify as the gate), then cutover only on a fully green card.
+
 ## Next (Wednesday onward), in order
 
 1. Confirm the restore finished (`tail -3 /root/meridian-bench/restore.log`; expect `EXIT:0` and `memory_nodes` around 150k).
