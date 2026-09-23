@@ -722,7 +722,28 @@ const TRUSTED_SOURCE_PATTERNS: RegExp[] = [
 ];
 const UNTRUSTED_SOURCE_MARKERS = /\b(?:external|public|untrusted|anon|anonymous|unknown)\b/i;
 
-export function isUntrustedProvenance(source: string | null): boolean {
+/**
+ * Compile operator-declared trusted source patterns (config.cortex.trustedSources).
+ * Each entry is a JavaScript regular expression source, matched case-insensitively
+ * against the memory's source label. Invalid entries throw here, at load time,
+ * so a typo cannot silently disable trust for an agent.
+ */
+export function compileTrustedSourcePatterns(patterns: readonly string[]): RegExp[] {
+  return patterns.map((p) => {
+    try {
+      return new RegExp(p, 'i');
+    } catch (err) {
+      throw new Error(
+        `cortex.trustedSources: invalid pattern ${JSON.stringify(p)}: ${(err as Error).message}`,
+      );
+    }
+  });
+}
+
+export function isUntrustedProvenance(
+  source: string | null,
+  extraTrusted: readonly RegExp[] = [],
+): boolean {
   // Guard null/empty AND non-string (a runtime type violation must fail closed
   // to untrusted, never throw and disable the whole screen).
   if (typeof source !== 'string' || source.length === 0) return true;
@@ -735,6 +756,13 @@ export function isUntrustedProvenance(source: string | null): boolean {
   if (s.startsWith('mcp:') || s.startsWith('mcp_')) return true;
   if (s.startsWith('ingest:web') || s.startsWith('web:')) return true;
   for (const re of TRUSTED_SOURCE_PATTERNS) {
+    if (re.test(s)) return false;
+  }
+  // Operator-declared first-party sources (an agent that migrated in from
+  // another runtime, a workspace import, a prior harness's encode labels).
+  // These sit AFTER the hard exclusions above on purpose: a pattern cannot
+  // trust an `mcp:`/`web:` source or one carrying an untrusted marker.
+  for (const re of extraTrusted) {
     if (re.test(s)) return false;
   }
   return true; // unknown / laundered → fail safe to untrusted
@@ -752,6 +780,20 @@ export const PREFIX_PROVENANCE_RESOLVER: ProvenanceResolver = {
   isUntrusted: (m) => isUntrustedProvenance(m.source),
   describe: (m) => (isUntrustedProvenance(m.source) ? 'prefix:untrusted' : 'prefix:trusted'),
 };
+
+/**
+ * The prefix heuristic extended with operator-declared trusted sources
+ * (config.cortex.trustedSources). Built once per turn from the agent config.
+ */
+export function prefixProvenanceResolver(trustedSources: readonly string[]): ProvenanceResolver {
+  if (trustedSources.length === 0) return PREFIX_PROVENANCE_RESOLVER;
+  const extra = compileTrustedSourcePatterns(trustedSources);
+  return {
+    isUntrusted: (m) => isUntrustedProvenance(m.source, extra),
+    describe: (m) =>
+      isUntrustedProvenance(m.source, extra) ? 'prefix:untrusted' : 'prefix:trusted',
+  };
+}
 
 // ─── Layer 4: cross-memory correlation (gradual subversion) ───────────────────
 // Individually-benign untrusted memories can compound: one builds trust in an

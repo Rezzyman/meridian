@@ -583,6 +583,31 @@ export const AgentConfigSchema = z.object({
      *     (or by external surfaces) are treated as untrusted.
      */
     provenanceTrust: z.enum(['prefix', 'signed']).default('prefix'),
+    /**
+     * Extra first-party source labels for the 'prefix' trust policy, as
+     * case-insensitive regular expressions matched against a memory's source.
+     * Use it for an agent whose memory predates Meridian (another runtime's
+     * encode labels, a workspace import, an operator's own directive files) so
+     * the poisoning screen does not quarantine the operator's standing rules
+     * as if a stranger had said them. Patterns never override the hard
+     * exclusions (`mcp:`, `web:`, sources marked external/public/unknown), and
+     * never apply in 'signed' mode. Invalid patterns fail config load.
+     */
+    trustedSources: z
+      .array(z.string().min(1))
+      .default([])
+      .superRefine((patterns, ctx) => {
+        for (const p of patterns) {
+          try {
+            new RegExp(p, 'i');
+          } catch (err) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `invalid regular expression ${JSON.stringify(p)}: ${(err as Error).message}`,
+            });
+          }
+        }
+      }),
   }),
 });
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
@@ -822,5 +847,6 @@ export const defaultAgentConfig = (slug: string, name: string): AgentConfig => (
     valenceInference: true,
     memoryLlmJudge: false,
     provenanceTrust: 'prefix',
+    trustedSources: [],
   },
 });

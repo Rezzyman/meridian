@@ -41,6 +41,16 @@ when BOTH hold:
      trust. Strong enough for the on-ramp, but a path that can *write* a trusted
      prefix (an automation/webhook/import tagged `automation:`/`cli:`) can still
      launder a directive into "trusted".
+     An agent whose memory predates Meridian (another runtime's encode labels,
+     a workspace import, an operator's own directive files) declares those
+     first-party labels in `config.cortex.trustedSources`, a list of
+     case-insensitive regular expressions matched against the source. Without
+     it the screen quarantines the operator's own standing rules from those
+     sources on every recall. Declared patterns never override the hard
+     exclusions (`mcp:`, `web:`, sources marked external/public/unknown), do
+     not apply in `signed` mode, and an invalid pattern fails config load.
+     Keep transcript sources (a pendant, screen capture, voice calls) out of
+     the list: strangers speak there.
    - **`signed`** (opt-in, strong) — trust requires a per-agent **HMAC
      signature** minted at encode time (`src/verification/provenance.ts`) over
      `(agentId, baseSource, sha256(content))` with a local key (0600, never

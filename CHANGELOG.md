@@ -4,6 +4,11 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Memory trust for migrated agents: `cortex.trustedSources` (2026-09-23)
+
+- The poisoning screen's prefix trust policy only knew Meridian's own encode labels, so an agent whose memory predates Meridian had its operator's standing directives quarantined from recall as if a stranger had said them. On Arlo's clone the screen was stripping `rez-directive` identity rules, Mac-workspace session notes, and a month of OpenClaw-era conversation encodes (`aterna-agent:agent:arlo:*`) on every turn. `config.cortex.trustedSources` now takes per-agent regular expressions for first-party source labels; they never override the hard exclusions (`mcp:`, `web:`, sources marked external/public/unknown), never apply in `signed` mode, and an invalid pattern fails config load instead of silently disabling trust. Found by reading the bench gateway log during `meridian certify`.
+- `meridian certify` golden rows now carry one entry per prompt (pass, failures, reply length, a 240-character excerpt) in the JSON report, so a red golden row can be read without rerunning it.
+
 ### Certification step 2: the golden set runs inside certify (2026-09-23)
 
 - A manifest may name a `golden` file (the agent's own job as prompts with deterministic checks, the parity bench prompt shape) and a minimum pass rate; `meridian certify` runs it through stateless, text-styled completions and reports one `golden` row with the failures named. Arlo's draft golden set has 12 prompts (brief, inbox, calendar, drafting, two memory recalls, honesty, clarify, safety, tone, commitments, brevity).
