@@ -20,10 +20,11 @@ capabilities:
     claim: A fact told to Arlo is recalled on a fresh session within 90 seconds
     probe:
       kind: memory
-      seed: "Remember this exact phrase, it matters: the certification marker is {{marker}}."
-      ask: "What is the certification marker I told you about?"
-      expect: "{{marker}}"
-      withinMs: 90000
+      # Unique nouns per run so an older, similar fact cannot outrank the new one.
+      seed: "Please keep this: the vault code for locker {{marker}} is zebra-{{marker}}."
+      ask: "What is the vault code for locker {{marker}}?"
+      expect: "zebra-{{marker}}"
+      withinMs: 120000
   - id: spend.caps
     claim: A daily dollar cap and a per-turn token ceiling are set
     probe: { kind: health, field: spendCaps.dailyUsd, truthy: true }
@@ -57,7 +58,8 @@ capabilities:
   - id: loop.canary
     claim: The Loop app gets cited, tool-free, memory-write-free answers
     severity: advisory   # blocking when Loop's upstream moves to Meridian
-    probe: { kind: loop-canary, url: "https://webhook.aterna.ai/v1/loop/turns", tokenEnv: MERIDIAN_LOOP_TOKEN }
+    # Needs a scoped DEVICE bearer (minted by pairing), not the gateway loop token; skipped when unset.
+    probe: { kind: loop-canary, url: "https://webhook.aterna.ai/v1/loop/turns", tokenEnv: LOOP_DEVICE_TOKEN }
 
   # ── Tools Arlo's job depends on ──
   - id: tools.gmail

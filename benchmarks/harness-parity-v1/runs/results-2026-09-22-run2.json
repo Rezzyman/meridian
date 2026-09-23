@@ -19,30 +19,14 @@
       "total": 30,
       "passed": 22,
       "failures": {
-        "f05": [
-          "missing /thursday/"
-        ],
-        "f06": [
-          "missing /friday/"
-        ],
-        "f10": [
-          "over 900 chars"
-        ],
-        "f11": [
-          "over 500 chars"
-        ],
-        "f13": [
-          "over 400 chars"
-        ],
-        "f17": [
-          "over 900 chars"
-        ],
-        "f21": [
-          "over 900 chars"
-        ],
-        "f29": [
-          "over 1400 chars"
-        ]
+        "f05": ["missing /thursday/"],
+        "f06": ["missing /friday/"],
+        "f10": ["over 900 chars"],
+        "f11": ["over 500 chars"],
+        "f13": ["over 400 chars"],
+        "f17": ["over 900 chars"],
+        "f21": ["over 900 chars"],
+        "f29": ["over 1400 chars"]
       }
     },
     "memory": {
@@ -72,58 +56,21 @@
       "total": 30,
       "passed": 15,
       "failures": {
-        "f04": [
-          "missing /4:?4|4:?5|late|over|miss/"
-        ],
-        "f05": [
-          "over 500 chars",
-          "missing /thursday/"
-        ],
-        "f06": [
-          "over 400 chars",
-          "missing /friday/"
-        ],
-        "f09": [
-          "narration prefix"
-        ],
-        "f10": [
-          "markdown wall",
-          "over 900 chars"
-        ],
-        "f11": [
-          "over 500 chars"
-        ],
-        "f13": [
-          "over 400 chars"
-        ],
-        "f17": [
-          "over 900 chars"
-        ],
-        "f19": [
-          "markdown wall",
-          "over 300 chars"
-        ],
-        "f20": [
-          "over 300 chars"
-        ],
-        "f21": [
-          "assistant-speak",
-          "over 900 chars"
-        ],
-        "f23": [
-          "HTTP 500"
-        ],
-        "f24": [
-          "over 300 chars"
-        ],
-        "f25": [
-          "narration prefix",
-          "markdown wall"
-        ],
-        "f29": [
-          "markdown wall",
-          "over 1400 chars"
-        ]
+        "f04": ["missing /4:?4|4:?5|late|over|miss/"],
+        "f05": ["over 500 chars", "missing /thursday/"],
+        "f06": ["over 400 chars", "missing /friday/"],
+        "f09": ["narration prefix"],
+        "f10": ["markdown wall", "over 900 chars"],
+        "f11": ["over 500 chars"],
+        "f13": ["over 400 chars"],
+        "f17": ["over 900 chars"],
+        "f19": ["markdown wall", "over 300 chars"],
+        "f20": ["over 300 chars"],
+        "f21": ["assistant-speak", "over 900 chars"],
+        "f23": ["HTTP 500"],
+        "f24": ["over 300 chars"],
+        "f25": ["narration prefix", "markdown wall"],
+        "f29": ["markdown wall", "over 1400 chars"]
       }
     },
     "memory": {
@@ -143,9 +90,7 @@
   "humanFeelTies": 8,
   "verdict": {
     "ok": false,
-    "reasons": [
-      "memory hit 85% < 100%"
-    ]
+    "reasons": ["memory hit 85% < 100%"]
   },
   "replies": {
     "a": {
