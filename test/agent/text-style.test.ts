@@ -79,5 +79,9 @@ describe('human texting shape (WS5b)', () => {
     assert.match(TEXT_STYLE_RULES, /No headers, no bullet lists/);
     assert.match(TEXT_STYLE_RULES, /No sign-offs/);
     assert.match(TEXT_STYLE_RULES, /As an AI/);
+    // Golden g05/g06/g10 on the bench: dossier answers and a status report to a vent.
+    assert.match(TEXT_STYLE_RULES, /Answer the question in your first sentence/);
+    assert.match(TEXT_STYLE_RULES, /respond to the person first/);
+    assert.match(TEXT_STYLE_RULES, /Private matters/);
   });
 });

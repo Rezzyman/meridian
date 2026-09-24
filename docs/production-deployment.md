@@ -20,6 +20,20 @@ Install `skeleton/systemd/meridian-gateway@.service` as `/etc/systemd/system/mer
 
 ## Ship a release
 
+The release train does all of the below in one command and refuses to mark a
+release shippable unless `meridian certify` passes against a shadow gateway
+running that exact build:
+
+```bash
+scripts/ops/release.sh 1.5.0-rc.2                       # gate, stage, build, shadow, certify
+scripts/ops/release.sh 1.5.0-rc.2 --confirm telegram.operator   # operator-attested claims
+```
+
+It writes `RELEASE.json` and `CERTIFICATION.json` into the release directory,
+then `CERTIFIED` (or `NOT-CERTIFIED`). `scripts/ops/arlo-cutover.sh` refuses a
+release without `CERTIFIED` unless `ALLOW_UNCERTIFIED=1` is set on purpose.
+The manual steps, for reference:
+
 ```bash
 # on the Mac
 pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build

@@ -29,6 +29,17 @@ fail() { log "FAIL: $*"; exit 1; }
 
 log "cutover start agent=$AGENT release=$RELEASE"
 [ -x "$RELEASE/bin/meridian" ] || fail "release binary missing at $RELEASE/bin/meridian"
+# The release train (scripts/ops/release.sh) writes CERTIFIED only when
+# `meridian certify` passed against a shadow of this exact release.
+if [ ! -f "$RELEASE/CERTIFIED" ]; then
+  if [ "${ALLOW_UNCERTIFIED:-0}" = "1" ]; then
+    log "WARN: $RELEASE has no CERTIFIED marker; proceeding because ALLOW_UNCERTIFIED=1"
+  else
+    fail "$RELEASE is not certified (no CERTIFIED marker). Run scripts/ops/release.sh first, or set ALLOW_UNCERTIFIED=1 to override on purpose."
+  fi
+else
+  log "certified: $(tr '\n' ' ' < "$RELEASE/CERTIFIED")"
+fi
 [ -x "$ROLLBACK" ] || fail "rollback script missing or not executable: $ROLLBACK"
 systemctl cat "$NEW_UNIT" >/dev/null 2>&1 || fail "$NEW_UNIT is not installed"
 systemctl cat "$NEW_UNIT" | grep -q "$RELEASE" || fail "$NEW_UNIT does not point at $RELEASE"

@@ -4,6 +4,11 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Release train with certification as the gate; texting rules from the golden set (2026-09-23)
+
+- `scripts/ops/release.sh <version>` runs the full gate, stages an immutable release on the VPS, builds it with the aterna node, starts a shadow gateway from that exact build, runs `meridian certify` against it, and writes `CERTIFIED` or `NOT-CERTIFIED` next to `RELEASE.json` and `CERTIFICATION.json`. `arlo-cutover.sh` now refuses a release without the `CERTIFIED` marker (`ALLOW_UNCERTIFIED=1` overrides on purpose, loudly).
+- Three texting rules added to the runtime text style after Arlo's golden run: answer in the first sentence and offer the rest, respond to the person before any system status when they are venting, and keep private matters to one line and a question. Found by the per-prompt golden detail (g05, g06, g10).
+
 ### Memory trust for migrated agents: `cortex.trustedSources` (2026-09-23)
 
 - The poisoning screen's prefix trust policy only knew Meridian's own encode labels, so an agent whose memory predates Meridian had its operator's standing directives quarantined from recall as if a stranger had said them. On Arlo's clone the screen was stripping `rez-directive` identity rules, Mac-workspace session notes, and a month of OpenClaw-era conversation encodes (`aterna-agent:agent:arlo:*`) on every turn. `config.cortex.trustedSources` now takes per-agent regular expressions for first-party source labels; they never override the hard exclusions (`mcp:`, `web:`, sources marked external/public/unknown), never apply in `signed` mode, and an invalid pattern fails config load instead of silently disabling trust. Found by reading the bench gateway log during `meridian certify`.
