@@ -82,6 +82,33 @@ capabilities:
   - id: tools.calendar
     claim: Arlo can read and schedule on Google Calendar
     probe: { kind: tools, names: [gcal_today, gcal_upcoming, gcal_schedule] }
+  # Live proof, not presence: these run the same CLIs the tools call, with no
+  # side effects (a token per scope, one inbox read). Red here means the Google
+  # Workspace admin has not delegated the scope to the service account yet.
+  - id: google.live.gmail
+    claim: Gmail reads are live through the service account
+    probe:
+      kind: exec
+      command: /root/.meridian/arlo/email-venv/bin/python
+      args: [./bin/arlo-gmail.py, recent, --max, "1"]
+      env: { ARLO_HOME: /root/.meridian/arlo }
+      expect: 'message\(s\) for'
+  - id: google.live.drafts
+    claim: Gmail drafting is live (gmail.compose delegated to the service account)
+    probe:
+      kind: exec
+      command: /root/.meridian/arlo/email-venv/bin/python
+      args: [./bin/arlo-gmail.py, scopes]
+      env: { ARLO_HOME: /root/.meridian/arlo }
+      expect: '"drafts": true'
+  - id: google.live.calendar
+    claim: Calendar read and schedule are live (calendar.events delegated to the service account)
+    probe:
+      kind: exec
+      command: /root/.meridian/arlo/email-venv/bin/python
+      args: [./bin/arlo-gmail.py, scopes]
+      env: { ARLO_HOME: /root/.meridian/arlo }
+      expect: '"schedule": true'
   - id: tools.web
     claim: Arlo can search the web with citations
     probe: { kind: tools, names: [web_search, web_answer] }

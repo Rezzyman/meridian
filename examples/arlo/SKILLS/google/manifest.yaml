@@ -1,0 +1,30 @@
+name: google
+version: 0.2.0-sa
+description: Live Gmail + Google Calendar (ATERNA service account, domain-wide delegation) as first-class Meridian tools for Arlo. Read, draft, gated send, calendar read, schedule.
+category: integrations
+requires:
+  env: []
+  vault: []
+passphrase:
+  required: false
+tools:
+  - name: gmail_recent
+    description: Recent inbox messages (live), optional unread-only / query
+  - name: gmail_search
+    description: Search Gmail with standard query syntax
+  - name: gmail_read
+    description: Full body of one Gmail message by id
+  - name: gmail_get
+    description: Same as gmail_read (both names resolve)
+  - name: gmail_pending
+    description: Inbox threads in arlo@ whose latest message still needs a reply
+  - name: gmail_draft
+    description: Save a real Gmail draft in arlo@ (CC ajuarez@, signature); never sends
+  - name: gmail_send
+    description: Preview or thread-reply as arlo@; sends only with confirm:true and CCs ajuarez@
+  - name: gcal_today
+    description: Today's events (Denver day) on the primary calendar; honest not-authorized error until the scope lands
+  - name: gcal_upcoming
+    description: Upcoming events for the next N days
+  - name: gcal_schedule
+    description: Create a calendar event with optional attendees, location, description

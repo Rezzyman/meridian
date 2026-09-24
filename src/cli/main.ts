@@ -258,6 +258,7 @@ program
   .option('--token <token>', 'gateway bearer (default from .env)')
   .option('--manifest <path>', 'manifest path (default CAPABILITIES/manifest.yaml)')
   .option('--confirm <id...>', 'attest a manual claim for this run')
+  .option('--only <id...>', 'run only these claims (a partial run, never a certification)')
   .option('--out <path>', 'write the JSON report here')
   .option('--json', 'print the raw report')
   .action(
