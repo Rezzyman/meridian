@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
@@ -55,6 +56,8 @@ export interface CertifyTarget {
   vars?: Record<string, string>;
   /** Manual claims the operator attests to this run. */
   confirmed?: Set<string>;
+  /** Run only these capability ids (plus 'golden' if listed). A partial run is never a certification. */
+  only?: string[];
   env?: Record<string, string | undefined>;
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
@@ -208,6 +211,36 @@ export async function runProbe(cap: Capability, t: CertifyTarget): Promise<Probe
         return res.ok
           ? done('green', `${p.url} HTTP ${res.status}`)
           : done('red', `${p.url} HTTP ${res.status}`);
+      }
+      case 'exec': {
+        const home = t.manifestDir ? resolve(t.manifestDir, '..') : process.cwd();
+        const command = isAbsolute(p.command) ? p.command : resolve(home, p.command);
+        const args = p.args.map((a) => (a.startsWith('./') ? resolve(home, a) : a));
+        const out = await new Promise<{ code: number | null; text: string }>((res) => {
+          execFile(
+            command,
+            args,
+            {
+              cwd: home,
+              timeout: p.timeoutMs,
+              maxBuffer: 1024 * 1024,
+              env: { ...process.env, ...(t.env ?? {}), ...p.env },
+            },
+            (err, stdout, stderr) => {
+              const code =
+                err && 'code' in err && typeof err.code === 'number' ? err.code : err ? 1 : 0;
+              res({ code, text: `${stdout ?? ''}\n${stderr ?? ''}`.trim() });
+            },
+          );
+        });
+        const re = new RegExp(p.expect);
+        const snippet = out.text.replace(/\s+/g, ' ').slice(0, 160);
+        return re.test(out.text)
+          ? done('green', `matched /${p.expect}/: ${snippet}`)
+          : done(
+              'red',
+              `expected /${p.expect}/ (exit ${out.code ?? '?'}): ${snippet || '(no output)'}`,
+            );
       }
       case 'loop-canary': {
         const token = t.env?.[p.tokenEnv];
@@ -392,11 +425,16 @@ export async function certify(
   const vars = { marker: `cert-${randomUUID().slice(0, 8)}`, ...(target.vars ?? {}) };
   const t = { ...target, vars };
   const results: ProbeResult[] = [];
-  for (const cap of manifest.capabilities) results.push(await runProbe(cap, t));
-  const golden = await runGolden(manifest, t);
+  const only = target.only && target.only.length > 0 ? new Set(target.only) : null;
+  for (const cap of manifest.capabilities) {
+    if (only && !only.has(cap.id)) continue;
+    results.push(await runProbe(cap, t));
+  }
+  const golden = only && !only.has('golden') ? null : await runGolden(manifest, t);
   if (golden) results.push(golden);
   const missing = missingRequired(manifest);
   const reasons: string[] = [];
+  if (only) reasons.push(`partial run (--only ${[...only].join(', ')}); not a certification`);
   for (const id of missing) reasons.push(`required capability not promised: ${id}`);
   // At least one operator channel must be green, whatever each channel's own
   // severity: an agent nobody can reach is not certified.

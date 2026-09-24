@@ -14,6 +14,7 @@ export async function runCertify(opts: {
   token?: string;
   manifest?: string;
   confirm?: string[];
+  only?: string[];
   out?: string;
   json?: boolean;
 }): Promise<number> {
@@ -52,6 +53,7 @@ export async function runCertify(opts: {
     token,
     manifestDir: dirname(manifestPath),
     confirmed: new Set(opts.confirm ?? []),
+    only: opts.only,
     env: process.env,
   });
   const outDir = join(home.layer('CAPABILITIES'), 'certifications');

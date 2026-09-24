@@ -1,5 +1,8 @@
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { Conversation } from '../../src/agent/conversation.js';
 import { startGateway } from '../../src/gateway/server.js';
@@ -330,5 +333,54 @@ describe('golden set inside certify (step 2)', () => {
     assert.equal(g.status, 'green', g.evidence);
     assert.match(g.evidence, /^2\/3 passed/);
     assert.match(g.evidence, /g3: missing/);
+  });
+});
+
+describe('exec probe: a capability proves it is live, not merely present', () => {
+  it('green when the command output matches expect, red otherwise, both with evidence', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meridian-exec-'));
+    const manifestDir = join(dir, 'CAPABILITIES');
+    mkdirSync(manifestDir, { recursive: true });
+    const base = { gateway: 'http://127.0.0.1:1', manifestDir, sleep: async () => {} };
+    const ok = await runProbe(
+      {
+        id: 'google.scopes',
+        claim: 'scopes',
+        severity: 'blocking',
+        channel: false,
+        probe: {
+          kind: 'exec',
+          command: process.execPath,
+          args: ['-e', 'console.log(JSON.stringify({ drafts: true, cwd: process.cwd() }))'],
+          expect: '"drafts": ?true',
+          env: {},
+          timeoutMs: 10000,
+        },
+      },
+      base,
+    );
+    assert.equal(ok.status, 'green', ok.evidence);
+    assert.match(ok.evidence, /drafts/);
+    // cwd is the agent home (the manifest dir's parent)
+    assert.match(ok.evidence, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    const bad = await runProbe(
+      {
+        id: 'google.scopes',
+        claim: 'scopes',
+        severity: 'blocking',
+        channel: false,
+        probe: {
+          kind: 'exec',
+          command: process.execPath,
+          args: ['-e', 'console.log(JSON.stringify({ drafts: false })); process.exit(0)'],
+          expect: '"drafts": ?true',
+          env: {},
+          timeoutMs: 10000,
+        },
+      },
+      base,
+    );
+    assert.equal(bad.status, 'red');
+    assert.match(bad.evidence, /expected/);
   });
 });

@@ -49,6 +49,19 @@ export const ProbeSchema = z.discriminatedUnion('kind', [
     url: z.string().url(),
     withinMs: z.number().int().positive().default(8000),
   }),
+  // A command run in the agent home must exit and print something matching
+  // `expect`. This is how a claim proves a capability is LIVE (a delegated
+  // Google scope, a reachable CLI) rather than merely present in the tool list.
+  // The manifest is operator-owned config inside the agent home, so this runs
+  // with exactly the trust the agent's own skills already have.
+  z.object({
+    kind: z.literal('exec'),
+    command: z.string().min(1),
+    args: z.array(z.string()).default([]),
+    expect: z.string().min(1),
+    env: z.record(z.string()).default({}),
+    timeoutMs: z.number().int().positive().default(30000),
+  }),
   // The Loop synthetic canary must pass against this gateway or sidecar.
   z.object({
     kind: z.literal('loop-canary'),

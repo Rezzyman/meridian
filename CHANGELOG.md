@@ -4,6 +4,11 @@ All notable changes to Meridian. Date format: YYYY-MM-DD. UTC.
 
 ## [Unreleased]
 
+### Arlo's Google skill: drafting and calendar through the service account; certify proves scopes are live (2026-09-23)
+
+- `examples/arlo/SKILLS/google` (0.2.0-sa) and `examples/arlo/bin/`: Arlo's installed skill could read and send Gmail and had no calendar at all. It now has `gmail_draft` (a real Gmail draft in arlo@, CC ajuarez@, signature, in-thread), `gmail_get`, `gcal_today`, `gcal_upcoming` (Denver day), and `gcal_schedule` (attendees get invites), all through the existing service account with no OAuth click. Every tool returns a clean `{ error }` with no side effects until the Workspace admin delegates `gmail.compose` and `calendar.events`. `arlo-gmail.py scopes` reports which scopes are delegated by minting a token per scope, nothing else.
+- `meridian certify` gains an `exec` probe (a command run in the agent home must print something matching `expect`) so a claim can prove a capability is live, not merely present in the tool list. Arlo's manifest adds `google.live.gmail`, `google.live.drafts`, `google.live.calendar`. `--only <id...>` runs a subset for zero-cost checks and is always reported as a partial run, never a certification.
+
 ### Release train with certification as the gate; texting rules from the golden set (2026-09-23)
 
 - `scripts/ops/release.sh <version>` runs the full gate, stages an immutable release on the VPS, builds it with the aterna node, starts a shadow gateway from that exact build, runs `meridian certify` against it, and writes `CERTIFIED` or `NOT-CERTIFIED` next to `RELEASE.json` and `CERTIFICATION.json`. `arlo-cutover.sh` now refuses a release without the `CERTIFIED` marker (`ALLOW_UNCERTIFIED=1` overrides on purpose, loudly).
