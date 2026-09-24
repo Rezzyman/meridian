@@ -53,6 +53,15 @@ VPS #2 (177.7.40.108), nothing production touched:
 - Bench hygiene: the bench home's `.env` uses Arlo's production ROUTEXOR key (same `...e1e38e`), not a dedicated bench key. Arlo's v0.1 google skill is restored on the bench (the v0.2 skeleton needs `meridian skills setup google`, an OAuth consent click, before it can run; see `skeleton/SKILLS/google/setup.md` and the headless OAuth playbook).
 - Next, in order, once Claude via ROUTEXOR is back: merge #51, restage rc.1 (`rsync` main to `/opt/meridian/releases/1.5.0-rc.1`, `pnpm install --frozen-lockfile && pnpm build` there), apply the trustedSources list to the bench config on Rez's yes, `/root/meridian-bench/start-meridian.sh`, rerun `meridian certify --gateway http://127.0.0.1:28889` from the bench home, and read the per-prompt golden detail. Then step 3 (golden tuning with Rez, Google v0.2 or shrink the claims), step 4 (release train with certify as the gate).
 
+### Later 09-23 (after Rez restored Anthropic credits at 18:35 Denver)
+
+- Outage cause confirmed: Anthropic prepaid credits. Rez added $40; that balance is shared by every Claude-backed ATERNA agent. Standing ask: do not burn it. Bench caps now `dailyUsd: 3`, `perTurnUsd: 0.10`. Two certify runs today cost $1.57 total.
+- Merged: #51 (trusted sources + golden per-prompt detail), #52 (`scripts/ops/release.sh` release train with certify as the gate; `arlo-cutover.sh` refuses a release without `CERTIFIED`; three texting rules). Main `c7e40be`.
+- First release-train run: `/opt/meridian/releases/1.5.0-rc.2` staged and built (RELEASE.json, CERTIFICATION.json, NOT-CERTIFIED). Card: every foundation, chat, tools.web/github/wearables, voice, automation row green; memory round trip 64 s; golden GREEN 10/12 (g05 at 910 of 900 chars, g06 at 536 of 400: still recaps the marital rough patch; g10 now 100 chars but still opens with CORTEX status before the person). NOT CERTIFIED only for: no operator channel attested (Telegram needs `--confirm telegram.operator` from Rez), tools.gmail and tools.calendar (v0.1 skill; Rez's Google decision).
+- Standing product thesis recorded in memory (`project_meridian_intelligence_ladder_thesis_2026-09-23`): the intelligence ladder lives in ROUTEXOR task profiles (`model: routexor/auto`, `task_profile`, `route`); Meridian only names the task class per request and owns the escalation hook. Build after the soak. At cutover: cheap tiers by config only.
+- Parked (memory `project_cortex_consolidation_monolith_todo`): one canonical CORTEX repo/version; not this week.
+- To certify rc.2 without another build: Rez says yes to Telegram attestation and decides Google; then rerun certify with `--confirm telegram.operator` (and `--confirm sms.operator` if he tests it) against the rc.2 shadow, or simply run `scripts/ops/release.sh 1.5.0-rc.3 --confirm telegram.operator` after dropping/keeping the Google claims in `examples/arlo/CAPABILITIES/manifest.yaml`.
+
 ## Next (Wednesday onward), in order
 
 1. Confirm the restore finished (`tail -3 /root/meridian-bench/restore.log`; expect `EXIT:0` and `memory_nodes` around 150k).
