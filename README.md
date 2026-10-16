@@ -1,3 +1,5 @@
+> **Archived, October 2026.** This repository is a frozen public snapshot. Meridian is now ATERNA's managed agent runtime, developed privately. Learn more at [aterna.ai/meridian](https://aterna.ai/meridian).
+
 <p align="center">
   <img src="assets/meridian-logo.svg" alt="MERIDIAN — the agent OS with memory you can give your life to" width="760">
 </p>
